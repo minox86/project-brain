@@ -9,6 +9,7 @@ from . import FORMAT_VERSION, __version__
 from .brain import Brain, find_brain
 from .errors import PbError
 from .resolve import resolve
+from .validate import validate
 
 
 class _Parser(argparse.ArgumentParser):
@@ -54,6 +55,11 @@ def _cmd_resolve(args):
     return {"candidates": resolve(_brain(args), args.name, args.type)}, 0
 
 
+def _cmd_validate(args):
+    result = validate(_brain(args), args.paths or None)
+    return result, 1 if result["errors"] else 0
+
+
 def build_parser():
     parser = _Parser(prog="pb", description="project-brain toolkit")
     parser.add_argument("--brain", help="path of the brain/ directory")
@@ -63,4 +69,7 @@ def build_parser():
     p.add_argument("name")
     p.add_argument("--type")
     p.set_defaults(handler=_cmd_resolve)
+    p = sub.add_parser("validate")
+    p.add_argument("paths", nargs="*")
+    p.set_defaults(handler=_cmd_validate)
     return parser

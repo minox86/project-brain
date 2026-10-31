@@ -123,10 +123,14 @@ def _cmd_routine(args):
     brain = _brain(args)
     if args.action == "discard":
         return gitops.routine_discard(brain), 0
+    if args.action == "cleanup":
+        if not args.worktree:
+            raise UsageError("pb routine cleanup needs --worktree")
+        return gitops.routine_cleanup(brain, args.worktree), 0
     if not args.branch:
         raise UsageError(f"pb routine {args.action} needs --branch")
     if args.action == "start":
-        return gitops.routine_start(brain, args.branch), 0
+        return gitops.routine_start(brain, args.branch, args.worktree), 0
     if not args.message:
         raise UsageError("pb routine finish needs -m MESSAGE")
     result = gitops.routine_finish(brain, args.branch, args.message)
@@ -194,8 +198,9 @@ def build_parser():
     p.add_argument("--include", nargs="+", help="extra repo paths to commit (e.g. CI workflows from init)")
     p.set_defaults(handler=_cmd_commit)
     p = sub.add_parser("routine")
-    p.add_argument("action", choices=["start", "finish", "discard"])
+    p.add_argument("action", choices=["start", "finish", "discard", "cleanup"])
     p.add_argument("--branch")
+    p.add_argument("--worktree", help="manual runs: work in a detached worktree at this path")
     p.add_argument("-m", "--message")
     p.set_defaults(handler=_cmd_routine)
     p = sub.add_parser("scan")

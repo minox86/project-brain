@@ -1,7 +1,7 @@
 ---
 name: routine-setup
 description: Configures the nightly routine that feeds the project brain from Microsoft Teams channels, Confluence spaces, Jira epics and merged GitHub PRs — picks channels, spaces and projects, the target branch the routine pushes to without PRs, writes the configuration and generates the cloud routine prompt. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion or routine.
-argument-hint: "[show]"
+argument-hint: "[show | schedule <frequency>]"
 ---
 
 # /pb:routine-setup — configure the nightly routine
@@ -9,6 +9,10 @@ argument-hint: "[show]"
 Arguments: `$ARGUMENTS`
 
 Read `BASE/../../references/conventions.md`. Repo mode only.
+
+**Connectors:** check those this run needs before starting (see **Connectors** in the conventions) and guide the user to connect what is missing. Setup needs Microsoft 365 (Teams), Atlassian (Confluence, Jira), `gh` and, to create the routine, the `schedule` skill. The routine itself runs with the connectors of the account that creates it: the same ones must be connected there.
+
+`schedule <frequency>`: change only how often the routine runs — go to **6. Schedule** with the given frequency, then update `routine.schedule` in `brain/schema/sources.md`, update the cloud routine (step 8, update instead of create) and commit. Stop there.
 
 `show`: print the current `routine`, `teams`, `confluence`, `jira`, `github` configuration from `brain/schema/sources.md` and the cursors (`PB state get teams|confluence|jira|github`), then stop.
 
@@ -40,13 +44,24 @@ The routine commits and pushes **directly, without a PR**, to one branch. Explai
 
 ## 6. Schedule
 
-Default `0 2 * * *` (02:00 every night, in the routine's timezone). Minimum interval for routines is one hour.
+Ask how often the routine should run, offering plain-language options and turning the answer into a cron expression (times in the routine's timezone):
+
+| Option | Cron |
+|---|---|
+| Every night at 02:00 (recommended) | `0 2 * * *` |
+| Every night, weekdays only | `0 2 * * 1-5` |
+| Three times a working day (08:00, 13:00, 18:00) | `0 8,13,18 * * 1-5` |
+| Every N hours (N ≥ 1) | `0 */N * * *` |
+| Once a week (Monday 06:00) | `0 6 * * 1` |
+| Custom | the user's cron |
+
+Routines run at most once an hour: the minute field must be a single number. `PB validate` rejects other schedules (`bad-schedule`). More frequent runs ingest sooner but cost more and often meet threads still being discussed, which are deferred anyway. For anything in between, `/pb:routine-run` starts a run on demand.
 
 ## 7. Write the configuration
 
 Edit the frontmatter of `brain/schema/sources.md`:
 
-    routine: {branch: <branch>, schedule: "<cron>", owner_role: Engineering Manager}
+    routine: {branch: <branch>, schedule: "<cron>", owner_role: Engineering Manager, trigger_id: <id, after step 8>}
     teams:
       - {id: <slug>, team: "<team name>", team_id: "<id>", channel: "<channel name>", channel_id: "<id>"}
     confluence:
@@ -61,8 +76,14 @@ Validate, then the closing flow (`PB commit -m "pb(routine-setup): configure nig
 
 ## 8. Create the routine
 
-Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo}}`, `{{channels}}`, `{{spaces}}`, `{{projects}}`. Then give the user the steps:
-1. In Claude Code run `/schedule` (or open claude.ai/code/routines) and create a routine on the monorepo `<repo>` with schedule `<cron>`.
+Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo}}`, `{{channels}}`, `{{spaces}}`, `{{projects}}`.
+
+**If you can manage routines here** (Claude Code with the `schedule` skill or the remote-trigger tool): create the routine yourself on the monorepo `<repo>`, with the rendered prompt, the schedule `<cron>` and the Microsoft 365 and Atlassian connectors. When `routine.trigger_id` already exists, update that routine instead of creating a new one. Relay the routine's link and next run time. Write the routine id to `routine.trigger_id` in `sources.md` and commit it (`PB commit -m "pb(routine-setup): record routine id"`).
+
+**Otherwise** give the user the steps:
+1. Run `/schedule` in Claude Code (or open claude.ai/code/routines) and create a routine on the monorepo `<repo>` with schedule `<cron>`.
 2. Paste the rendered prompt.
-3. Make sure the Microsoft 365 and Atlassian connectors are enabled for the routine and the `pb` plugin is installed for the account.
-4. Run it once now ("Run now") and check `brain/digests/<today>.md` on the target branch.
+3. Enable the Microsoft 365 and Atlassian connectors for the routine and make sure the `pb` plugin is installed for the account.
+4. Tell you the routine id, so it can be recorded in `routine.trigger_id`.
+
+Either way, finish with a first run: `/pb:routine-run`, then check `brain/digests/<today>.md` on the target branch.

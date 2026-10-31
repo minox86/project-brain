@@ -23,7 +23,7 @@ Never ask the user what you can find yourself.
 - Read the base preset: `BASE/../../presets/software-product/brain.md` and every file in `BASE/../../presets/software-product/types/`.
 - Read the root README and the READMEs of the main module candidates; skim a sample of ADRs and the first lines of each spec.
 - Infer: product name (README title, package name), domain vocabulary (recurring nouns), module boundaries (workspaces, deployables), whether UX decisions are likely (frontend apps present), glossary languages.
-- Only if the user names them: a Confluence space (Atlassian connector: pages tree) and Jira epics (JQL) to seed features and concepts.
+- Only if the user names them: a Confluence space (Atlassian connector: pages tree) and Jira epics (JQL) to seed features and concepts. If the Atlassian connector is missing, guide the user to connect it (see **Connectors** in the conventions) or skip the seeding.
 
 ## 2. Build the design tree
 

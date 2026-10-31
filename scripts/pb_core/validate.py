@@ -63,9 +63,29 @@ def validate(brain, paths=None):
         for hit in scan(text):
             report(errors, rel, "secret", f"line {hit['line']}: looks like a {hit['kind']} secret")
 
+    routine = brain.sources.get("routine")
+    if isinstance(routine, dict) and routine.get("schedule") is not None:
+        problem = schedule_problem(str(routine.get("schedule")))
+        if problem:
+            report(errors, "schema/sources.md", "bad-schedule", problem)
+
     errors.sort(key=lambda f: (f["path"], f["code"]))
     warnings.sort(key=lambda f: (f["path"], f["code"]))
     return {"errors": errors, "warnings": warnings}
+
+
+CRON_FIELD = re.compile(r"[0-9*,/-]+$")
+
+
+def schedule_problem(cron):
+    """Why a routine cron expression is unusable, or None. Routines run at most once an hour."""
+    fields = cron.split()
+    if len(fields) != 5 or not all(CRON_FIELD.match(f) for f in fields):
+        return f"'{cron}' is not a 5-field cron expression (minute hour day month weekday)"
+    minute = fields[0]
+    if not minute.isdigit() or int(minute) > 59:
+        return f"'{cron}' runs more than once an hour: the minute field must be one number (0-59)"
+    return None
 
 
 def _check_page(brain, p, error, warn):

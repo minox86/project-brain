@@ -27,7 +27,7 @@ Arguments: `$ARGUMENTS`
 | Figma | figma.com URL | Figma connector if available; otherwise ask the user for the relevant notes |
 | Web | other http(s) URL | WebFetch |
 
-If the tool you need is missing or fails, say so and stop for that source. Never rebuild content from memory.
+If the connector or tool for the input is missing, guide the user as **Connectors** in the conventions says before anything else, and offer to continue from pasted text or an exported file. Never rebuild content from memory.
 
 ## 2. Capture local files
 

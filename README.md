@@ -42,8 +42,9 @@ In the monorepo's GitHub settings, set **Actions → General → Workflow permis
 2. Run `/pb:routine-setup` and pick:
    - the Teams channels and Confluence spaces to read;
    - the Jira projects whose epics to follow;
-   - the branch the routine writes to.
-3. Follow the steps it prints to create the routine, then click **Run now**.
+   - the branch the routine writes to;
+   - how often it runs: every night (default), weekdays only, a few times a day, every N hours, once a week, or a custom schedule. At most once an hour.
+3. Claude creates the routine for you (or prints the steps to do it) and starts a first run.
 4. Check `brain/digests/<today>.md`: it lists what was added and what was skipped.
 
 ## Use
@@ -73,6 +74,8 @@ Once the brain and the routine are set up, nobody needs to run a command for the
 | Save a Teams meeting | `/pb:meeting last` |
 | Correct something wrong | `/pb:fix <what is wrong and what is right>` |
 | Clean up the brain | `/pb:lint --fix` |
+| Run the routine now, without waiting for the night | `/pb:routine-run` (add `--local` to run it here with your connectors, `--check` to only preview) |
+| Change how often the routine runs | `/pb:routine-setup schedule every 4 hours` |
 | Change the wiki structure | `/pb:schema` |
 
 Changes are committed on your current branch and go out with your PR.
@@ -86,15 +89,8 @@ Cowork only reads the brain. To add knowledge, write where you already do: analy
 
 ## Troubleshooting
 
+- **A connector is missing** (Atlassian, Microsoft 365, GitHub): the command tells you which one and how to connect it, and offers a workaround meanwhile. In Cowork, connectors live under **Customize → Connectors**; some may need an organization Owner to enable them.
 - **Cowork says the brain is not reachable**: connect GitHub with read access to the monorepo.
 - **Nothing was added overnight**: read "Problems" in the latest digest in `brain/digests/`.
 - **Wrong information**: a developer runs `/pb:fix`. Anyone else can report it in the Teams channel.
 - **After updating the plugin**: in the monorepo, ask Claude to run `pb toolkit-sync` and commit the result, so CI uses the new version.
-
-## Contributing
-
-Design notes are in [`docs/`](docs/). Run the tests with `python3 -m unittest discover -s tests`.
-
-## License
-
-[MIT](LICENSE)

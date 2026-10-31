@@ -63,9 +63,11 @@ def _remote_has(repo, branch):
     return _git(repo, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}", check=False).returncode == 0
 
 
-def routine_start(brain, branch):
+def routine_start(brain, branch, worktree=None):
     repo = _repo_root(brain)
     _git(repo, "fetch", "-q", "origin")
+    if worktree is not None:
+        return _start_in_worktree(brain, repo, branch, Path(worktree))
     if _remote_has(repo, branch):
         _git(repo, "checkout", "-q", "-B", branch, f"origin/{branch}")
         return {"branch": branch, "created": False}
@@ -73,6 +75,23 @@ def routine_start(brain, branch):
     start = f"origin/{base}" if _remote_has(repo, base) else "HEAD"
     _git(repo, "checkout", "-q", "-B", branch, start)
     return {"branch": branch, "created": True}
+
+
+def _start_in_worktree(brain, repo, branch, worktree):
+    """Manual runs: a detached worktree on the target branch, so the user's checkout is never touched."""
+    created = not _remote_has(repo, branch)
+    start = f"origin/{default_branch(repo) if created else branch}"
+    _git(repo, "worktree", "add", "-q", "--detach", str(worktree), start)
+    worktree = worktree.resolve()
+    return {"branch": branch, "created": created, "worktree": str(worktree),
+            "brain": str(worktree / _brain_prefix(brain, repo))}
+
+
+def routine_cleanup(brain, worktree):
+    repo = _repo_root(brain)
+    _git(repo, "worktree", "remove", "--force", str(worktree))
+    _git(repo, "worktree", "prune")
+    return {"removed": str(worktree)}
 
 
 def routine_finish(brain, branch, message):

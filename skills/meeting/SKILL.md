@@ -18,7 +18,7 @@ Microsoft 365 connector:
 - `today`: list today's ended meetings with time and title, and let the user pick one or more;
 - `<name>`: `outlook_calendar_search` by subject over the last 14 days; ask if ambiguous.
 
-If the connector is missing, stop and say so.
+If the Microsoft 365 connector is missing or not signed in, guide the user as **Connectors** in the conventions says before anything else. As a fallback offer to work from notes or a transcript the user pastes.
 
 ## 2. Read
 

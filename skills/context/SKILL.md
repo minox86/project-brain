@@ -8,11 +8,11 @@ argument-hint: "<JIRA-KEY | feature or epic title | paths…>"
 
 Arguments: `$ARGUMENTS`
 
-Read `BASE/../../references/conventions.md`. Works in repo mode and read mode.
+Read `BASE/../../references/conventions.md`. Works in repo mode and read mode. In Cowork without a GitHub connector that reads the monorepo, guide the user to connect it first (see **Connectors** in the conventions).
 
 ## Repo mode
 
-1. Choose the seed: a Jira key (`ABC-123`) → `--jira` (it matches epic pages and features listing the key; for a story or task, first find its parent epic with `getJiraIssue` and use that key if the issue itself matches nothing); existing file or folder paths → `--paths`; otherwise → `--feature` with a feature or epic title (resolve it with `PB resolve` first). No argument: use the files changed on the current branch (`git diff --name-only $(git merge-base HEAD origin/HEAD)`).
+1. Choose the seed: a Jira key (`ABC-123`) → `--jira` (it matches epic pages and features listing the key; for a story or task, first find its parent epic with `getJiraIssue` and use that key if the issue itself matches nothing; without the Atlassian connector, suggest connecting it or ask the user for the epic key); existing file or folder paths → `--paths`; otherwise → `--feature` with a feature or epic title (resolve it with `PB resolve` first). No argument: use the files changed on the current branch (`git diff --name-only $(git merge-base HEAD origin/HEAD)`).
 2. `PB context <seed>`.
 3. Empty result: say which seed found nothing; for paths, suggest creating or fixing the module's `paths` (`/pb:put` or `/pb:fix`).
 4. Present `markdown` as is, then one line listing pages included as summary only (`included: "summary"`), which can be read in full on request.

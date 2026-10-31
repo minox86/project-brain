@@ -24,7 +24,7 @@ Every `pb` skill reads this file before acting. BASE is the skill's base directo
 | `PB state suppress <source> "<claim>"` | Claim corrected by `/pb:fix` that sync must not re-ingest |
 | `PB correction --page P --wrong W --right R --evidence E` | Append to `brain/.pb/corrections.md` |
 | `PB commit -m MSG [--allow-default] [--include PATH…]` | Commit `brain/` changes (generated files excluded), plus any `--include` paths, on the current branch |
-| `PB routine start --branch B` / `PB routine finish --branch B -m MSG` / `PB routine discard` | Routine runs: checkout target branch; commit, rebase, push (no PR); drop the run's brain changes except digests |
+| `PB routine start --branch B [--worktree DIR]` / `PB routine finish --branch B -m MSG` / `PB routine discard` / `PB routine cleanup --worktree DIR` | Routine runs: checkout target branch (or, for manual local runs, a detached worktree that leaves the user's checkout alone); commit, rebase, push (no PR); drop the run's brain changes except digests; remove the worktree |
 | `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap |
 | `PB scaffold --product NAME [--repo DIR]` | Create `brain/`, CI workflows, CLAUDE.md pointer, vendored toolkit |
 | `PB generate` | CI only: index, glossary, context packs, backlinks, digest retention |
@@ -36,9 +36,35 @@ Run `PB version` first.
 
 - **Repo mode** — `brain` is a path: all skills available. You are in the monorepo (Claude Code).
 - **Read mode** — `brain` is `null` or Python is unavailable, but a GitHub connector or tool can read the monorepo: only `/pb:ask` and `/pb:context`. Read files from the default branch: `brain/index.md` first, then `brain/glossary.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
-- **Neither** — say that the brain is not reachable: open the monorepo in Claude Code, or connect GitHub with read access to the monorepo in Cowork.
+- **Neither** — the brain is not reachable. Guide the user as **Connectors** below says for the GitHub connector (Cowork), or tell them to open the monorepo in Claude Code.
 
-In read mode, write skills (`put`, `meeting`, `capture`, `fix`, `sync`, `lint`, `schema`, `init`, `routine-setup`) do not run. Reply: "The brain is read-only here. Knowledge reaches it through the Teams channels and Confluence spaces the nightly routine reads; a developer can also add it with `/pb:put` or fix it with `/pb:fix`."
+In read mode, write skills (`put`, `meeting`, `capture`, `fix`, `sync`, `lint`, `schema`, `init`, `routine-setup`, `routine-run`) do not run. Reply: "The brain is read-only here. Knowledge reaches it through the Teams channels and Confluence spaces the nightly routine reads; a developer can also add it with `/pb:put` or fix it with `/pb:fix`."
+
+## Connectors
+
+Many commands need a connector or a CLI. Check **before** starting the work, never halfway through: list what this run needs, see which tools are present, and resolve what is missing with the user first.
+
+| Need | Connector or tool | Tools that prove it is there | Used by |
+|---|---|---|---|
+| Teams channels, meetings | **Microsoft 365** connector | `teams_list_channel_messages`, `outlook_calendar_search` | `sync`, `meeting`, `routine-setup`, `routine-run --local` |
+| Confluence pages, Jira issues and epics | **Atlassian** connector | `getConfluencePage`, `searchJiraIssuesUsingJql` | `put`, `sync`, `routine-setup`, `routine-run --local`, `init` (seeding), `context` (parent epic) |
+| PRs and issues of the monorepo | **GitHub CLI** `gh`, logged in (Claude Code) | `gh auth status` succeeds | `put`, `sync`, `routine-setup` |
+| Reading the brain from Cowork | **GitHub** connector with read access to the monorepo | a GitHub file-read tool | `ask`, `context` in read mode |
+| Figma frames | **Figma** connector (optional) | Figma tools | `put` |
+| Creating and starting routines | Claude Code `schedule` skill or remote-trigger tool | the tool is listed | `routine-setup`, `routine-run` |
+
+When something is missing:
+1. **Say what and why** in one line: "To read the Confluence page I need the Atlassian connector, which isn't connected."
+2. **Connector present but not signed in** (only an `authenticate` tool is listed for it): start the sign-in with that tool and give the user the link it returns. Continue once they confirm.
+3. **Connector absent**: give the steps for where the user is.
+   - **Cowork or claude.ai**: **Customize → Connectors** (Settings → Connectors on claude.ai), find Atlassian / Microsoft 365 / GitHub / Figma, **Connect**, sign in with the work account. If it is not in the list or is locked, an organization Owner must enable it first: say so.
+   - **Claude Code**: connectors added on claude.ai are available to Claude Code when signed in with the same account. After connecting, run `/mcp` to check its status and sign in, then retry; a new session may be needed.
+   - **GitHub CLI**: suggest `! gh auth login` (the `!` runs it in this session), then `gh auth status`.
+   - **GitHub connector in Cowork**: grant access to the monorepo (an organization-owned repo may need approval from a GitHub org owner).
+4. **Offer a way forward now**, so the user is not blocked: paste the content, export the page to a file, or run the command in Claude Code instead of Cowork. Then wait for their choice.
+5. **Never invent content** for a source you could not read.
+
+The routine is not interactive: there, a missing connector skips that source, and the digest under "Problems" says which connector the routine's owner must connect and where (the steps above).
 
 ## Before writing
 

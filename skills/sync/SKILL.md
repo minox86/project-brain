@@ -17,7 +17,7 @@ Read `BASE/../../references/conventions.md`. Repo mode only.
 - `--digest`: write `brain/digests/YYYY-MM-DD.md` (always on when run by the routine).
 - Read `brain/schema/sources.md`. A source with no configuration is skipped with a note ("run `/pb:routine-setup`").
 - For each source read its state: `PB state get <source>`. `suppressed` lists claims corrected by `/pb:fix`: never re-ingest them.
-- Missing connector or tool for a source: skip it, record the reason, continue with the others.
+- Connectors: interactive run → check those the selected sources need before starting and guide the user to connect what is missing (see **Connectors** in the conventions); they may also choose to skip that source. Routine run → skip the source and write under "Problems" which connector the routine's owner must connect.
 
 ## 1. Teams (Microsoft 365 connector)
 

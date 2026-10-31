@@ -13,7 +13,7 @@ from .context import build_context
 from .generate import generate
 from .lint import lint
 from .stats import stats
-from . import state
+from . import gitops, state
 from .errors import PbError, UsageError
 from .resolve import resolve
 from .validate import validate
@@ -113,6 +113,20 @@ def _cmd_correction(args):
     return state.add_correction(_brain(args), args.page, args.wrong, args.right, args.evidence, _today(args)), 0
 
 
+def _cmd_commit(args):
+    return gitops.commit(_brain(args), args.message, args.allow_default), 0
+
+
+def _cmd_routine(args):
+    brain = _brain(args)
+    if args.action == "start":
+        return gitops.routine_start(brain, args.branch), 0
+    if not args.message:
+        raise UsageError("pb routine finish needs -m MESSAGE")
+    result = gitops.routine_finish(brain, args.branch, args.message)
+    return result, 1 if result["conflict"] else 0
+
+
 def _cmd_stats(args):
     return stats(_brain(args)), 0
 
@@ -148,6 +162,15 @@ def build_parser():
         p.add_argument(name, required=True)
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_correction)
+    p = sub.add_parser("commit")
+    p.add_argument("-m", "--message", required=True)
+    p.add_argument("--allow-default", action="store_true")
+    p.set_defaults(handler=_cmd_commit)
+    p = sub.add_parser("routine")
+    p.add_argument("action", choices=["start", "finish"])
+    p.add_argument("--branch", required=True)
+    p.add_argument("-m", "--message")
+    p.set_defaults(handler=_cmd_routine)
     p = sub.add_parser("lint")
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_lint)

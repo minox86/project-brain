@@ -1,6 +1,6 @@
 ---
 name: routine-setup
-description: Configures the nightly routine that feeds the project brain from Microsoft Teams channels, Confluence spaces, Jira epics and merged GitHub PRs — picks channels, spaces and projects, the target branch the routine pushes to without PRs, writes the configuration and generates the cloud routine prompt. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion or routine.
+description: Configures the nightly routine that feeds the project brain from Microsoft Teams channels and recurring meetings, Confluence spaces, Jira epics and merged GitHub PRs — picks channels, spaces and projects, the target branch the routine pushes to without PRs, writes the configuration and generates the cloud routine prompt. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion or routine.
 argument-hint: "[show | schedule <frequency>]"
 ---
 
@@ -14,7 +14,7 @@ Read `BASE/../../references/conventions.md`. Repo mode only.
 
 `schedule <frequency>`: change only how often the routine runs — go to **6. Schedule** with the given frequency, then update `routine.schedule` in `brain/schema/sources.md`, update the cloud routine (step 8, update instead of create) and commit. Stop there.
 
-`show`: print the current `routine`, `teams`, `confluence`, `jira`, `github` configuration from `brain/schema/sources.md` and the cursors (`PB state get teams|confluence|jira|github`), then stop.
+`show`: print the current `routine`, `teams`, `meetings`, `confluence`, `jira`, `github` configuration from `brain/schema/sources.md` and the cursors (`PB state get teams|meetings|confluence|jira|github`), then stop.
 
 ## 1. Owner
 
@@ -23,6 +23,16 @@ The routine is a Claude Code cloud routine that runs with the account of whoever
 ## 2. Teams channels
 
 With the Microsoft 365 connector: `teams_list_teams`, then `teams_list_channels` for the teams the user names. Show them numbered and let the user pick the channels where the team (developers, PMs, designers, analysts, QA) discusses the product. Check each one is readable (`teams_list_channel_messages` with a small page); drop and report the ones that fail.
+
+## 2b. Recurring meetings
+
+With the Microsoft 365 connector: `outlook_calendar_search` over the last 30 days (`query: "*"`, paginate). Keep Teams meetings that occur at least twice with the same subject and organizer, and show them numbered with their cadence (e.g. "Sprint refinement — weekly, Tue"). Let the user pick the ones where product decisions are taken (refinement, design review, demo, architecture review); one-to-ones and stand-ups usually fail the significance gate.
+
+For each pick, read the latest occurrence and check that its transcript is readable (`meetingTranscriptUrl` with `read_resource`). If it is not, tell the user what is needed:
+- **transcription on** for the series (the organizer can set "record and transcribe automatically" in the meeting options);
+- the **routine owner's account invited** to the series, since the routine reads with that account.
+
+Keep the series anyway if the user will fix it; the routine skips occurrences without a transcript and says so in the digest.
 
 ## 3. Confluence spaces
 
@@ -68,15 +78,17 @@ Edit the frontmatter of `brain/schema/sources.md`:
       - {id: <slug>, space: <KEY>, root_page: "<id or omit>"}
     jira:
       - {id: <slug>, project: <KEY>}
+    meetings:
+      - {id: <slug>, subject: "<series subject>", organizer: <organizer email>}
     github: {repo: <owner/name>}
 
-Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule, target branch, the list of channels, spaces and Jira projects, and "digests in `brain/digests/`".
+Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule, target branch, the list of channels, recurring meetings, spaces and Jira projects, and "digests in `brain/digests/`".
 
 Validate, then the closing flow (`PB commit -m "pb(routine-setup): configure nightly routine"`). The routine reads this configuration from the target branch: make sure the commit reaches it (merge the PR, or push to the target branch).
 
 ## 8. Create the routine
 
-Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo}}`, `{{channels}}`, `{{spaces}}`, `{{projects}}`.
+Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo}}`, `{{channels}}`, `{{spaces}}`, `{{projects}}`, `{{meetings}}`.
 
 **If you can manage routines here** (Claude Code with the `schedule` skill or the remote-trigger tool): create the routine yourself on the monorepo `<repo>`, with the rendered prompt, the schedule `<cron>` and the Microsoft 365 and Atlassian connectors. When `routine.trigger_id` already exists, update that routine instead of creating a new one. Relay the routine's link and next run time. Write the routine id to `routine.trigger_id` in `sources.md` and commit it (`PB commit -m "pb(routine-setup): record routine id"`).
 

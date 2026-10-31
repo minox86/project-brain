@@ -5,7 +5,7 @@ import tempfile
 
 from .errors import UsageError
 
-SOURCES = ("teams", "confluence", "github", "jira")
+SOURCES = ("teams", "confluence", "github", "jira", "meetings")
 CORRECTIONS_HEADER = "# Corrections\n\n| Date | Page | Wrong | Right | Evidence |\n|---|---|---|---|---|\n"
 
 

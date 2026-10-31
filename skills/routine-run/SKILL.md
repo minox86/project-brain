@@ -14,7 +14,7 @@ Read `BASE/../../references/conventions.md`. Repo mode only. Read `routine` from
 
 ## Choose how
 
-- `--check`: run `/pb:sync teams confluence github jira --check` here and report what would be ingested. Nothing is written, no cursor moves. Stop.
+- `--check`: run `/pb:sync teams confluence github jira meetings --check` here and report what would be ingested. Nothing is written, no cursor moves. Stop.
 - `status`: show the latest runs of the cloud routine (below, step 3 only). Stop.
 - `--local`, or no `routine.trigger_id`, or no way to manage routines here: **local run**.
 - Otherwise: **cloud run**.
@@ -32,7 +32,7 @@ Same routine, same account and connectors as the scheduled runs.
 The routine's steps, here, with the user's own Microsoft 365 and Atlassian connectors. Commits are attributed to the user and pushed to `routine.branch` without a PR. Say so and ask for confirmation first.
 
 1. Worktree outside the repo, so the user's checkout and uncommitted work are never touched: `PB routine start --branch <routine.branch> --worktree <tmp dir>`. From now on, run every `PB` command with `--brain <brain path from the result>`.
-2. Follow `/pb:sync teams confluence github jira --digest` against that brain, applying all of its rules. Use the configured sources and the cursors stored on the target branch.
+2. Follow `/pb:sync teams confluence github jira meetings --digest` against that brain, applying all of its rules. Use the configured sources and the cursors stored on the target branch.
 3. `PB validate` there: fix errors and retry at most twice; condense over-budget pages. If it still fails: `PB routine discard`, write the failure under "Problems" in today's digest, and do not move any cursor.
 4. `PB routine finish --branch <routine.branch> -m "pb(routine): manual sync <YYYY-MM-DD>"`. On `"conflict": true` nothing was pushed: report it and do not retry.
 5. Always finish with `PB routine cleanup --worktree <tmp dir>`.

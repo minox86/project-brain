@@ -33,6 +33,7 @@ Project Brain collects that context into `brain/`, a folder of plain Markdown pa
 ```mermaid
 flowchart LR
     T[Teams threads] --> R
+    M[Recurring meetings] --> R
     C[Confluence pages] --> R
     J[Jira epics] --> R
     P[Merged PRs] --> R
@@ -102,6 +103,7 @@ Once per product.
 
 1. Run **`/pb:routine-setup`** and pick:
    - the Teams channels and Confluence spaces to read;
+   - the recurring meetings to follow (refinement, design review, demo…): they need transcription on and the routine owner invited;
    - the Jira projects whose epics to follow;
    - the branch the routine writes to;
    - how often it runs: every night (default), weekdays only, a few times a day, every N hours, once a week, or a custom schedule. At most once an hour.
@@ -113,6 +115,7 @@ Once per product.
 Once the brain and the routine are set up, these happen without anyone running a command:
 
 - 🔄 **Teams, Confluence and Jira flow in on schedule.** The routine keeps only what is worth remembering (decisions, requirement clarifications, domain explanations, open questions). It never copies messages verbatim and writes a digest of what it added and skipped.
+- 🎙️ **Recurring meetings are captured.** After each refinement or design review, the routine reads the transcript and keeps the decisions and open questions. The transcript itself is never stored.
 - 🎯 **Epics stay in sync.** Discussions that mention a Jira epic key are filed under that epic. When the epic is done, what still matters moves to the feature and decision pages.
 - 🤖 **Every Claude session in the repo knows the brain**, even without the plugin. `CLAUDE.md` points to `brain/AGENTS.md`. Claude then:
   - uses the glossary terms;
@@ -134,7 +137,8 @@ Once the brain and the routine are set up, these happen without anyone running a
 | Ask something | `/pb:ask why do invoices have a single approver?` |
 | Save what you learned in this session | `/pb:capture` |
 | Add a document, Confluence page or Jira ticket | `/pb:put <file \| link \| jira:KEY \| text>` |
-| Save a Teams meeting | `/pb:meeting last` |
+| Save a one-off Teams meeting | `/pb:meeting last` |
+| Get a briefing for a role | `/pb:brief qa FIN-412` · `/pb:brief dev <feature>` |
 | Correct something wrong | `/pb:fix <what is wrong and what is right>` |
 | Clean up the brain | `/pb:lint --fix` |
 | Run the routine now | `/pb:routine-run` (`--local` to run it here, `--check` to preview) |
@@ -148,7 +152,11 @@ Changes are committed on your current branch and go out with your PR.
 | You want to… | Say it, or run |
 |---|---|
 | Ask something | `/pb:ask what is still open on multi-level approval?` |
-| Get a briefing | `/pb:context <feature, epic or Jira key>` |
+| Get the full context | `/pb:context <feature, epic or Jira key>` |
+| Test scenarios (QA) | `/pb:brief qa <feature or epic>` |
+| Release notes (PM) | `/pb:brief pm <epic>` |
+| UX constraints and open points (design) | `/pb:brief design <feature>` |
+| Get started on the product | `/pb:brief onboarding` |
 
 > [!TIP]
 > Cowork only reads the brain. To add knowledge, write where you already do: analyses on Confluence, discussions in the Teams channel. Mention the Jira epic key and the routine files the content under that epic.

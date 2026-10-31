@@ -1,7 +1,7 @@
 ---
 name: sync
-description: Incrementally ingests into the project brain what changed in the configured sources since the last run — Teams channel threads (triaged), new or modified Confluence pages, merged GitHub PRs touching known modules, Jira epics of the configured projects — using stored cursors, and writes a digest when run by the routine. Use when the user asks to sync or update the brain from Teams, Confluence, GitHub or Jira, to check what would be ingested, or when the nightly routine runs.
-argument-hint: "[teams] [confluence] [github] [jira] [--check] [--digest]"
+description: Incrementally ingests into the project brain what changed in the configured sources since the last run — Teams channel threads (triaged), new or modified Confluence pages, merged GitHub PRs touching known modules, Jira epics of the configured projects, transcripts of the configured recurring Teams meetings — using stored cursors, and writes a digest when run by the routine. Use when the user asks to sync or update the brain from Teams, Confluence, GitHub or Jira, to check what would be ingested, or when the nightly routine runs.
+argument-hint: "[teams] [confluence] [github] [jira] [meetings] [--check] [--digest]"
 ---
 
 # /pb:sync — incremental ingestion
@@ -12,7 +12,7 @@ Read `BASE/../../references/conventions.md`. Repo mode only.
 
 ## 0. Setup
 
-- Sources: the ones named in the arguments; none named → `teams confluence github jira`.
+- Sources: the ones named in the arguments; none named → `teams confluence github jira meetings`.
 - `--check`: report what would be ingested, write nothing, move no cursor.
 - `--digest`: write `brain/digests/YYYY-MM-DD.md` (always on when run by the routine).
 - Read `brain/schema/sources.md`. A source with no configuration is skipped with a note ("run `/pb:routine-setup`").
@@ -67,7 +67,17 @@ For each configured project (`jira:` entries):
 5. Only when `jira` is named explicitly: also features with `jira:` keys (`key in (…) AND updated > "<cursor>"`). Update only their summary and links; raise an `open-question` when Jira contradicts the brain.
 6. New cursor: the latest `updated` processed.
 
-## 5. Write, digest, cursors
+## 5. Meetings (recurring series, Microsoft 365 connector)
+
+For each configured series (`meetings:` entries):
+1. Cursor: `PB state get meetings <id>` → `{"cursor": "<ISO datetime>"}`: the end of the last occurrence processed. No cursor → last 7 days.
+2. `outlook_calendar_search` with `query: "<subject>"`, `organizer: "<organizer>"`, `afterDateTime: <cursor>`, `beforeDateTime: now`, `order: oldest`. Keep occurrences that have **ended** and whose subject matches; skip cancelled ones.
+3. For each occurrence, oldest first: `read_resource` on the event, then on its `meetingTranscriptUrl` verbatim, scoped to the occurrence with `start`/`end`. Read the meeting chat too when the event links it.
+4. No transcript yet: **defer** the occurrence if it ended less than 24 hours ago (transcripts can take time), and stop processing this series for this run. Otherwise skip it and record "no transcript: transcription may be off for this series, or the routine's account was not invited".
+5. Extract with the rules of `/pb:meeting` step 3 (`BASE/../meeting/SKILL.md`): decisions, open questions, epic scope and constraints, feature behaviour, concepts, module discoveries; drop status updates, scheduling, who-does-what. No raw transcript, no names. Cite `teams:meeting/<event id>`. Write without asking for confirmation.
+6. New cursor: the end time of the last occurrence fully processed (never past a deferred one).
+
+## 6. Write, digest, cursors
 
 1. Validate as in the closing flow (fix errors, condense over-budget pages).
 2. With `--digest`, write `brain/digests/YYYY-MM-DD.md` (no frontmatter):

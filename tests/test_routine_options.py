@@ -78,3 +78,19 @@ class LocalRunTest(GitRepoCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MeetingsSourceTest(unittest.TestCase):
+    def test_meetings_cursor_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_brain(tmp)
+            code, _, err = run_cli("state", "set", "meetings", "refinement", '{"cursor": "2026-10-30T16:00:00Z"}', cwd=repo)
+            self.assertEqual(code, 0, err)
+            code, data, _ = run_cli("state", "get", "meetings", "refinement", cwd=repo)
+            self.assertEqual(data["value"], {"cursor": "2026-10-30T16:00:00Z"})
+
+    def test_preset_and_routine_prompt_know_meetings(self):
+        from helpers import ROOT
+        self.assertIn("meetings: []", (ROOT / "presets/software-product/sources.md").read_text())
+        self.assertIn("/pb:sync teams confluence github jira meetings --digest",
+                      (ROOT / "templates/routine/prompt.md").read_text())

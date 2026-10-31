@@ -20,7 +20,7 @@ Every `pb` skill reads this file before acting. BASE is the skill's base directo
 | `PB context (--jira KEY \| --feature T \| --paths P…) [--max-words N]` | Context pack: pages + markdown (`--jira` matches epics and features; `--feature` takes any feature or epic title) |
 | `PB stats` | Pages and words per type/area, over-budget pages, largest pages |
 | `PB lint` | Structural findings (validate errors, budgets, duplicates, orphans, stale, archivable, dead module paths, superseded references) |
-| `PB state get <source> [key]` / `PB state set <source> <key> <json>` | Sync cursors (`teams`, `confluence`, `github`, `jira`) |
+| `PB state get <source> [key]` / `PB state set <source> <key> <json>` | Sync cursors (`teams`, `confluence`, `github`, `jira`, `meetings`) |
 | `PB state suppress <source> "<claim>"` | Claim corrected by `/pb:fix` that sync must not re-ingest |
 | `PB correction --page P --wrong W --right R --evidence E` | Append to `brain/.pb/corrections.md` |
 | `PB commit -m MSG [--allow-default] [--include PATH…]` | Commit `brain/` changes (generated files excluded), plus any `--include` paths, on the current branch |
@@ -35,7 +35,7 @@ Every `pb` skill reads this file before acting. BASE is the skill's base directo
 Run `PB version` first.
 
 - **Repo mode** — `brain` is a path: all skills available. You are in the monorepo (Claude Code).
-- **Read mode** — `brain` is `null` or Python is unavailable, but a GitHub connector or tool can read the monorepo: only `/pb:ask` and `/pb:context`. Read files from the default branch: `brain/index.md` first, then `brain/glossary.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
+- **Read mode** — `brain` is `null` or Python is unavailable, but a GitHub connector or tool can read the monorepo: only `/pb:ask`, `/pb:context` and `/pb:brief`. Read files from the default branch: `brain/index.md` first, then `brain/glossary.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
 - **Neither** — the brain is not reachable. Guide the user as **Connectors** below says for the GitHub connector (Cowork), or tell them to open the monorepo in Claude Code.
 
 In read mode, write skills (`put`, `meeting`, `capture`, `fix`, `sync`, `lint`, `schema`, `init`, `routine-setup`, `routine-run`) do not run. Reply: "The brain is read-only here. Knowledge reaches it through the Teams channels and Confluence spaces the nightly routine reads; a developer can also add it with `/pb:put` or fix it with `/pb:fix`."
@@ -46,7 +46,7 @@ Many commands need a connector or a CLI. Check **before** starting the work, nev
 
 | Need | Connector or tool | Tools that prove it is there | Used by |
 |---|---|---|---|
-| Teams channels, meetings | **Microsoft 365** connector | `teams_list_channel_messages`, `outlook_calendar_search` | `sync`, `meeting`, `routine-setup`, `routine-run --local` |
+| Teams channels, meetings and their transcripts | **Microsoft 365** connector | `teams_list_channel_messages`, `outlook_calendar_search`, `read_resource` | `sync`, `meeting`, `routine-setup`, `routine-run --local` |
 | Confluence pages, Jira issues and epics | **Atlassian** connector | `getConfluencePage`, `searchJiraIssuesUsingJql` | `put`, `sync`, `routine-setup`, `routine-run --local`, `init` (seeding), `context` (parent epic) |
 | PRs and issues of the monorepo | **GitHub CLI** `gh`, logged in (Claude Code) | `gh auth status` succeeds | `put`, `sync`, `routine-setup` |
 | Reading the brain from Cowork | **GitHub** connector with read access to the monorepo | a GitHub file-read tool | `ask`, `context` in read mode |

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from . import FORMAT_VERSION, __version__
 from .brain import Brain, find_brain
+from .context import build_context
 from .errors import PbError
 from .resolve import resolve
 from .validate import validate
@@ -60,6 +61,11 @@ def _cmd_validate(args):
     return result, 1 if result["errors"] else 0
 
 
+def _cmd_context(args):
+    return build_context(_brain(args), jira=args.jira, feature=args.feature,
+                         paths=args.paths, max_words=args.max_words), 0
+
+
 def build_parser():
     parser = _Parser(prog="pb", description="project-brain toolkit")
     parser.add_argument("--brain", help="path of the brain/ directory")
@@ -69,6 +75,13 @@ def build_parser():
     p.add_argument("name")
     p.add_argument("--type")
     p.set_defaults(handler=_cmd_resolve)
+    p = sub.add_parser("context")
+    seed = p.add_mutually_exclusive_group(required=True)
+    seed.add_argument("--jira")
+    seed.add_argument("--feature")
+    seed.add_argument("--paths", nargs="+")
+    p.add_argument("--max-words", type=int)
+    p.set_defaults(handler=_cmd_context)
     p = sub.add_parser("validate")
     p.add_argument("paths", nargs="*")
     p.set_defaults(handler=_cmd_validate)

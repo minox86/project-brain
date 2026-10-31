@@ -2,6 +2,8 @@
 
 A Claude plugin, for Claude Code and Claude Cowork, that keeps a **product brain** inside the product monorepo. `brain/` is a typed, linked Markdown wiki of functional concepts and features, epics in progress, technical modules and interfaces, decisions and open questions. It is fed by the team's Teams channels, Confluence spaces, Jira epics, merged PRs and developer sessions, and it is written for AI agents as much as for people.
 
+**New here? Start with [`QUICKSTART.md`](QUICKSTART.md).**
+
 Design: [`docs/specs/2026-10-31-project-brain-design.md`](docs/specs/2026-10-31-project-brain-design.md) · verification spikes: [`docs/spikes.md`](docs/spikes.md)
 
 ## How it works

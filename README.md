@@ -48,9 +48,23 @@ In the monorepo's GitHub settings, set **Actions → General → Workflow permis
 
 ## Use
 
+### What happens on its own
+
+Once the brain and the routine are set up, nobody needs to run a command for these:
+
+- **Teams, Confluence and Jira flow in every night.** The routine reads the configured channels and spaces, the Jira epics and the merged PRs. It keeps only what is worth remembering (decisions, requirement clarifications, domain explanations, open questions), never copies messages verbatim, and writes a digest of what it added and skipped in `brain/digests/`.
+- **Epics stay in sync.** Discussions that mention a Jira epic key are filed under that epic. When the epic is done in Jira, what still matters moves to the feature and decision pages and the epic shrinks to a short outcome.
+- **Every Claude session in the monorepo knows the brain.** `CLAUDE.md` points to `brain/AGENTS.md`, so Claude Code reads it without the plugin installed. It uses the glossary terms, starts from the context of the feature or epic you are working on, follows accepted decisions, and tells you when the code contradicts the brain. Other AI agents that read `AGENTS.md`-style instructions can use it the same way.
+- **The brain checks itself on every PR.** CI blocks brain changes with broken links, malformed pages or anything that looks like a password or token. PRs that touch only `brain/` merge on their own once the checks pass.
+- **Indexes stay fresh.** After every merge (and at least hourly) CI rebuilds the index, the bilingual glossary and a ready-made context pack for every feature and every active epic in `brain/context/`.
+- **Old items step aside.** Superseded decisions, answered questions and closed epics drop out of the index after a while; history stays in git.
+- **You don't need the slash commands.** Plain requests work: "what did we decide about approvals?", "save this decision in the brain", "give me the context for FIN-412". In Cowork, asking a product question is enough.
+
+### When you want to do something
+
 **In Claude Code (developers)**
 
-| You want to… | Run |
+| You want to… | Say it, or run |
 |---|---|
 | Get context before a ticket | `/pb:context FIN-412` (or a feature, an epic, or file paths) |
 | Ask something | `/pb:ask why do invoices have a single approver?` |
@@ -61,14 +75,14 @@ In the monorepo's GitHub settings, set **Actions → General → Workflow permis
 | Clean up the brain | `/pb:lint --fix` |
 | Change the wiki structure | `/pb:schema` |
 
+Changes are committed on your current branch and go out with your PR.
+
 **In Cowork (everyone)**
 
 - Ask: `/pb:ask what is still open on multi-level approval?`
 - Get a briefing: `/pb:context <feature, epic or Jira key>`
 
-Cowork only reads the brain. To add knowledge, write where you already do: analyses on Confluence, discussions in the Teams channel. Mention the Jira epic key, and the routine files the content under that epic.
-
-You can also ask in plain words, for example "save this decision in the brain".
+Cowork only reads the brain. To add knowledge, write where you already do: analyses on Confluence, discussions in the Teams channel. Mention the Jira epic key and the routine files the content under that epic.
 
 ## Troubleshooting
 

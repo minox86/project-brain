@@ -29,3 +29,42 @@ def run_cli(*argv, cwd=None):
     text = out.getvalue().strip()
     data = json.loads(text) if text.startswith("{") else None
     return code, data, err.getvalue()
+
+
+PRESET = ROOT / "presets" / "software-product"
+
+FOLDERS = {
+    "feature": "functional/features",
+    "concept": "functional/concepts",
+    "module": "technical/modules",
+    "interface": "technical/interfaces",
+    "environment": "technical/environments",
+    "decision": "decisions",
+    "open-question": "open-questions",
+}
+
+
+def page(type_, title, meta="", body="Body.\n"):
+    """(relative path, text) of a brain page of the given type."""
+    lines = [f"type: {type_}", f'title: "{title}"']
+    if meta.strip():
+        lines.append(meta.strip("\n"))
+    text = "---\n" + "\n".join(lines) + "\n---\n" + body
+    return f"{FOLDERS[type_]}/{title}.md", text
+
+
+def make_brain(tmp, files=None):
+    """Create <tmp>/brain with the software-product schema plus files. Returns the repo root."""
+    import shutil
+    repo = Path(tmp)
+    brain = repo / "brain"
+    shutil.copytree(str(PRESET), str(brain / "schema"))
+    for rel, text in (files or {}).items():
+        target = brain / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+    return repo
+
+
+def files_of(*pages):
+    return dict(pages)

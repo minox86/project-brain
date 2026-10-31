@@ -3,9 +3,12 @@ import argparse
 import json
 import sys
 import traceback
+from pathlib import Path
 
 from . import FORMAT_VERSION, __version__
+from .brain import Brain, find_brain
 from .errors import PbError
+from .resolve import resolve
 
 
 class _Parser(argparse.ArgumentParser):
@@ -38,8 +41,17 @@ def _emit(data):
     sys.stdout.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
 
+def _brain(args):
+    return Brain.locate(getattr(args, "brain", None))
+
+
 def _cmd_version(args):
-    return {"version": __version__, "format": FORMAT_VERSION, "brain": None}, 0
+    root = find_brain(Path.cwd(), args.brain)
+    return {"version": __version__, "format": FORMAT_VERSION, "brain": str(root) if root else None}, 0
+
+
+def _cmd_resolve(args):
+    return {"candidates": resolve(_brain(args), args.name, args.type)}, 0
 
 
 def build_parser():
@@ -47,4 +59,8 @@ def build_parser():
     parser.add_argument("--brain", help="path of the brain/ directory")
     sub = parser.add_subparsers(dest="command", parser_class=_Parser)
     sub.add_parser("version").set_defaults(handler=_cmd_version)
+    p = sub.add_parser("resolve")
+    p.add_argument("name")
+    p.add_argument("--type")
+    p.set_defaults(handler=_cmd_resolve)
     return parser

@@ -1,0 +1,37 @@
+name: pb-validate
+
+on:
+  pull_request:
+    paths: ["brain/**"]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate brain
+        run: python3 brain/.pb/toolkit/pb.py validate
+
+  automerge:
+    needs: validate
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-merge brain-only pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          files=$(gh pr diff --name-only "$PR")
+          if [ -n "$files" ] && ! echo "$files" | grep -qv '^brain/'; then
+            gh pr merge --auto --squash "$PR"
+          else
+            echo "PR touches files outside brain/: normal review flow"
+          fi

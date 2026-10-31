@@ -2,6 +2,7 @@
 import argparse
 import datetime
 import json
+import subprocess
 import json
 import sys
 import traceback
@@ -14,6 +15,8 @@ from .generate import generate
 from .lint import lint
 from .stats import stats
 from . import gitops, state
+from .scaffold import scaffold, sync_toolkit
+from .scan import scan
 from .errors import PbError, UsageError
 from .resolve import resolve
 from .validate import validate
@@ -127,6 +130,26 @@ def _cmd_routine(args):
     return result, 1 if result["conflict"] else 0
 
 
+def _repo_arg(args):
+    if args.repo:
+        return Path(args.repo)
+    proc = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    return Path(proc.stdout.strip()) if proc.returncode == 0 else Path.cwd()
+
+
+def _cmd_scan(args):
+    return scan(_repo_arg(args)), 0
+
+
+def _cmd_scaffold(args):
+    return scaffold(_repo_arg(args), args.product, args.preset), 0
+
+
+def _cmd_toolkit_sync(args):
+    brain = _brain(args)
+    return {"toolkit": str(sync_toolkit(brain.root)), "version": __version__}, 0
+
+
 def _cmd_stats(args):
     return stats(_brain(args)), 0
 
@@ -171,6 +194,15 @@ def build_parser():
     p.add_argument("--branch", required=True)
     p.add_argument("-m", "--message")
     p.set_defaults(handler=_cmd_routine)
+    p = sub.add_parser("scan")
+    p.add_argument("--repo")
+    p.set_defaults(handler=_cmd_scan)
+    p = sub.add_parser("scaffold")
+    p.add_argument("--repo")
+    p.add_argument("--product", required=True)
+    p.add_argument("--preset", default="software-product")
+    p.set_defaults(handler=_cmd_scaffold)
+    sub.add_parser("toolkit-sync").set_defaults(handler=_cmd_toolkit_sync)
     p = sub.add_parser("lint")
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_lint)

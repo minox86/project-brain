@@ -1,0 +1,88 @@
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from helpers import run_cli
+
+
+class ScaffoldTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.repo = Path(self.tmp.name)
+
+    def scaffold(self):
+        return run_cli("scaffold", "--repo", self.repo, "--product", "Fatture Pro")
+
+    def test_scaffold_creates_layout(self):
+        code, data, err = self.scaffold()
+        self.assertEqual(code, 0, err)
+        brain = self.repo / "brain"
+        for rel in ("schema/VERSION", "schema/types/decision.md", "schema/proposals.md", "functional/features/.gitkeep",
+                    "technical/environments/.gitkeep", "decisions/.gitkeep", "open-questions/.gitkeep",
+                    "digests/.gitkeep", "raw/.gitkeep", "README.md"):
+            self.assertTrue((brain / rel).exists(), rel)
+        self.assertIn("# Fatture Pro brain", (brain / "AGENTS.md").read_text())
+        self.assertIn("product: Fatture Pro", (brain / "schema/brain.md").read_text())
+        out = subprocess.run([sys.executable, str(brain / ".pb/toolkit/pb.py"), "version"], cwd=str(self.repo),
+                             capture_output=True, text=True)
+        self.assertEqual(json.loads(out.stdout)["brain"], str(brain.resolve()))
+        self.assertTrue((brain / ".pb/toolkit/VERSION").read_text().strip())
+        self.assertTrue((self.repo / ".github/workflows/pb-validate.yml").is_file())
+        generate = (self.repo / ".github/workflows/pb-generate.yml").read_text()
+        self.assertIn('branches: ["main"]', generate)
+        claude = (self.repo / "CLAUDE.md").read_text()
+        self.assertIn("<!-- pb:start -->\nFor product and domain context read brain/AGENTS.md.\n<!-- pb:end -->", claude)
+        self.assertIn("brain/.pb/cache/", (self.repo / ".gitignore").read_text())
+        self.assertIn("brain/AGENTS.md", data["created"])
+
+    def test_scaffold_refuses_existing_brain(self):
+        self.scaffold()
+        code, data, _ = self.scaffold()
+        self.assertEqual(code, 2)
+        self.assertIn("already", data["error"])
+
+    def test_scaffold_claude_md_idempotent_and_keeps_content(self):
+        (self.repo / "CLAUDE.md").write_text("# Repo rules\n")
+        (self.repo / ".github/workflows").mkdir(parents=True)
+        (self.repo / ".github/workflows/pb-validate.yml").write_text("custom\n")
+        code, data, _ = self.scaffold()
+        self.assertEqual(code, 0)
+        self.assertIn(".github/workflows/pb-validate.yml", data["skipped"])
+        self.assertEqual((self.repo / ".github/workflows/pb-validate.yml").read_text(), "custom\n")
+        text = (self.repo / "CLAUDE.md").read_text()
+        self.assertTrue(text.startswith("# Repo rules\n"))
+        from pb_core.scaffold import ensure_claude_pointer
+        ensure_claude_pointer(self.repo)
+        self.assertEqual((self.repo / "CLAUDE.md").read_text().count("<!-- pb:start -->"), 1)
+
+    def test_scaffolded_brain_validates_clean(self):
+        self.scaffold()
+        for cmd in ("validate", "generate", "stats", "lint"):
+            code, data, err = run_cli(cmd, cwd=self.repo)
+            self.assertEqual(code, 0, (cmd, data, err))
+        code, data, _ = run_cli("context", "--paths", "x", cwd=self.repo)
+        self.assertEqual((code, data["pages"]), (0, []))
+
+    def test_toolkit_sync_refreshes_vendored_copy(self):
+        self.scaffold()
+        vendored = self.repo / "brain/.pb/toolkit/pb_core/__init__.py"
+        vendored.write_text("stale")
+        code, _, _ = run_cli("toolkit-sync", cwd=self.repo)
+        self.assertEqual(code, 0)
+        self.assertIn("__version__", vendored.read_text())
+
+    def test_toolkit_sync_from_vendored_copy_refuses_and_keeps_toolkit(self):
+        self.scaffold()
+        vendored = self.repo / "brain/.pb/toolkit/pb.py"
+        out = subprocess.run([sys.executable, str(vendored), "toolkit-sync"], cwd=str(self.repo),
+                             capture_output=True, text=True)
+        self.assertEqual(out.returncode, 2)
+        self.assertTrue(vendored.is_file())
+
+
+if __name__ == "__main__":
+    unittest.main()

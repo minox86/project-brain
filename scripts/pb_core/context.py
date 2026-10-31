@@ -71,7 +71,7 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
             if other.type == "interface" and m.title in _link_titles(brain, other, ("provided_by", "consumed_by")):
                 add([other])
             if other.type == "feature" and m.title in _link_titles(brain, other, ("modules",)):
-                add([other])
+                add([other] + _targets(brain, other, "concepts"))
     hit = {p.title for p in collected.values()}
     for other in brain.pages():
         affects = set(_link_titles(brain, other, ("affects",)))

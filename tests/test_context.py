@@ -44,7 +44,7 @@ class ContextTest(unittest.TestCase):
         code, data, _ = run_cli("context", "--paths", "services/billing/api/handler.py", cwd=repo)
         self.assertEqual(code, 0)
         self.assertEqual(data["seeds"], ["Billing"])
-        self.assertEqual(titles(data), ["Approval limits", "Billing", "Billing API", "Invoice Approval",
+        self.assertEqual(titles(data), ["Approval limits", "Billing", "Billing API", "Invoice", "Invoice Approval",
                                         "Invoice Events", "Single approver"])
         md = data["markdown"]
         self.assertTrue(md.startswith("# Context: Billing"))

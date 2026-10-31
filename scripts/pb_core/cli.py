@@ -1,5 +1,6 @@
 """Command line interface: argument parsing, dispatch, JSON output, exit codes."""
 import argparse
+import datetime
 import json
 import sys
 import traceback
@@ -8,7 +9,9 @@ from pathlib import Path
 from . import FORMAT_VERSION, __version__
 from .brain import Brain, find_brain
 from .context import build_context
-from .errors import PbError
+from .generate import generate
+from .stats import stats
+from .errors import PbError, UsageError
 from .resolve import resolve
 from .validate import validate
 
@@ -66,6 +69,24 @@ def _cmd_context(args):
                          paths=args.paths, max_words=args.max_words), 0
 
 
+def _today(args):
+    value = getattr(args, "today", None)
+    if not value:
+        return datetime.date.today()
+    try:
+        return datetime.date.fromisoformat(value)
+    except ValueError:
+        raise UsageError("--today must be YYYY-MM-DD")
+
+
+def _cmd_generate(args):
+    return generate(_brain(args), _today(args)), 0
+
+
+def _cmd_stats(args):
+    return stats(_brain(args)), 0
+
+
 def build_parser():
     parser = _Parser(prog="pb", description="project-brain toolkit")
     parser.add_argument("--brain", help="path of the brain/ directory")
@@ -82,6 +103,10 @@ def build_parser():
     seed.add_argument("--paths", nargs="+")
     p.add_argument("--max-words", type=int)
     p.set_defaults(handler=_cmd_context)
+    p = sub.add_parser("generate")
+    p.add_argument("--today")
+    p.set_defaults(handler=_cmd_generate)
+    sub.add_parser("stats").set_defaults(handler=_cmd_stats)
     p = sub.add_parser("validate")
     p.add_argument("paths", nargs="*")
     p.set_defaults(handler=_cmd_validate)

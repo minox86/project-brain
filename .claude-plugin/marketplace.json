@@ -1,0 +1,12 @@
+{
+  "name": "project-brain",
+  "description": "Marketplace for the project-brain (pb) plugin.",
+  "owner": { "name": "Mattia Minotti" },
+  "plugins": [
+    {
+      "name": "pb",
+      "source": "./",
+      "description": "project-brain: product wiki in the monorepo for humans and AI agents."
+    }
+  ]
+}

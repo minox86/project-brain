@@ -8,7 +8,7 @@ argument-hint: "[show | propose | apply <Pn> | <change in plain words>]"
 
 Arguments: `$ARGUMENTS`
 
-Read `BASE/../../references/conventions.md`. Repo mode only.
+Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only.
 
 ## show (default)
 

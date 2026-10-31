@@ -8,7 +8,7 @@ argument-hint: "<what is wrong> [→ what is right] [evidence]"
 
 Arguments: `$ARGUMENTS`
 
-Read `BASE/../../references/conventions.md`. Repo mode only.
+Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only.
 
 ## 1. Understand the correction
 

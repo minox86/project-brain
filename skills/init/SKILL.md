@@ -10,7 +10,7 @@ Arguments: `$ARGUMENTS`
 
 ## 0. Preconditions
 
-1. Read `BASE/../../references/conventions.md`.
+1. Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`.
 2. `PB version`. If `brain` is not null, stop: "A brain already exists at <path>. Use `/pb:schema` to change it."
 3. You must be in a git repo (the monorepo): `git rev-parse --show-toplevel`. If not, stop and say so.
 4. If the current branch is the default branch, propose creating `pb/init` (`git switch -c pb/init`) before writing anything.
@@ -78,7 +78,7 @@ Ask: "Create all / choose by number / none". Apply the significance gate and the
 
 ## 7. Close
 
-Closing flow of the conventions, committing the files scaffold created outside `brain/` too: `PB commit -m "pb(init): create brain for <product>" --include CLAUDE.md .gitignore .github/workflows/pb-validate.yml .github/workflows/pb-generate.yml` (leave out workflows reported as `skipped`). Then explain the next steps:
+Closing flow of the writing conventions, committing the files scaffold created outside `brain/` too: `PB commit -m "pb(init): create brain for <product>" --include CLAUDE.md .gitignore .github/workflows/pb-validate.yml .github/workflows/pb-generate.yml` (leave out workflows reported as `skipped`). Then explain the next steps:
 - the brain travels with this branch's PR; once merged, CI keeps `index.md`, `glossary.md` and `context/` up to date;
 - enable auto-merge in the repo settings so brain-only PRs merge once `pb-validate` passes; `pb-generate` also runs hourly, because merges made by auto-merge do not trigger push workflows;
 - `/pb:routine-setup` to feed the brain nightly from Teams, Confluence and merged PRs;

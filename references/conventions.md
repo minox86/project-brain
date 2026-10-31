@@ -1,6 +1,6 @@
 # Shared conventions of the `pb` skills
 
-Every `pb` skill reads this file before acting. BASE is the skill's base directory, shown when the skill loads; the plugin root is `BASE/../..`.
+Every `pb` skill reads this file before acting. Skills that write to the brain also read `writing.md`, next to it. BASE is the skill's base directory, shown when the skill loads; the plugin root is `BASE/../..`.
 
 ## Toolkit
 
@@ -18,6 +18,7 @@ Every `pb` skill reads this file before acting. BASE is the skill's base directo
 | `PB validate [paths…]` | Check pages against the schema, secrets, budgets (warnings never fail) |
 | `PB resolve "<name>" [--type T]` | Candidate pages for a name (`title`, `alias`, `partial`, `fuzzy`) |
 | `PB context (--jira KEY \| --feature T \| --paths P…) [--max-words N]` | Context pack: pages + markdown (`--jira` matches epics and features; `--feature` takes any feature or epic title) |
+| `PB prs --since ISO [--repo owner/name]` | Merged PRs since the cursor that touch a module (via `gh`): only those reach you, with modules, matched files, diff size and description; plus the new `cursor` |
 | `PB stats` | Pages and words per type/area, over-budget pages, largest pages |
 | `PB lint` | Structural findings (validate errors, budgets, duplicates, orphans, stale, archivable, dead module paths, superseded references) |
 | `PB state get <source> [key]` / `PB state set <source> <key> <json>` | Sync cursors (`teams`, `confluence`, `github`, `jira`, `meetings`) |
@@ -66,10 +67,6 @@ When something is missing:
 
 The routine is not interactive: there, a missing connector skips that source, and the digest under "Problems" says which connector the routine's owner must connect and where (the steps above).
 
-## Before writing
-
-Read `brain/schema/brain.md`, the `brain/schema/types/<type>.md` files of every type you will write, and `brain/AGENTS.md`. The prose of each type is binding: when to create, when not to, body structure, word budget.
-
 ## Page format
 
 - File name = `title` + `.md`, in the type's `folder`. Titles are unique across the brain and cannot contain `\ / : * ? " < > | # ^ [ ]`.
@@ -81,63 +78,8 @@ Read `brain/schema/brain.md`, the `brain/schema/types/<type>.md` files of every 
 - Relevant claims cite their source inline `^[jira:FIN-412]`; the same references go in `sources`.
 - Never write a field you cannot infer with reasonable confidence: omit it.
 
-## Significance gate
+## Reading economy
 
-Content enters the brain only if it is:
-- **durable** — still true and useful in a month (not status updates, not who-is-doing-what-today);
-- **non-derivable** — not obvious from the code, the diff, Jira fields or the linked document itself;
-- **decision-relevant** — it changes how someone would build, test, design or explain the product.
-
-What fails the gate is dropped. When ingesting for the routine, list it in the digest as skipped with a short reason.
-
-## Writing rules
-
-- **Update before create**: run `PB resolve` for every entity; create a page only if no existing page covers it.
-- **Consolidate, don't append**: rewrite knowledge pages to stay a current, coherent description; no chronological logs, no "update of <date>" sections.
-- **Link, don't copy**: summarise external documents in a few lines and link them.
-- **One fact, one place**: a fact lives on its canonical page; other pages link to it.
-- **Feature or epic**: what will still be true after the work ends goes on feature, concept, module and decision pages; an `epic` page holds only what is specific to delivering that change (scope, constraints, risks, pointers to the discussion) and links the rest. A closed epic is consolidated, then shrinks to its outcome.
-- **Plain, dense prose**: no preambles, no restating the title, no filler; bullets over paragraphs.
-- **Budgets**: respect each type's `max_words`. An `over-budget` warning from validate means: condense that page before committing.
-- **Decisions are never rewritten** because things changed: create a new decision with `supersedes` and set the old one to `superseded`.
-- **Propagation**: a decision that changes stable knowledge also updates the affected feature/module/interface page and links to it.
-
-## Name resolution
-
-For every entity mentioned run `PB resolve "<name>"`:
-- a `title` or `alias` match is the page: use it;
-- one `partial` candidate and nothing else above 0.5: use it;
-- several candidates, or only `fuzzy`: ask the user one multiple-choice question including "new page"; then add the name used to the chosen page's `aliases`;
-- no candidate: a new entity; create it only if the type's prose allows, else write the name as plain text.
-
-## Authority and conflicts
-
-| Fact | Source of truth |
-|---|---|
-| Decisions, concepts, modules, interfaces, environments | The brain |
-| Requirement detail (PRD on Confluence, acceptance criteria on Jira) | The external source; the brain summarises and links |
-| Epic status and breakdown into stories | Jira; the `epic` page mirrors the status and keeps what was agreed around it |
-
-When a source contradicts the brain, never overwrite silently: create or update an `open-question` citing both sources and link it from the affected pages. Code that contradicts the brain goes through the `/pb:fix` flow.
-
-## Privacy
-
-- Never store Teams messages or meeting transcripts verbatim: synthesis only, with a permalink reference.
-- Uploaded files: only extracted text in `brain/raw/YYYY/MM/`; binaries stay outside the repo, recorded by link.
-- No judgements about people, no person names in decisions, no personal or customer personal data, no credentials. `PB validate` fails on secret-looking strings: remove them, never work around the check.
-
-## Closing flow (repo mode)
-
-Every writing operation ends like this:
-
-1. `PB validate <created or changed pages>`. Fix errors and repeat, at most twice. If errors remain, stop and report them; do not commit broken pages.
-2. Condense every page with an `over-budget` warning, then validate again.
-3. `PB commit -m "pb(<skill>): <one-line summary>"`. The commit stays on the current branch and travels with the developer's PR. Never push, never open PRs.
-4. If the commit fails with `code: on-default-branch`, ask: "You are on `<branch>`. Create a working branch (recommended) or commit here?" Create the branch with `git switch -c <name>` and rerun, or rerun with `--allow-default`.
-5. Summarise: pages created/updated (as `[[links]]`), open questions raised, anything dropped by the significance gate worth mentioning.
-
-The nightly routine uses its own closing flow (see `templates/routine/prompt.md`).
-
-## Schema signals
-
-When the schema does not fit (the same structure repeated in a generic type, a missing field, recurring `unknown-field` warnings), append a line to `brain/schema/proposals.md`: `- [ ] P<n> · <proposal>` with `n` = highest existing + 1. `/pb:schema` applies proposals.
+- **Don't re-read** what this session already holds: pages returned by `PB context`, pages you just wrote, the index after a search found the page.
+- Read the smallest thing that answers: a context pack before single pages, `PB resolve` before the index, one page before its neighbours.
+- Batch independent tool calls in one turn.

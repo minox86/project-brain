@@ -8,7 +8,7 @@ argument-hint: "[show | schedule <frequency>]"
 
 Arguments: `$ARGUMENTS`
 
-Read `BASE/../../references/conventions.md`. Repo mode only.
+Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only.
 
 **Connectors:** check those this run needs before starting (see **Connectors** in the conventions) and guide the user to connect what is missing. Setup needs Microsoft 365 (Teams), Atlassian (Confluence, Jira), `gh` and, to create the routine, the `schedule` skill. The routine itself runs with the connectors of the account that creates it: the same ones must be connected there.
 

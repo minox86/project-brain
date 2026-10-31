@@ -1,6 +1,6 @@
 # Study — token usage
 
-Status: analysis and proposals, not implemented. Date: 2026-10-31.
+Status: D1, T1, T2, T3 and T7 implemented on 2026-10-31 (`pb prs`, reader subagents, writing conventions split, edit and re-read rules). The rest is still a proposal.
 
 Questions:
 1. Which operations can run **without AI** at no loss of quality?

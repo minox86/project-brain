@@ -8,7 +8,7 @@ argument-hint: "[last | today | <teams link> | <meeting name>]"
 
 Arguments: `$ARGUMENTS`
 
-Read `BASE/../../references/conventions.md`. Repo mode only.
+Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only.
 
 Recurring meetings configured in `/pb:routine-setup` (the `meetings:` list in `brain/schema/sources.md`) are ingested by the routine after each occurrence: use this skill for one-off meetings, or to ingest an occurrence right away. If the meeting is an occurrence of a configured series, after writing, move that series' cursor past it (`PB state set meetings <id> …`) only if it is the oldest unprocessed one, so the routine does not ingest it twice.
 
@@ -24,7 +24,7 @@ If the Microsoft 365 connector is missing or not signed in, guide the user as **
 
 ## 2. Read
 
-Read the transcript and the meeting chat with `read_resource` (resources linked from the event). No transcript available: say so and offer to work from the user's notes instead (then use `/pb:put`).
+Read the transcript and the meeting chat with `read_resource` (resources linked from the event). With subagents available, dispatch one reader (`BASE/../../references/reader.md`, model `sonnet`) for the occurrence instead, and work from its findings: the transcript stays out of this session. No transcript available: say so and offer to work from the user's notes instead (then use `/pb:put`).
 
 ## 3. Extract
 

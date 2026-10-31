@@ -10,7 +10,7 @@ Arguments: `$ARGUMENTS`
 
 ## 0. Before starting
 
-1. Read `BASE/../../references/conventions.md`. Repo mode only (read mode: give the read-only reply).
+1. Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only (read mode: give the read-only reply).
 2. Read `brain/AGENTS.md`, `brain/schema/brain.md`; list types with `ls brain/schema/types`.
 3. Options: `--as <type>` fixes the main type; `--plan` forces showing the plan before writing.
 4. No input: ask "What do you want to put in the brain?".

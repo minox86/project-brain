@@ -8,7 +8,7 @@ argument-hint: "[--local] [--check] [status]"
 
 Arguments: `$ARGUMENTS`
 
-Read `BASE/../../references/conventions.md`. Repo mode only. Read `routine` from the frontmatter of `brain/schema/sources.md`: no `routine.branch` → stop and suggest `/pb:routine-setup`.
+Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only. Read `routine` from the frontmatter of `brain/schema/sources.md`: no `routine.branch` → stop and suggest `/pb:routine-setup`.
 
 **Connectors:** check those this run needs before starting (see **Connectors** in the conventions) and guide the user to connect what is missing. A local run needs Microsoft 365, Atlassian and `gh`; a cloud run needs the `schedule` skill or the remote-trigger tool, and otherwise the user can press **Run now** on the routine at claude.ai/code/routines.
 

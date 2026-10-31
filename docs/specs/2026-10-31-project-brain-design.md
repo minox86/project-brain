@@ -329,6 +329,12 @@ Explicit correction when someone finds wrong information in the brain. Input: wh
 | **Teams meetings** | Occurrences of the configured recurring series (refinement, design review…): transcript and chat, synthesised like `/pb:meeting`, never stored raw; occurrences without a transcript yet are deferred up to 24h | Per-series cursor (end of last processed occurrence) |
 | **Jira** | Epics of the configured projects: keeps `epic` pages aligned (status, goal) and closes them when done; features' Jira keys only on demand (`/pb:sync jira`) | `updated > cursor` per project |
 
+### Token economy
+
+- Raw content (Teams threads, Confluence pages, meeting transcripts) is read by **reader subagents** on a cheaper model (`references/reader.md`); they return complete findings with references, and the main session only resolves and writes. Raw text never enters the main context.
+- Merged PRs are filtered by the toolkit (`pb prs`, through `gh`): only PRs touching a module reach the model.
+- Read-only skills load only `references/conventions.md`; writing skills also load `references/writing.md`. Pages are changed with targeted edits, and nothing already in the session is read again.
+
 ### Teams triage
 
 1. Group messages by **thread**; never ingest single messages out of context.

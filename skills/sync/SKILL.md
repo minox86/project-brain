@@ -8,7 +8,7 @@ argument-hint: "[teams] [confluence] [github] [jira] [meetings] [--check] [--dig
 
 Arguments: `$ARGUMENTS`
 
-Read `BASE/../../references/conventions.md`. Repo mode only.
+Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only.
 
 ## 0. Setup
 
@@ -19,27 +19,34 @@ Read `BASE/../../references/conventions.md`. Repo mode only.
 - For each source read its state: `PB state get <source>`. `suppressed` lists claims corrected by `/pb:fix`: never re-ingest them.
 - Connectors: interactive run → check those the selected sources need before starting and guide the user to connect what is missing (see **Connectors** in the conventions); they may also choose to skip that source. Routine run → skip the source and write under "Problems" which connector the routine's owner must connect.
 
+## Readers: raw content stays out of this session
+
+Teams threads, Confluence pages and meeting transcripts are the bulk of what a sync reads. You do not read them yourself: **readers** do, and return findings (`BASE/../../references/reader.md`). You then resolve, decide and write from the findings alone.
+
+- **Subagents available** (the Agent tool): dispatch one reader per unit, all in one message so they run in parallel: one per Teams channel, one per Confluence space, one per meeting occurrence. Use the `sonnet` model unless this session already runs on it or on a smaller one. Each reader's prompt holds:
+  - the instruction to follow `BASE/../../references/reader.md`, with its absolute path;
+  - the unit: the tools to use, the ids, the cursor and, for Confluence, the stored `versions`;
+  - `suppressed` from the source's state;
+  - the active epics: title, aliases and `jira` key of each page in `brain/epics/` whose `status` is `active`.
+- **No subagents**: act as the reader yourself, one unit at a time, following the same brief, and keep only the findings.
+
+Readers never write. You keep the significance gate: findings marked `?` are yours to decide. `--check`: report the readers' verdicts and findings without writing.
+
 ## 1. Teams (Microsoft 365 connector)
 
 For each configured channel (`teams:` entries):
 1. Cursor: `PB state get teams <id>` → `{"cursor": "<ISO datetime>"}`; no cursor → last 7 days.
-2. `teams_list_channel_messages` for messages and replies after the cursor; page through all results.
-3. Group by **thread** (root message + replies). Never ingest a message out of its thread.
-4. **Defer** threads whose last reply is less than 24 hours old: they are still being discussed. The cursor must not move past the root of a deferred thread.
-5. **Triage** each complete thread:
-   - `knowledge` — a decision, a requirement clarification, a domain explanation, an incident learning, an open question → ingest;
-   - `signal` — relevant but not durable (progress, coordination) → digest only;
-   - `ignore` — noise → digest count only.
-6. Ingest `knowledge` threads like `/pb:put` (analyse → significance gate → resolve → write), routing by epic (see **Epic routing** below). Cite `teams:<team>/<channel>/<root message id>`; never store message text verbatim, never name people.
-7. New cursor: the latest message time fully processed (before any deferred thread).
+2. A reader reads the channel (`teams_list_channel_messages` after the cursor), groups threads, defers active ones and triages the rest.
+3. Ingest the `knowledge` findings like `/pb:put` (significance gate → resolve → write), routing by epic (see **Epic routing** below). Cite `teams:<team>/<channel>/<root message id>`; never name people. `signal` items go to the digest; `ignore` items are counted.
+4. New cursor: the reader's `CURSOR` (never past a deferred thread).
 
 ## 2. Confluence (Atlassian connector)
 
 For each configured space (`confluence:` entries):
 1. Cursor: `PB state get confluence <id>` → `{"cursor": "<YYYY-MM-DD HH:MM>", "versions": {"<pageId>": <version>}}`.
-2. `searchConfluenceUsingCql` with `space = "<SPACE>" AND type = page AND lastmodified > "<cursor>"` (add `AND ancestor = <root_page>` when configured); no cursor → last 30 days.
-3. For each page: skip it if its version equals the stored one; otherwise `getConfluencePage` and ingest like `/pb:put` — analyses and requirements are summarised and linked (the page stays authoritative on requirement detail); decisions, concepts and behaviour go into typed pages citing `confluence:<SPACE>/<pageId>`. Route by epic (below).
-4. Update `versions` and the cursor.
+2. A reader searches with `searchConfluenceUsingCql`: `space = "<SPACE>" AND type = page AND lastmodified > "<cursor>"` (add `AND ancestor = <root_page>` when configured); no cursor → last 30 days. It skips pages whose version equals the stored one before fetching them.
+3. Ingest the findings like `/pb:put`: analyses and requirements are summarised and linked (the page stays authoritative on requirement detail); decisions, concepts and behaviour go into typed pages citing `confluence:<SPACE>/<pageId>`. Route by epic (below).
+4. Update `versions` and the cursor from the reader's `VERSIONS` and `CURSOR`.
 
 ## Epic routing (Teams and Confluence)
 
@@ -51,11 +58,10 @@ Unknown epic key in a `knowledge` thread or page: `getJiraIssue`. If it is an Ep
 
 ## 3. GitHub (merged pull requests)
 
-1. Repo from `github.repo` in `sources.md`. Cursor: `PB state get github cursor` (ISO datetime); no cursor → last 7 days.
-2. `gh api "repos/<repo>/pulls?state=closed&sort=updated&direction=desc&per_page=100"`; keep PRs with `merged_at` after the cursor. (`gh pr …` is unavailable in cloud routines: use `gh api` only.)
-3. For each PR: `gh api repos/<repo>/pulls/<n>/files --paginate` → file paths → `PB context --paths <files…>`. No module matched → skip (count it in the digest).
-4. From title, description and diff summary keep only what passes the significance gate: technical decisions and their reasons, changed module responsibilities, new or changed interfaces, behaviour changes of features. Cite `gh:pr/<n>`.
-5. New cursor: the latest `merged_at` processed.
+1. Cursor: `PB state get github cursor` (ISO datetime); no cursor → 7 days ago.
+2. `PB prs --since <cursor>`. The toolkit reads the merged PRs through `gh`, matches their files against `module.paths` and returns only the PRs that touch a module: number, title, url, modules, matched files, diff size and description (`body_truncated` when cut). PRs touching no module are listed in `skipped`: count them in the digest. `code: gh-missing` or `gh-failed`: see **Connectors** in the conventions (in the routine, record it under "Problems").
+3. For each PR, keep from title and description only what passes the significance gate: technical decisions and their reasons, changed module responsibilities, new or changed interfaces, behaviour changes of features. Read more (`gh api repos/<repo>/pulls/<n>`, or the diff of `matched_files`) only when the description is truncated or too thin to tell. Cite `gh:pr/<n>`. `gh pr …` is unavailable in cloud routines: use `gh api` only.
+4. New cursor: the `cursor` returned by `PB prs`.
 
 ## 4. Jira (epics)
 
@@ -71,11 +77,10 @@ For each configured project (`jira:` entries):
 
 For each configured series (`meetings:` entries):
 1. Cursor: `PB state get meetings <id>` → `{"cursor": "<ISO datetime>"}`: the end of the last occurrence processed. No cursor → last 7 days.
-2. `outlook_calendar_search` with `query: "<subject>"`, `organizer: "<organizer>"`, `afterDateTime: <cursor>`, `beforeDateTime: now`, `order: oldest`. Keep occurrences that have **ended** and whose subject matches; skip cancelled ones.
-3. For each occurrence, oldest first: `read_resource` on the event, then on its `meetingTranscriptUrl` verbatim, scoped to the occurrence with `start`/`end`. Read the meeting chat too when the event links it.
-4. No transcript yet: **defer** the occurrence if it ended less than 24 hours ago (transcripts can take time), and stop processing this series for this run. Otherwise skip it and record "no transcript: transcription may be off for this series, or the routine's account was not invited".
-5. Extract with the rules of `/pb:meeting` step 3 (`BASE/../meeting/SKILL.md`): decisions, open questions, epic scope and constraints, feature behaviour, concepts, module discoveries; drop status updates, scheduling, who-does-what. No raw transcript, no names. Cite `teams:meeting/<event id>`. Write without asking for confirmation.
-6. New cursor: the end time of the last occurrence fully processed (never past a deferred one).
+2. `outlook_calendar_search` with `query: "<subject>"`, `organizer: "<organizer>"`, `afterDateTime: <cursor>`, `beforeDateTime: now`, `order: oldest`. Keep occurrences that have **ended** and whose subject matches; skip cancelled ones. This list is small: read it yourself.
+3. One reader per occurrence, oldest first: transcript (`meetingTranscriptUrl` from the event, verbatim, scoped to the occurrence with `start`/`end`) and meeting chat. A reader returning `deferred` (ended less than 24 hours ago, no transcript yet) stops this series for this run. `skipped` (no transcript after 24 hours) is recorded as "no transcript: transcription may be off for this series, or the routine's account was not invited".
+4. Write the findings without asking for confirmation, with the rules of `/pb:meeting` step 3 (`BASE/../meeting/SKILL.md`). Cite `teams:meeting/<event id>`.
+5. New cursor: the end time of the last occurrence fully processed (never past a deferred one).
 
 ## 6. Write, digest, cursors
 

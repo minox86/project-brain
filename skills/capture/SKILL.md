@@ -8,7 +8,7 @@ argument-hint: "[focus, optional]"
 
 Arguments: `$ARGUMENTS` (an optional focus, e.g. "only the retry decision")
 
-Read `BASE/../../references/conventions.md`. Repo mode only (Claude Code).
+Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only (Claude Code).
 
 ## 1. Re-read the session
 

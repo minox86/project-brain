@@ -8,7 +8,7 @@ argument-hint: "[--fix]"
 
 Arguments: `$ARGUMENTS`
 
-Read `BASE/../../references/conventions.md`. Repo mode only.
+Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only.
 
 1. `PB lint`. Report findings grouped by code, with counts, then the size summary from `stats` (pages, words, over budget, largest).
 2. Without `--fix`, stop here and suggest the most valuable fixes first: schema errors, over-budget pages, duplicates.

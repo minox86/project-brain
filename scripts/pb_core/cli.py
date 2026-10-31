@@ -17,6 +17,7 @@ from . import gitops, state
 from .scaffold import scaffold, sync_toolkit
 from .scan import scan
 from .errors import PbError, UsageError
+from .prs import merged_prs
 from .resolve import resolve
 from .validate import validate
 
@@ -62,6 +63,10 @@ def _cmd_version(args):
 
 def _cmd_resolve(args):
     return {"candidates": resolve(_brain(args), args.name, args.type)}, 0
+
+
+def _cmd_prs(args):
+    return merged_prs(_brain(args), args.since, args.repo), 0
 
 
 def _cmd_validate(args):
@@ -177,6 +182,10 @@ def build_parser():
     seed.add_argument("--paths", nargs="+")
     p.add_argument("--max-words", type=int)
     p.set_defaults(handler=_cmd_context)
+    p = sub.add_parser("prs")
+    p.add_argument("--since", required=True, help="ISO datetime cursor, e.g. 2026-10-30T02:00:00Z")
+    p.add_argument("--repo", help="owner/name; default: github.repo in sources.md")
+    p.set_defaults(handler=_cmd_prs)
     p = sub.add_parser("generate")
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_generate)

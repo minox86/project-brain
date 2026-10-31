@@ -11,7 +11,7 @@ Design: [`docs/specs/2026-10-31-project-brain-design.md`](docs/specs/2026-10-31-
 **Claude Code**
 
 ```
-/plugin marketplace add <org>/project-brain
+/plugin marketplace add minox86/project-brain
 /plugin install pb@project-brain
 ```
 

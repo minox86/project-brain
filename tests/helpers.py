@@ -40,6 +40,7 @@ FOLDERS = {
     "interface": "technical/interfaces",
     "environment": "technical/environments",
     "decision": "decisions",
+    "epic": "epics",
     "open-question": "open-questions",
 }
 

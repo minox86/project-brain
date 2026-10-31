@@ -30,13 +30,13 @@ Never ask the user what you can find yourself.
 The decisions that define the schema, each with the decisions that hang off it:
 
 - Product name.
-- For each preset type (`feature`, `concept`, `module`, `interface`, `environment`, `decision`, `open-question`): keep / extend / drop. `decision` and `open-question` are system types: they can be extended, never dropped.
+- For each preset type (`feature`, `epic`, `concept`, `module`, `interface`, `environment`, `decision`, `open-question`): keep / extend / drop. Keep `epic` when the team plans work in Jira epics; drop it otherwise. `decision` and `open-question` are system types: they can be extended, never dropped.
   - For kept types: extra fields, enum values (e.g. feature `status`, interface `kind`, environment `kind`), word budget (`max_words`), body sections.
 - Additional types the project needs (only with a clear recurring need: e.g. `persona`, `integration-partner`, `metric`), each with area, folder, fields, budget, prose.
 - Glossary languages (default `[en, it]`).
 - Module map: which scan candidates are modules, their names, their `paths`, groupings.
 - Thresholds in `brain.md` (archive, stale open questions, digest retention, context pack cap, raw cap).
-- Sources to register now or later via `/pb:routine-setup` (Teams channels, Confluence spaces).
+- Sources to register now or later via `/pb:routine-setup` (Teams channels, Confluence spaces, Jira projects whose epics the brain follows).
 - Bootstrap scope: which modules, specs and ADRs to turn into pages now.
 
 ## 3. Grill in rounds
@@ -72,7 +72,7 @@ Propose, as one numbered list, the initial pages:
 - one `module` per confirmed module, with `paths` and a 2–4 line `## Responsibility` drawn from its README/manifest;
 - one `interface` per spec worth a page (`spec_path` set, `provided_by` the owning module);
 - one `decision` (`area: technical`, `status: accepted`) per existing ADR, summarised and linked to the ADR file — never copied;
-- optionally `feature` and `concept` pages from the Confluence space / Jira epics the user named.
+- optionally `feature` and `concept` pages from the Confluence space the user named, and `epic` pages for the active Jira epics that are discussed beyond their ticket.
 
 Ask: "Create all / choose by number / none". Apply the significance gate and the writing rules; prefer fewer, accurate pages.
 

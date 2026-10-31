@@ -1,6 +1,6 @@
 ---
 name: routine-setup
-description: Configures the nightly routine that feeds the project brain from Microsoft Teams channels, Confluence spaces and merged GitHub PRs — picks channels and spaces, the target branch the routine pushes to without PRs, writes the configuration and generates the cloud routine prompt. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion or routine.
+description: Configures the nightly routine that feeds the project brain from Microsoft Teams channels, Confluence spaces, Jira epics and merged GitHub PRs — picks channels, spaces and projects, the target branch the routine pushes to without PRs, writes the configuration and generates the cloud routine prompt. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion or routine.
 argument-hint: "[show]"
 ---
 
@@ -10,7 +10,7 @@ Arguments: `$ARGUMENTS`
 
 Read `BASE/../../references/conventions.md`. Repo mode only.
 
-`show`: print the current `routine`, `teams`, `confluence`, `github` configuration from `brain/schema/sources.md` and the cursors (`PB state get teams|confluence|github`), then stop.
+`show`: print the current `routine`, `teams`, `confluence`, `jira`, `github` configuration from `brain/schema/sources.md` and the cursors (`PB state get teams|confluence|jira|github`), then stop.
 
 ## 1. Owner
 
@@ -23,6 +23,10 @@ With the Microsoft 365 connector: `teams_list_teams`, then `teams_list_channels`
 ## 3. Confluence spaces
 
 With the Atlassian connector: `getConfluenceSpaces`. Let the user pick the spaces where analyses and requirements are written, optionally restricted to a page tree (root page id). Check read access with one CQL search per space.
+
+## 3b. Jira projects
+
+With the Atlassian connector: `getVisibleJiraProjects`. Let the user pick the projects whose epics the brain should follow: the routine keeps their `epic` pages aligned with Jira and closes them when the epic is done. Check read access with one JQL search per project (`project = <KEY> AND issuetype = Epic`).
 
 ## 4. GitHub repo
 
@@ -47,15 +51,17 @@ Edit the frontmatter of `brain/schema/sources.md`:
       - {id: <slug>, team: "<team name>", team_id: "<id>", channel: "<channel name>", channel_id: "<id>"}
     confluence:
       - {id: <slug>, space: <KEY>, root_page: "<id or omit>"}
+    jira:
+      - {id: <slug>, project: <KEY>}
     github: {repo: <owner/name>}
 
-Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule, target branch, the list of channels and spaces, and "digests in `brain/digests/`".
+Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule, target branch, the list of channels, spaces and Jira projects, and "digests in `brain/digests/`".
 
 Validate, then the closing flow (`PB commit -m "pb(routine-setup): configure nightly routine"`). The routine reads this configuration from the target branch: make sure the commit reaches it (merge the PR, or push to the target branch).
 
 ## 8. Create the routine
 
-Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo}}`, `{{channels}}`, `{{spaces}}`. Then give the user the steps:
+Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo}}`, `{{channels}}`, `{{spaces}}`, `{{projects}}`. Then give the user the steps:
 1. In Claude Code run `/schedule` (or open claude.ai/code/routines) and create a routine on the monorepo `<repo>` with schedule `<cron>`.
 2. Paste the rendered prompt.
 3. Make sure the Microsoft 365 and Atlassian connectors are enabled for the routine and the `pb` plugin is installed for the account.

@@ -17,7 +17,7 @@ Every `pb` skill reads this file before acting. BASE is the skill's base directo
 | `PB version` | `brain` is the brain path, or `null` outside a brain |
 | `PB validate [paths…]` | Check pages against the schema, secrets, budgets (warnings never fail) |
 | `PB resolve "<name>" [--type T]` | Candidate pages for a name (`title`, `alias`, `partial`, `fuzzy`) |
-| `PB context (--jira KEY \| --feature T \| --paths P…) [--max-words N]` | Context pack: pages + markdown |
+| `PB context (--jira KEY \| --feature T \| --paths P…) [--max-words N]` | Context pack: pages + markdown (`--jira` matches epics and features; `--feature` takes any feature or epic title) |
 | `PB stats` | Pages and words per type/area, over-budget pages, largest pages |
 | `PB lint` | Structural findings (validate errors, budgets, duplicates, orphans, stale, archivable, dead module paths, superseded references) |
 | `PB state get <source> [key]` / `PB state set <source> <key> <json>` | Sync cursors (`teams`, `confluence`, `github`, `jira`) |
@@ -35,7 +35,7 @@ Every `pb` skill reads this file before acting. BASE is the skill's base directo
 Run `PB version` first.
 
 - **Repo mode** — `brain` is a path: all skills available. You are in the monorepo (Claude Code).
-- **Read mode** — `brain` is `null` or Python is unavailable, but a GitHub connector or tool can read the monorepo: only `/pb:ask` and `/pb:context`. Read files from the default branch: `brain/index.md` first, then `brain/glossary.md`, `brain/context/<feature>.md`, and the pages they link. Never try to write.
+- **Read mode** — `brain` is `null` or Python is unavailable, but a GitHub connector or tool can read the monorepo: only `/pb:ask` and `/pb:context`. Read files from the default branch: `brain/index.md` first, then `brain/glossary.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
 - **Neither** — say that the brain is not reachable: open the monorepo in Claude Code, or connect GitHub with read access to the monorepo in Cowork.
 
 In read mode, write skills (`put`, `meeting`, `capture`, `fix`, `sync`, `lint`, `schema`, `init`, `routine-setup`) do not run. Reply: "The brain is read-only here. Knowledge reaches it through the Teams channels and Confluence spaces the nightly routine reads; a developer can also add it with `/pb:put` or fix it with `/pb:fix`."
@@ -70,6 +70,7 @@ What fails the gate is dropped. When ingesting for the routine, list it in the d
 - **Consolidate, don't append**: rewrite knowledge pages to stay a current, coherent description; no chronological logs, no "update of <date>" sections.
 - **Link, don't copy**: summarise external documents in a few lines and link them.
 - **One fact, one place**: a fact lives on its canonical page; other pages link to it.
+- **Feature or epic**: what will still be true after the work ends goes on feature, concept, module and decision pages; an `epic` page holds only what is specific to delivering that change (scope, constraints, risks, pointers to the discussion) and links the rest. A closed epic is consolidated, then shrinks to its outcome.
 - **Plain, dense prose**: no preambles, no restating the title, no filler; bullets over paragraphs.
 - **Budgets**: respect each type's `max_words`. An `over-budget` warning from validate means: condense that page before committing.
 - **Decisions are never rewritten** because things changed: create a new decision with `supersedes` and set the old one to `superseded`.
@@ -89,6 +90,7 @@ For every entity mentioned run `PB resolve "<name>"`:
 |---|---|
 | Decisions, concepts, modules, interfaces, environments | The brain |
 | Requirement detail (PRD on Confluence, acceptance criteria on Jira) | The external source; the brain summarises and links |
+| Epic status and breakdown into stories | Jira; the `epic` page mirrors the status and keeps what was agreed around it |
 
 When a source contradicts the brain, never overwrite silently: create or update an `open-question` citing both sources and link it from the affected pages. Code that contradicts the brain goes through the `/pb:fix` flow.
 

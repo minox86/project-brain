@@ -1,6 +1,6 @@
 ---
 name: put
-description: Feeds the project brain with content — pasted text or notes, local files (PDF, docx, markdown), Confluence pages, Jira issues or JQL, GitHub PRs or issues, Figma links, web pages — extracting features, concepts, modules, interfaces, decisions and open questions and updating the right pages. Use when the user says to add, ingest, import or save something into the brain, or shares knowledge to remember ("we decided that…", "the billing service actually…").
+description: Feeds the project brain with content — pasted text or notes, local files (PDF, docx, markdown), Confluence pages, Jira issues or JQL, GitHub PRs or issues, Figma links, web pages — extracting features, epics, concepts, modules, interfaces, decisions and open questions and updating the right pages. Use when the user says to add, ingest, import or save something into the brain, or shares knowledge to remember ("we decided that…", "the billing service actually…").
 argument-hint: "<text | file | confluence:… | jira:… | gh:pr/N | url> [--as <type>] [--plan]"
 ---
 
@@ -22,7 +22,7 @@ Arguments: `$ARGUMENTS`
 | Free text | anything that is not a reference | as is |
 | Local file or folder | the path exists | Read (PDF via Read); a folder is a batch, one file at a time |
 | Confluence | `…atlassian.net/wiki/…` URL or `confluence:<SPACE>/<id>` | Atlassian connector: `getConfluencePage` |
-| Jira | `jira:<KEY>`, or `jira: <JQL>` (batch) | `getJiraIssue` / `searchJiraIssuesUsingJql` |
+| Jira | `jira:<KEY>`, or `jira: <JQL>` (batch) | `getJiraIssue` / `searchJiraIssuesUsingJql`; an Epic becomes an `epic` page |
 | GitHub | `gh:pr/<n>`, `gh:issue/<n>`, or a github.com URL | `gh api repos/{owner}/{repo}/pulls/<n>` (+ `/files`), `…/issues/<n>` |
 | Figma | figma.com URL | Figma connector if available; otherwise ask the user for the relevant notes |
 | Web | other http(s) URL | WebFetch |
@@ -50,7 +50,7 @@ For a local file (not for external sources, not for pasted text):
 
 ## 3. Analyse
 
-1. Extract candidate knowledge: features and their expected behaviour, domain concepts (with the Italian term if used), modules and interfaces and their non-obvious behaviour, decisions (with options and reasons), open questions, contradictions with what the brain says.
+1. Extract candidate knowledge: features and their expected behaviour, scope agreements, constraints and risks of an epic in progress (on its `epic` page; what stays true after delivery goes on features and decisions), domain concepts (with the Italian term if used), modules and interfaces and their non-obvious behaviour, decisions (with options and reasons), open questions, contradictions with what the brain says.
 2. Apply the **significance gate** to each item. Drop what fails it.
 3. Resolve every entity with `PB resolve`; prefer updating existing pages.
 4. For external requirement detail (PRD, acceptance criteria) keep only a short summary and the link: the source stays authoritative.

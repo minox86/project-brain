@@ -28,7 +28,7 @@ Ignore generated files (`index.md`, `glossary.md`, `context/`): CI rebuilds them
 - **Misrecorded** — the brain never matched reality: correct in place.
 - **Outdated** — it was true and changed:
   - a `decision` is never rewritten: create a new decision with `supersedes: "[[Old]]"`, set the old one to `status: superseded`, update `affects` pages to link the new one;
-  - knowledge pages (feature, concept, module, interface, environment): update the content.
+  - knowledge pages (feature, epic, concept, module, interface, environment): update the content.
 - **Contested** — the evidence conflicts with an external source of truth (Confluence PRD, Jira acceptance criteria): do not pick a side; create an `open-question` citing both and link it from the affected pages.
 
 ## 4. Trace the origin

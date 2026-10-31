@@ -1,6 +1,6 @@
 # project-brain (`pb`)
 
-A Claude plugin, for Claude Code and Claude Cowork, that keeps a **product brain** inside the product monorepo. `brain/` is a typed, linked Markdown wiki of functional concepts and features, technical modules and interfaces, decisions and open questions. It is fed by the team's Teams channels, Confluence spaces, merged PRs and developer sessions, and it is written for AI agents as much as for people.
+A Claude plugin, for Claude Code and Claude Cowork, that keeps a **product brain** inside the product monorepo. `brain/` is a typed, linked Markdown wiki of functional concepts and features, epics in progress, technical modules and interfaces, decisions and open questions. It is fed by the team's Teams channels, Confluence spaces, Jira epics, merged PRs and developer sessions, and it is written for AI agents as much as for people.
 
 Design: [`docs/specs/2026-10-31-project-brain-design.md`](docs/specs/2026-10-31-project-brain-design.md) · verification spikes: [`docs/spikes.md`](docs/spikes.md)
 
@@ -33,7 +33,7 @@ Design: [`docs/specs/2026-10-31-project-brain-design.md`](docs/specs/2026-10-31-
 | `/pb:fix <what is wrong>` | repo | Correct wrong information everywhere it appears, and log the correction |
 | `/pb:sync [sources] [--check]` | repo | Incremental ingestion from Teams, Confluence, GitHub, Jira |
 | `/pb:ask <question>` | repo + read | Answers with citations |
-| `/pb:context <jira\|feature\|paths>` | repo + read | Context pack for an agent or a person |
+| `/pb:context <jira\|feature\|epic\|paths>` | repo + read | Context pack for an agent or a person |
 | `/pb:lint [--fix]` | repo | Maintenance: budgets, duplicates, orphans, stale and dead items |
 | `/pb:schema [action]` | repo | Evolve the schema |
 | `/pb:routine-setup` | repo | Configure the nightly routine |

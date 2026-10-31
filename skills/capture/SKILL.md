@@ -21,6 +21,7 @@ Keep only items that pass the **significance gate**:
 - **discoveries** about how modules and interfaces actually behave (invariants, gotchas, implicit contracts) that the code does not make obvious;
 - **domain concepts** introduced or clarified;
 - **open questions** left unresolved;
+- **epic context**: when the branch name or the session names an active epic, constraints and scope clarifications that matter only until it ships go on its `epic` page;
 - **wrong brain content** discovered during the session → handle it with the `/pb:fix` flow (step 4 of that skill onwards), in the same run.
 
 Discard: debugging steps, dead ends without a lesson, anything the diff already shows, task status, temporary workarounds that will not survive the PR.

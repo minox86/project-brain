@@ -33,7 +33,8 @@ It follows the **LLM Wiki** pattern: raw inputs (documents, threads, pages, PRs,
 | People | No `person` pages, no names in decisions |
 | Tasks | Not in the wiki; Jira is the source of truth |
 | Conflicts | Wiki wins on decisions/concepts/modules/interfaces; external sources win on requirement detail; contradictions always become an `open-question` |
-| Periodic ingestion | Nightly Claude Code cloud routine created by the Engineering Manager: Teams channels + Confluence spaces + merged PRs |
+| Periodic ingestion | Nightly Claude Code cloud routine created by the Engineering Manager: Teams channels + Confluence spaces + Jira epics + merged PRs |
+| Epics | Dedicated `epic` type next to `feature`: the epic page collects what was agreed around a Jira epic in progress; lasting content goes on features/decisions; closed and consolidated when the Jira epic is done |
 | Toolkit | Python 3.9+, standard library only, under `scripts/` |
 | Distribution | Marketplace in a company GitHub org repo, synced by the org admin into Cowork |
 | Session capture | Manual skill `/pb:capture`, triggered by the dev on the current session; no hooks in the MVP |
@@ -95,11 +96,12 @@ No `bin/` directory (it blocks Cowork and org distribution). Skills invoke `pyth
     │   ├── modules/
     │   ├── interfaces/
     │   └── environments/
+    ├── epics/                   # Jira epics in progress: agreed scope, constraints, discussion
     ├── decisions/
     ├── open-questions/
     ├── digests/                 # one per routine run: what was ingested/skipped and why
     ├── raw/YYYY/MM/             # extracted text of uploaded files, immutable
-    ├── context/                 # GENERATED: per-feature context packs
+    ├── context/                 # GENERATED: context packs per feature and per active epic
     ├── index.md                 # GENERATED: one line per page
     ├── glossary.md              # GENERATED: from concepts, bilingual
     └── .pb/
@@ -143,13 +145,13 @@ Generated files (`index.md`, `glossary.md`, `context/`, `.pb/backlinks.json`) ar
 
 ### 3.1 Areas
 
-The brain is split into a **functional** knowledge base and a **technical** one, plus cross-cutting **decisions** and **open questions**.
+The brain is split into a **functional** knowledge base and a **technical** one, plus cross-cutting **epics**, **decisions** and **open questions**.
 
 - **functional** — what the product is and does: domain concepts (the glossary), features, functional and UX choices.
 - **technical** — how it is built: modules of the monorepo, interfaces between them and with the outside, environments.
-- **cross-cutting** — decisions (functional, UX or technical) and open questions that block them.
+- **cross-cutting** — epics in progress (Jira epics and what was agreed around them), decisions (functional, UX or technical) and open questions that block them.
 
-Knowledge pages are **updated and consolidated** (stable sections, no fine-grained chronology). Decisions and open questions are **created and closed** (they have a lifecycle).
+Knowledge pages are **updated and consolidated** (stable sections, no fine-grained chronology). Epics, decisions and open questions are **created and closed** (they have a lifecycle).
 
 **Propagation rule:** a decision that changes stable knowledge also updates the affected feature/module/interface page and links to it.
 
@@ -182,10 +184,13 @@ Body in Markdown with [[wikilinks]]. Relevant claims cite their source. ^[conflu
 | technical | `module` | `technical/modules` | `paths: [apps/billing/**]`, `owner_team` (free string), `interfaces: [[…]]`, `depends_on: [[module]]` |
 | technical | `interface` | `technical/interfaces` | `kind` (rest \| event \| grpc \| lib \| ui-contract), `provided_by: [[module]]`, `consumed_by: [[module]]`, `spec_path` |
 | technical | `environment` | `technical/environments` | `kind` (dev \| staging \| prod \| …), `url`; operational notes, **never secrets** |
+| cross | `epic` | `epics` | `jira` (epic key, required), `status` (active \| done \| cancelled), `features: [[feature]]`, `modules: [[module]]`; body: goal / agreed scope / constraints and risks / discussion; budget 500 |
 | cross | `decision` | `decisions` | `area` (functional \| ux \| technical), `status` (proposed \| accepted \| superseded), `date`, `supersedes: [[decision]]`, `affects: [[feature \| module \| interface]]`, `resolves: [[open-question]]`; body: context / options / outcome / consequences. No person names |
 | cross | `open-question` | `open-questions` | `area`, `status` (open \| resolved \| dropped), `resolved_by: [[decision]]`, `affects` |
 
 `decision` and `open-question` are **system types**: the toolkit relies on them. The init interview can extend any type but cannot remove system types.
+
+**Epic vs feature.** Both stay in the preset, with separate roles. A `feature` is the product's behaviour as it is, or will be once released: it outlives any project. An `epic` is a change in delivery, tied to one Jira epic: it gathers what the team agreed about that change in Teams threads, Confluence analyses and meetings (scope, constraints, risks, pointers to the discussion) so that whoever builds it takes it into account. The rule that prevents overlap: anything that will still be true after the epic closes goes on feature, concept, module or decision pages, linked from the epic. When the Jira epic is done, the routine closes the page: it consolidates the lasting content into those pages and reduces the epic to a short outcome; closed epics leave the index after `archive_after_days`. Teams that do not plan in epics drop the type at init.
 
 `module.paths` is the bridge between code and brain: given a set of changed files, the toolkit finds the modules, and from them interfaces, features and decisions.
 
@@ -242,7 +247,7 @@ What fails the gate is dropped (and, for the routine, listed in the digest as sk
 | `/pb:fix <what is wrong>` | ✅ | — | Explicit correction of wrong information: find every page asserting it, correct it, record the correction |
 | `/pb:sync [teams\|confluence\|github\|jira] [--check]` | ✅ | — | Incremental ingestion from configured sources using cursors in `.pb/state/` |
 | `/pb:ask <question>` | ✅ | ✅ | Answer with citations to brain pages and sources; reads `index.md` first |
-| `/pb:context <jira-key\|feature\|paths>` | ✅ | ✅ | Context pack for an agent or person: features, concepts, modules, interfaces, decisions, open questions |
+| `/pb:context <jira-key\|feature\|epic\|paths>` | ✅ | ✅ | Context pack for an agent or person: active epics, features, concepts, modules, interfaces, decisions, open questions |
 | `/pb:lint [--fix]` | ✅ | — | Broken links, orphans, stale open questions, superseded-but-referenced decisions, modules whose `paths` no longer exist, contradictions |
 | `/pb:schema [action]` | ✅ | — | Schema evolution: propose, apply with migration |
 | `/pb:routine-setup` | ✅ | — | Configure and generate the nightly routine (see §6) |
@@ -264,7 +269,7 @@ Facts are never asked of the user if they can be found in the repo or via connec
 
 ### 4.2 `/pb:context`
 
-Given a Jira key (→ linked features via `jira:` field, → modules), a feature title, or a set of paths (→ modules via `paths` globs), returns a compact pack: relevant concepts with definitions, the feature(s), module(s) and interfaces, accepted decisions affecting them, open questions. `pb-generate.yml` also pre-builds one pack per feature in `brain/context/<feature>.md` so agents can read it without the plugin.
+Given a Jira key (→ the epic page or features listing it, → features and modules), a feature or epic title, or a set of paths (→ modules via `paths` globs), returns a compact pack: relevant concepts with definitions, the feature(s), module(s) and interfaces, accepted decisions affecting them, open questions. Packs include the active epics that touch the features or modules in the pack, and the decisions and open questions affecting those epics. `pb-generate.yml` also pre-builds one pack per feature and per active epic in `brain/context/<title>.md` so agents can read it without the plugin.
 
 ### 4.3 `/pb:capture`
 
@@ -294,18 +299,18 @@ Explicit correction when someone finds wrong information in the brain. Input: wh
 
 ## 5. Agent-facing output
 
-- **`brain/AGENTS.md`** — how to read the brain (start from `index.md`, use `glossary.md` for terminology, `context/` for feature packs, `module.paths` to map code) and the rules for writing it.
+- **`brain/AGENTS.md`** — how to read the brain (start from `index.md`, use `glossary.md` for terminology, `context/` for feature and epic packs, `module.paths` to map code) and the rules for writing it.
 - **Monorepo `CLAUDE.md` pointer** — added by init: "For product and domain context read `brain/AGENTS.md`."
 - **`index.md`** — one line per page: type, title, one-line summary; grouped by area.
 - **`glossary.md`** — bilingual table generated from `concept` pages.
-- **`context/<feature>.md`** — pre-built packs (§4.2).
+- **`context/<feature or epic>.md`** — pre-built packs (§4.2).
 
 ## 6. Nightly routine
 
 ### Shape
 
 - A **Claude Code cloud routine** (`/schedule`) on the monorepo, created by the **Engineering Manager**, who must be a member of every configured Teams channel and have read access to the configured Confluence spaces. Commits are attributed to that account.
-- Runs nightly. Prompt generated by `/pb:routine-setup` from `templates/routine/`; it calls `/pb:sync teams confluence github`.
+- Runs nightly. Prompt generated by `/pb:routine-setup` from `templates/routine/`; it calls `/pb:sync teams confluence github jira`.
 - **No PR.** Each run checks out the **target branch** configured at setup (`routine.branch` in `brain/schema/sources.md`), writes pages and the digest `brain/digests/YYYY-MM-DD.md`, runs `pb validate` (fix and repeat; on persistent failure it commits nothing and reports in the digest of the next run), then commits and pushes directly to that branch.
 - The target branch is chosen by whoever sets up the routine:
   - `main` — knowledge lands immediately; the routine's account needs permission to push to `main` past branch protection (bypass for `brain/` or an exception in the ruleset);
@@ -319,18 +324,19 @@ Explicit correction when someone finds wrong information in the brain. Input: wh
 | **Teams** | Configured teams/channels where the team (incl. non-devs) discusses | Per-channel cursor (last processed message time/id) |
 | **Confluence** | Configured spaces or page trees where non-devs write analyses: **new and modified** pages | CQL `lastModified > cursor` per space; page version for re-ingest |
 | **GitHub** | PRs merged since last run touching any `module.paths` | Merge time cursor |
-| **Jira** | Not in the routine; on demand via `/pb:put` and `/pb:sync jira` | — |
+| **Jira** | Epics of the configured projects: keeps `epic` pages aligned (status, goal) and closes them when done; features' Jira keys only on demand (`/pb:sync jira`) | `updated > cursor` per project |
 
 ### Teams triage
 
 1. Group messages by **thread**; never ingest single messages out of context.
 2. Defer threads still active (last reply < 24h) to the next run.
 3. Classify each thread `ignore | signal | knowledge`. Only `knowledge` (decision, requirement clarification, domain explanation, incident learning, open question) creates or updates pages; `signal` is listed in the digest only.
-4. The digest records what was ingested, what was skipped and why, making triage auditable.
+4. Threads that mention an epic (Jira key, or the title/alias of an `epic` page) feed that epic page with delivery-specific content; lasting content goes to its own pages, linked from the epic.
+5. The digest records what was ingested, what was skipped and why, making triage auditable.
 
 ### `/pb:routine-setup`
 
-Interactive: lists teams/channels via the Microsoft 365 connector, Confluence spaces via Atlassian, lets the user pick; asks for the **target branch** (explaining the `main` vs long-lived branch trade-off and, for `main`, checking push permission); checks membership/access; writes the configuration into `brain/schema/sources.md`; generates the routine prompt and the `/schedule` instructions; documents owner and scope in `AGENTS.md`.
+Interactive: lists teams/channels via the Microsoft 365 connector, Confluence spaces and Jira projects via Atlassian, lets the user pick; asks for the **target branch** (explaining the `main` vs long-lived branch trade-off and, for `main`, checking push permission); checks membership/access; writes the configuration into `brain/schema/sources.md`; generates the routine prompt and the `/schedule` instructions; documents owner and scope in `AGENTS.md`.
 
 ## 7. Distribution
 

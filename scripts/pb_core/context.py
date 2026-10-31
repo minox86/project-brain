@@ -1,9 +1,10 @@
-"""Context packs: from a Jira key, a feature or code paths to the relevant brain pages."""
+"""Context packs: from a Jira key, a feature or epic, or code paths to the relevant brain pages."""
 import fnmatch
 
 from . import links
 
 SECTIONS = [
+    ("epic", "Epics"),
     ("feature", "Features"),
     ("concept", "Concepts"),
     ("module", "Modules"),
@@ -62,6 +63,8 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
         for p in pages:
             collected.setdefault(p.rel, p)
 
+    for p in [p for p in collected.values() if p.type == "epic"]:
+        add(_targets(brain, p, "features") + _targets(brain, p, "modules"))
     for p in list(collected.values()):
         if p.type == "feature":
             add(_targets(brain, p, "modules") + _targets(brain, p, "concepts"))
@@ -72,6 +75,11 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
                 add([other])
             if other.type == "feature" and m.title in _link_titles(brain, other, ("modules",)):
                 add([other] + _targets(brain, other, "concepts"))
+    hit = {p.title for p in collected.values()}
+    for other in brain.pages():
+        if other.type == "epic" and other.get("status", "active") == "active" \
+                and set(_link_titles(brain, other, ("features", "modules"))) & hit:
+            add([other])
     hit = {p.title for p in collected.values()}
     for other in brain.pages():
         affects = set(_link_titles(brain, other, ("affects",)))
@@ -102,7 +110,7 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
 def _seeds(brain, jira, feature, paths):
     if jira:
         key = jira.strip().upper()
-        return [p for p in brain.pages() if p.type == "feature" and (
+        return [p for p in brain.pages() if p.type in ("feature", "epic") and (
             key in [str(j).upper() for j in _list(p.get("jira"))]
             or f"JIRA:{key}" in [str(s).upper() for s in _list(p.get("sources"))])]
     if feature:

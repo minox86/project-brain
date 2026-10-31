@@ -18,7 +18,7 @@ Read `BASE/../../references/conventions.md`. Repo mode only.
    - **duplicate-candidate** — merge into one page: keep the better title, move the other title to `aliases`, rewrite every `[[link]]` to the kept title across the brain, delete the other file;
    - **orphan** — link it from the right page, or delete it if it fails the significance gate;
    - **stale-open-question** — ask whether it is resolved (→ decision), dropped, or still open (refresh `updated`);
-   - **archivable** — delete it (history stays in git) or keep it;
+   - **archivable** — delete it (history stays in git) or keep it; for an epic, first check that what is still true lives on feature, concept, module or decision pages;
    - **dead-module-paths** — update `paths` from the current repo layout, or delete the module;
    - **superseded-referenced** — relink to the successor decision.
 4. Apply what the user confirms. Deletions and merges are destructive: list them explicitly before applying.

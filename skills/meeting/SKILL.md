@@ -29,7 +29,7 @@ Read the transcript and the meeting chat with `read_resource` (resources linked 
 From the transcript and chat, keep only what passes the **significance gate**:
 - decisions (functional, UX, technical) with options considered and reasons;
 - open questions left unresolved, and action-blocking doubts;
-- changes to expected behaviour of features, new or clarified domain concepts, discoveries about modules and interfaces.
+- scope agreements, constraints and risks of an epic in progress (on its `epic` page), changes to expected behaviour of features, new or clarified domain concepts, discoveries about modules and interfaces.
 
 Drop: status updates, scheduling, small talk, who-will-do-what (that belongs to Jira), opinions about people.
 

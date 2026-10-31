@@ -41,7 +41,7 @@ class ValidateTest(unittest.TestCase):
         self.assertError({"decisions/X.md": "just text\n"}, "missing-type")
 
     def test_unknown_type(self):
-        self.assertError({"decisions/X.md": "---\ntype: epic\ntitle: X\n---\n"}, "unknown-type")
+        self.assertError({"decisions/X.md": "---\ntype: persona\ntitle: X\n---\n"}, "unknown-type")
 
     def test_missing_title(self):
         self.assertError({"decisions/X.md": "---\ntype: decision\narea: ux\n---\n"}, "missing-title")

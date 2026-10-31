@@ -68,7 +68,7 @@ def scaffold(repo_root, product, preset="software-product"):
     if "brain/.pb/cache/" not in existing.splitlines():
         sep = "" if not existing or existing.endswith("\n") else "\n"
         gitignore.write_text(existing + sep + "brain/.pb/cache/\n", encoding="utf-8")
-    return {"brain": str(brain), "created": created, "skipped": skipped}
+    return {"brain": str(brain), "created": created, "skipped": skipped, "default_branch": default}
 
 
 def sync_toolkit(brain):
@@ -105,8 +105,6 @@ def _set_product(path, product):
 
 
 def _default_branch(repo):
-    for args in (["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"], ["branch", "--show-current"]):
-        proc = subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True)
-        if proc.returncode == 0 and proc.stdout.strip():
-            return proc.stdout.strip().rsplit("/", 1)[-1] if args[0] == "symbolic-ref" else proc.stdout.strip()
-    return "main"
+    from .gitops import default_branch
+    inside = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=str(repo), capture_output=True, text=True)
+    return default_branch(repo) if inside.returncode == 0 else "main"

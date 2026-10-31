@@ -13,7 +13,9 @@ def resolve(brain, name, type_=None, limit=5):
     for p in brain.pages():
         if type_ and p.type != type_:
             continue
-        names = [p.title] + [str(a) for a in (p.get("aliases") or [])]
+        aliases = p.get("aliases")
+        aliases = aliases if isinstance(aliases, list) else ([aliases] if aliases else [])
+        names = [p.title] + [str(a) for a in aliases]
         normed = [_norm(n) for n in names]
         if normed[0] == target:
             match, score = "title", 1.0

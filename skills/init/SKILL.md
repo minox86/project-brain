@@ -62,7 +62,7 @@ Show the final schema in one block: types table (area, folder, fields, budget), 
 
 ## 5. Scaffold and apply the schema
 
-1. `PB scaffold --product "<name>"` (creates `brain/`, CI workflows, the CLAUDE.md pointer, `.gitignore` entry, vendored toolkit). Report `skipped` workflows if any already existed.
+1. `PB scaffold --product "<name>"` (creates `brain/`, CI workflows, the CLAUDE.md pointer, `.gitignore` entry, vendored toolkit). Report `skipped` workflows if any already existed, and confirm `default_branch` with the user: it is the branch `pb-generate.yml` runs on (fix the workflow if it is wrong).
 2. Apply the interview results by editing `brain/schema/brain.md` and `brain/schema/types/*.md`: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; add new type files in the same format.
 3. `PB validate` must pass on the empty brain.
 
@@ -78,8 +78,8 @@ Ask: "Create all / choose by number / none". Apply the significance gate and the
 
 ## 7. Close
 
-Closing flow of the conventions (`PB commit -m "pb(init): create brain for <product>"`). Then explain the next steps:
+Closing flow of the conventions, committing the files scaffold created outside `brain/` too: `PB commit -m "pb(init): create brain for <product>" --include CLAUDE.md .gitignore .github/workflows/pb-validate.yml .github/workflows/pb-generate.yml` (leave out workflows reported as `skipped`). Then explain the next steps:
 - the brain travels with this branch's PR; once merged, CI keeps `index.md`, `glossary.md` and `context/` up to date;
-- enable auto-merge in the repo settings so brain-only PRs merge once `pb-validate` passes;
+- enable auto-merge in the repo settings so brain-only PRs merge once `pb-validate` passes; `pb-generate` also runs hourly, because merges made by auto-merge do not trigger push workflows;
 - `/pb:routine-setup` to feed the brain nightly from Teams, Confluence and merged PRs;
 - non-developers read the brain from Cowork through the GitHub connector.

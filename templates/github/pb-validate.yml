@@ -13,11 +13,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check out the base branch toolkit (a PR cannot change the check that judges it)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .pb-base
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Validate brain
-        run: python3 brain/.pb/toolkit/pb.py validate
+        run: |
+          toolkit=.pb-base/brain/.pb/toolkit/pb.py
+          # The PR that introduces the brain has no toolkit on the base branch yet.
+          [ -f "$toolkit" ] || toolkit=brain/.pb/toolkit/pb.py
+          python3 "$toolkit" --brain brain validate
 
   automerge:
     needs: validate
@@ -30,8 +39,9 @@ jobs:
           PR: ${{ github.event.pull_request.html_url }}
         run: |
           files=$(gh pr diff --name-only "$PR")
-          if [ -n "$files" ] && ! echo "$files" | grep -qv '^brain/'; then
+          # Brain content only: code, and the vendored toolkit in brain/.pb/toolkit/, go through review.
+          if [ -n "$files" ] && ! echo "$files" | grep -qv '^brain/' && ! echo "$files" | grep -q '^brain/\.pb/toolkit/'; then
             gh pr merge --auto --squash "$PR"
           else
-            echo "PR touches files outside brain/: normal review flow"
+            echo "PR touches code or the pb toolkit: normal review flow"
           fi

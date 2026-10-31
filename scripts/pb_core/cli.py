@@ -3,7 +3,6 @@ import argparse
 import datetime
 import json
 import subprocess
-import json
 import sys
 import traceback
 from pathlib import Path
@@ -117,11 +116,15 @@ def _cmd_correction(args):
 
 
 def _cmd_commit(args):
-    return gitops.commit(_brain(args), args.message, args.allow_default), 0
+    return gitops.commit(_brain(args), args.message, args.allow_default, args.include or ()), 0
 
 
 def _cmd_routine(args):
     brain = _brain(args)
+    if args.action == "discard":
+        return gitops.routine_discard(brain), 0
+    if not args.branch:
+        raise UsageError(f"pb routine {args.action} needs --branch")
     if args.action == "start":
         return gitops.routine_start(brain, args.branch), 0
     if not args.message:
@@ -188,10 +191,11 @@ def build_parser():
     p = sub.add_parser("commit")
     p.add_argument("-m", "--message", required=True)
     p.add_argument("--allow-default", action="store_true")
+    p.add_argument("--include", nargs="+", help="extra repo paths to commit (e.g. CI workflows from init)")
     p.set_defaults(handler=_cmd_commit)
     p = sub.add_parser("routine")
-    p.add_argument("action", choices=["start", "finish"])
-    p.add_argument("--branch", required=True)
+    p.add_argument("action", choices=["start", "finish", "discard"])
+    p.add_argument("--branch")
     p.add_argument("-m", "--message")
     p.set_defaults(handler=_cmd_routine)
     p = sub.add_parser("scan")

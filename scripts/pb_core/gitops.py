@@ -35,7 +35,13 @@ def default_branch(repo):
     return "main"
 
 
-def commit(brain, message, allow_default=False):
+def _staged(repo, specs):
+    out = _git(repo, "-c", "core.quotePath=false", "diff", "--cached", "--name-only", "--no-renames", "-z",
+               "--", *specs).stdout
+    return [f for f in out.split("\0") if f]
+
+
+def commit(brain, message, allow_default=False, include=()):
     repo = _repo_root(brain)
     branch = current_branch(repo)
     if not allow_default and branch == default_branch(repo):
@@ -43,12 +49,12 @@ def commit(brain, message, allow_default=False):
                        {"error": f"current branch '{branch}' is the default branch: switch to a working branch "
                                  "or pass --allow-default", "code": "on-default-branch", "branch": branch})
     prefix = _brain_prefix(brain, repo)
-    specs = [prefix] + [f":(exclude){prefix}/{g.rstrip('/')}" for g in GENERATED]
+    specs = [prefix] + [f":(exclude){prefix}/{g.rstrip('/')}" for g in GENERATED] + list(include)
     _git(repo, "add", "-A", "--", *specs)
-    files = [f for f in _git(repo, "diff", "--cached", "--name-only", "--", *specs).stdout.splitlines() if f]
+    files = _staged(repo, specs)
     if not files:
         return {"committed": False, "sha": None, "branch": branch, "files": []}
-    _git(repo, "commit", "-q", "-m", message, "--", *files)
+    _git(repo, "commit", "-q", "-m", message, "--", *specs)
     sha = _git(repo, "rev-parse", "HEAD").stdout.strip()
     return {"committed": True, "sha": sha, "branch": branch, "files": files}
 
@@ -80,3 +86,14 @@ def routine_finish(brain, branch, message):
             return {"committed": done["committed"], "pushed": False, "conflict": True}
     _git(repo, "push", "-q", "origin", f"HEAD:refs/heads/{branch}")
     return {"committed": done["committed"], "pushed": True, "conflict": False}
+
+
+def routine_discard(brain):
+    """Throw away every brain/ change of this run except the digests."""
+    repo = _repo_root(brain)
+    prefix = _brain_prefix(brain, repo)
+    specs = [prefix, f":(exclude){prefix}/digests"]
+    _git(repo, "reset", "-q", "--", *specs)
+    _git(repo, "checkout", "--", *specs, check=False)
+    _git(repo, "clean", "-fdq", "--", *specs)
+    return {"discarded": True}

@@ -17,7 +17,7 @@ def git(cwd, *args):
     return subprocess.run(["git", *args], cwd=str(cwd), env=env, capture_output=True, text=True, check=True).stdout.strip()
 
 
-class GitopsTest(unittest.TestCase):
+class GitRepoCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -51,6 +51,8 @@ class GitopsTest(unittest.TestCase):
         rel, text = page("feature", title)
         self.write("brain/" + rel, text, root)
 
+
+class GitopsTest(GitRepoCase):
     def test_commit_only_brain_and_excludes_generated(self):
         git(self.repo, "checkout", "-qb", "feat/x")
         self.add_page("Approval")

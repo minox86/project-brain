@@ -79,8 +79,8 @@ def _duplicates(pages, add):
         for b in pages[i + 1:]:
             if a.type != b.type or (b.rel, a.rel) in seen:
                 continue
-            names_a = {a.title.lower()} | {str(x).lower() for x in (a.get("aliases") or [])}
-            names_b = {b.title.lower()} | {str(x).lower() for x in (b.get("aliases") or [])}
+            names_a = {a.title.lower()} | {str(x).lower() for x in _as_list(a.get("aliases"))}
+            names_b = {b.title.lower()} | {str(x).lower() for x in _as_list(b.get("aliases"))}
             ratio = difflib.SequenceMatcher(None, a.title.lower(), b.title.lower()).ratio()
             if ratio >= 0.85 or names_a & names_b:
                 seen.add((a.rel, b.rel))
@@ -120,3 +120,9 @@ def _superseded_refs(brain, pages, add):
             if not any(n.rel in targets for n in newer):
                 hint = ", ".join(f"[[{n.title}]]" for n in newer) or "its successor"
                 add("superseded-referenced", p, f"links superseded [[{t.title}]]: link {hint} instead or as well")
+
+
+def _as_list(value):
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]

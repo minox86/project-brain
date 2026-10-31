@@ -23,8 +23,8 @@ Every `pb` skill reads this file before acting. BASE is the skill's base directo
 | `PB state get <source> [key]` / `PB state set <source> <key> <json>` | Sync cursors (`teams`, `confluence`, `github`, `jira`) |
 | `PB state suppress <source> "<claim>"` | Claim corrected by `/pb:fix` that sync must not re-ingest |
 | `PB correction --page P --wrong W --right R --evidence E` | Append to `brain/.pb/corrections.md` |
-| `PB commit -m MSG [--allow-default]` | Commit `brain/` changes (generated files excluded) on the current branch |
-| `PB routine start --branch B` / `PB routine finish --branch B -m MSG` | Routine runs: checkout target branch; commit, rebase, push (no PR) |
+| `PB commit -m MSG [--allow-default] [--include PATH…]` | Commit `brain/` changes (generated files excluded), plus any `--include` paths, on the current branch |
+| `PB routine start --branch B` / `PB routine finish --branch B -m MSG` / `PB routine discard` | Routine runs: checkout target branch; commit, rebase, push (no PR); drop the run's brain changes except digests |
 | `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap |
 | `PB scaffold --product NAME [--repo DIR]` | Create `brain/`, CI workflows, CLAUDE.md pointer, vendored toolkit |
 | `PB generate` | CI only: index, glossary, context packs, backlinks, digest retention |

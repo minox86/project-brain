@@ -2,6 +2,7 @@
 import argparse
 import datetime
 import json
+import json
 import sys
 import traceback
 from pathlib import Path
@@ -12,6 +13,7 @@ from .context import build_context
 from .generate import generate
 from .lint import lint
 from .stats import stats
+from . import state
 from .errors import PbError, UsageError
 from .resolve import resolve
 from .validate import validate
@@ -89,6 +91,28 @@ def _cmd_lint(args):
     return result, 1 if result["findings"] else 0
 
 
+def _cmd_state(args):
+    brain = _brain(args)
+    if args.action == "get":
+        return {"source": args.source, "key": args.key, "value": state.get(brain, args.source, args.key)}, 0
+    if args.action == "set":
+        if args.key is None or args.value is None:
+            raise UsageError("usage: pb state set <source> <key> <json-value>")
+        try:
+            value = json.loads(args.value)
+        except ValueError:
+            raise UsageError("value must be valid JSON (quote strings: '\"text\"')")
+        state.set_(brain, args.source, args.key, value)
+        return {"source": args.source, "key": args.key, "value": value}, 0
+    if args.key is None:
+        raise UsageError("usage: pb state suppress <source> \"<claim>\"")
+    return {"source": args.source, "suppressed": state.suppress(brain, args.source, args.key)}, 0
+
+
+def _cmd_correction(args):
+    return state.add_correction(_brain(args), args.page, args.wrong, args.right, args.evidence, _today(args)), 0
+
+
 def _cmd_stats(args):
     return stats(_brain(args)), 0
 
@@ -113,6 +137,17 @@ def build_parser():
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_generate)
     sub.add_parser("stats").set_defaults(handler=_cmd_stats)
+    p = sub.add_parser("state")
+    p.add_argument("action", choices=["get", "set", "suppress"])
+    p.add_argument("source")
+    p.add_argument("key", nargs="?")
+    p.add_argument("value", nargs="?")
+    p.set_defaults(handler=_cmd_state)
+    p = sub.add_parser("correction")
+    for name in ("--page", "--wrong", "--right", "--evidence"):
+        p.add_argument(name, required=True)
+    p.add_argument("--today")
+    p.set_defaults(handler=_cmd_correction)
     p = sub.add_parser("lint")
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_lint)

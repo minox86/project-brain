@@ -10,6 +10,7 @@ from . import FORMAT_VERSION, __version__
 from .brain import Brain, find_brain
 from .context import build_context
 from .generate import generate
+from .lint import lint
 from .stats import stats
 from .errors import PbError, UsageError
 from .resolve import resolve
@@ -83,6 +84,11 @@ def _cmd_generate(args):
     return generate(_brain(args), _today(args)), 0
 
 
+def _cmd_lint(args):
+    result = lint(_brain(args), _today(args))
+    return result, 1 if result["findings"] else 0
+
+
 def _cmd_stats(args):
     return stats(_brain(args)), 0
 
@@ -107,6 +113,9 @@ def build_parser():
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_generate)
     sub.add_parser("stats").set_defaults(handler=_cmd_stats)
+    p = sub.add_parser("lint")
+    p.add_argument("--today")
+    p.set_defaults(handler=_cmd_lint)
     p = sub.add_parser("validate")
     p.add_argument("paths", nargs="*")
     p.set_defaults(handler=_cmd_validate)

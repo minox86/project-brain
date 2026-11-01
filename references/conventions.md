@@ -30,7 +30,7 @@ Every `pb` skill reads this file before acting. Skills that write to the brain a
 | `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap |
 | `PB scaffold --product NAME [--repo DIR]` | Create `brain/`, CI workflows, CLAUDE.md pointer, vendored toolkit |
 | `PB generate` | CI only: index, glossary, context packs, backlinks, digest retention |
-| `PB toolkit-sync` | Refresh `brain/.pb/toolkit` after a plugin upgrade |
+| `PB toolkit-sync` | Refresh `brain/.pb/toolkit` (scripts, plus the sync/put/meeting skills and these references the cloud routine follows, since routines load no plugins) after a plugin upgrade |
 
 ## Modes
 

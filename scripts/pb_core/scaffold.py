@@ -10,7 +10,10 @@ from .errors import UsageError
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 POINTER = "<!-- pb:start -->\nFor product and domain context read brain/AGENTS.md.\n<!-- pb:end -->"
 PROPOSALS = "# Schema proposals\n\nOne line per proposal: `- [ ] P<n> · <proposal>`.\n"
-NEEDS_QUOTES = re.compile(r"""^[\[\]{}#&*!|>'"%@`-]|[:#]\s|,\s""")
+# Skills the cloud routine follows from the repo: sync, and those sync defers to (put's analysis, meeting's step 3).
+ROUTINE_SKILLS = ("sync", "put", "meeting")
+ROUTINE_SYNC_SKILL = "skills/sync/SKILL.md"
+NEEDS_QUOTES =re.compile(r"""^[\[\]{}#&*!|>'"%@`-]|[:#]\s|,\s""")
 
 
 def scaffold(repo_root, product, preset="software-product"):
@@ -72,7 +75,12 @@ def scaffold(repo_root, product, preset="software-product"):
 
 
 def sync_toolkit(brain):
-    """Copy the running toolkit into brain/.pb/toolkit so CI can run it. Returns the target dir."""
+    """Copy the running toolkit into brain/.pb/toolkit so CI and the cloud routine can run it.
+
+    Cloud routines do not load plugins: besides the scripts, the instructions the routine follows
+    (ROUTINE_SKILLS and the references) are copied with the plugin's layout, so the relative paths
+    inside them (BASE/../../references/…, BASE/../meeting/SKILL.md) keep resolving. Returns the target dir.
+    """
     target = Path(brain) / ".pb" / "toolkit"
     scripts = PLUGIN_ROOT / "scripts"
     if not (scripts / "pb_core").is_dir():
@@ -83,6 +91,10 @@ def sync_toolkit(brain):
     shutil.copy2(str(scripts / "pb.py"), str(target / "pb.py"))
     shutil.copytree(str(scripts / "pb_core"), str(target / "pb_core"),
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    shutil.copytree(str(PLUGIN_ROOT / "references"), str(target / "references"))
+    for name in ROUTINE_SKILLS:
+        (target / "skills" / name).mkdir(parents=True)
+        shutil.copy2(str(PLUGIN_ROOT / "skills" / name / "SKILL.md"), str(target / "skills" / name / "SKILL.md"))
     (target / "VERSION").write_text(__version__ + "\n", encoding="utf-8")
     return target
 

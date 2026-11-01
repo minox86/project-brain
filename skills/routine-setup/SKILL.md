@@ -84,7 +84,9 @@ Edit the frontmatter of `brain/schema/sources.md`:
 
 Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule, target branch, the list of channels, recurring meetings, spaces and Jira projects, and "digests in `brain/digests/`".
 
-Validate, then the closing flow (`PB commit -m "pb(routine-setup): configure nightly routine"`). The routine reads this configuration from the target branch: make sure the commit reaches it (merge the PR, or push to the target branch).
+Cloud routines do not load plugins: the routine follows the copy of the toolkit and of its instructions (sync, put, meeting skills and the references) vendored in `brain/.pb/toolkit/`. Refresh it from this plugin with `PB toolkit-sync`, so the routine runs the same version as the plugin.
+
+Validate, then the closing flow (`PB commit -m "pb(routine-setup): configure nightly routine"`, which includes the refreshed `brain/.pb/toolkit/`). The routine reads configuration and instructions from the target branch: make sure the commit reaches it (merge the PR, or push to the target branch). After every plugin upgrade, `PB toolkit-sync` and commit again, or the routine keeps following the old instructions.
 
 ## 8. Create the routine
 
@@ -95,7 +97,7 @@ Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo
 **Otherwise** give the user the steps:
 1. Run `/schedule` in Claude Code (or open claude.ai/code/routines) and create a routine on the monorepo `<repo>` with schedule `<cron>`.
 2. Paste the rendered prompt.
-3. Enable the Microsoft 365 and Atlassian connectors for the routine and make sure the `pb` plugin is installed for the account.
+3. Enable the Microsoft 365 and Atlassian connectors for the routine. The `pb` plugin is not needed there: the routine follows the instructions vendored in `brain/.pb/toolkit/`.
 4. Tell you the routine id, so it can be recorded in `routine.trigger_id`.
 
 Either way, finish with a first run: `/pb:routine-run`, then check `brain/digests/<today>.md` on the target branch.

@@ -115,6 +115,12 @@ class TemplatesTest(unittest.TestCase):
             self.assertNotRegex(line, r"`pb (validate|routine)")
         self.assertIn("$PB routine discard", text)
 
+    def test_routine_prompt_needs_no_plugin(self):
+        text = (ROOT / "templates/routine/prompt.md").read_text()
+        self.assertNotIn("Run `/pb:", text)
+        self.assertIn("brain/.pb/toolkit/skills/sync/SKILL.md", text)
+        self.assertIn("`BASE` is `brain/.pb/toolkit/skills/sync`", text)
+
 
 class AliasStringTest(unittest.TestCase):
     def test_single_string_alias(self):

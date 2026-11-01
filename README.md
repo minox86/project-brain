@@ -171,7 +171,7 @@ Changes are committed on your current branch and go out with your PR.
 | Cowork says the brain is not reachable | Connect GitHub with read access to the monorepo |
 | Nothing was added overnight | Read "Problems" in the latest digest in `brain/digests/` |
 | Wrong information | A developer runs `/pb:fix`; anyone else reports it in the Teams channel |
-| The plugin was updated | In the monorepo, ask Claude to run `pb toolkit-sync` and commit, so CI uses the new version |
+| The plugin was updated | In the monorepo, ask Claude to run `pb toolkit-sync` and commit it to the routine's branch, so CI and the routine use the new version (cloud routines load no plugins: they follow the copy in `brain/.pb/toolkit/`) |
 
 <div align="center">
 <sub>MIT licensed · built for <a href="https://claude.com/claude-code">Claude Code</a> and Claude Cowork</sub>

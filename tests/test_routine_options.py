@@ -34,6 +34,12 @@ class ScheduleValidationTest(unittest.TestCase):
                 self.assertEqual([(e["path"], e["code"]) for e in data["errors"]],
                                  [("schema/sources.md", "bad-schedule")])
 
+    def test_routine_without_vendored_instructions_warns(self):
+        code, data, _ = self.check("0 2 * * *")
+        self.assertEqual(code, 0, data)
+        self.assertEqual([(w["path"], w["code"]) for w in data["warnings"]],
+                         [("schema/sources.md", "routine-instructions-missing")])
+
     def test_no_routine_configured_is_fine(self):
         repo = make_brain(self.tmp.name)
         code, _, _ = run_cli("validate", cwd=repo)
@@ -92,5 +98,5 @@ class MeetingsSourceTest(unittest.TestCase):
     def test_preset_and_routine_prompt_know_meetings(self):
         from helpers import ROOT
         self.assertIn("meetings: []", (ROOT / "presets/software-product/sources.md").read_text())
-        self.assertIn("/pb:sync teams confluence github jira meetings --digest",
+        self.assertIn("`teams confluence github jira meetings --digest`",
                       (ROOT / "templates/routine/prompt.md").read_text())

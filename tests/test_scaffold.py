@@ -1,11 +1,12 @@
 import json
+import re
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from helpers import run_cli
+from helpers import ROOT, run_cli
 
 
 class ScaffoldTest(unittest.TestCase):
@@ -74,6 +75,18 @@ class ScaffoldTest(unittest.TestCase):
         code, _, _ = run_cli("toolkit-sync", cwd=self.repo)
         self.assertEqual(code, 0)
         self.assertIn("__version__", vendored.read_text())
+
+    def test_toolkit_vendors_routine_instructions_with_plugin_layout(self):
+        self.scaffold()
+        toolkit = self.repo / "brain/.pb/toolkit"
+        for rel in ("skills/sync/SKILL.md", "skills/put/SKILL.md", "skills/meeting/SKILL.md",
+                    "references/conventions.md", "references/writing.md", "references/reader.md"):
+            self.assertEqual((toolkit / rel).read_text(), (ROOT / rel).read_text(), rel)
+        # Every BASE-relative path the sync skill uses resolves inside the vendored copy.
+        base = toolkit / "skills/sync"
+        text = (base / "SKILL.md").read_text()
+        for rel in sorted(set(re.findall(r"BASE/([\w./-]+\.md)", text))):
+            self.assertTrue((base / rel).resolve().is_file(), rel)
 
     def test_toolkit_sync_from_vendored_copy_refuses_and_keeps_toolkit(self):
         self.scaffold()

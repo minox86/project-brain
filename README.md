@@ -87,7 +87,7 @@ Once per product.
 > **Who:** a developer, in Claude Code · **Needs:** Python 3.9+ and git
 
 1. Open the monorepo and create a branch: `git switch -c pb/init`.
-2. Run **`/pb:init`**. Claude looks at the repo, then asks a few rounds of questions to shape the wiki around your product. Answer "yes" to accept its suggestion.
+2. Run **`/pb:init`**. Claude looks at the repo, then asks a few rounds of questions to shape the wiki around your product, including which parts of it need a human review and who reviews technical, functional and design changes. Answer "yes" to accept its suggestion.
 3. Confirm. Claude creates `brain/`, adds two GitHub workflows and proposes the first pages.
 4. Open a PR and merge it.
 
@@ -122,7 +122,9 @@ Once the brain and the routine are set up, these happen without anyone running a
   - starts from the context of your feature or epic;
   - follows accepted decisions;
   - flags code that contradicts the brain.
-- ✅ **The brain checks itself on every PR.** CI flags broken links, malformed pages and anything that looks like a password or token. Brain-only PRs merge on their own once the checks pass.
+- ✅ **The brain checks itself on every PR.** CI flags broken links, malformed pages and anything that looks like a password or token. Brain-only PRs merge on their own once the checks pass, unless they touch a point you asked to watch.
+- 🔇 **Noise is caught as it is written.** New pages that look like an existing one, pages nobody links, claims without a source, dated "update" sections, status talk ("this sprint", "TODO") and long verbatim quotes are flagged before the commit.
+- 👀 **Sensitive changes wait for the right reviewer.** `brain/schema/review.md`, written by `/pb:init` and changed with `/pb:schema`, lists the points that need a human (decisions, interfaces, feature status…) and who reviews technical, functional and design changes. The routine pushes what it is sure of and opens a PR, with those reviewers, for the rest.
 - 📚 **Indexes stay fresh.** CI rebuilds the index, the bilingual glossary and a context pack for every feature and active epic after every merge, and at least hourly.
 - 🧹 **Old items step aside.** Superseded decisions, answered questions and closed epics leave the index after a while. Git keeps the history.
 - 💬 **No commands to remember.** Ask in plain words: *"what did we decide about approvals?"*, *"save this decision in the brain"*, *"give me the context for FIN-412"*.

@@ -29,12 +29,12 @@ Same routine, same account and connectors as the scheduled runs.
 
 ## Local run
 
-The routine's steps, here, with the user's own Microsoft 365 and Atlassian connectors. Commits are attributed to the user and pushed to `routine.branch` without a PR. Say so and ask for confirmation first.
+The routine's steps, here, with the user's own Microsoft 365 and Atlassian connectors. Commits are attributed to the user and pushed to `routine.branch`; what the review policy holds goes to a PR. Say so and ask for confirmation first.
 
 1. Worktree outside the repo, so the user's checkout and uncommitted work are never touched: `PB routine start --branch <routine.branch> --worktree <tmp dir>`. From now on, run every `PB` command with `--brain <brain path from the result>`.
 2. Follow `/pb:sync teams confluence github jira meetings --digest` against that brain, applying all of its rules. Use the configured sources and the cursors stored on the target branch.
 3. `PB validate` there: fix errors and retry at most twice; condense over-budget pages. If it still fails: `PB routine discard`, write the failure under "Problems" in today's digest, and do not move any cursor.
-4. `PB routine finish --branch <routine.branch> -m "pb(routine): manual sync <YYYY-MM-DD>"`. On `"conflict": true` nothing was pushed: report it and do not retry.
+4. `PB routine finish --branch <routine.branch> -m "pb(routine): manual sync <YYYY-MM-DD>" --confidence <PATH=LEVEL items, as in sync>`. On `"conflict": true` nothing was pushed: report it and do not retry. Held pages go to the PR in `review.pr`: give the link.
 5. Always finish with `PB routine cleanup --worktree <tmp dir>`.
 6. Report in three lines: ingested pages, skipped and deferred counts, problems.
 

@@ -48,9 +48,9 @@ With the Atlassian connector: `getVisibleJiraProjects`. Let the user pick the pr
 
 ## 5. Target branch
 
-The routine commits and pushes **directly, without a PR**, to one branch. Explain and let the user choose:
+The routine pushes **directly** to one branch what the review policy (`brain/schema/review.md`) lets through; what it holds goes to a `pb/review/…` PR towards that branch, with the area reviewers. The routine's account must be able to create `pb/review/*` branches and open PRs. Explain and let the user choose:
 - **default branch (`main`)** — knowledge lands immediately and CI regenerates index and context packs at once; the owner's account must be allowed to push to it past branch protection (a bypass for this account, or a ruleset exception for `brain/**`). Check with the user that this is in place.
-- **a long-lived branch** (e.g. `brain/inbox`) — no protection to bypass; someone merges it into `main` when they want, and that merge is the only review point.
+- **a long-lived branch** (e.g. `brain/inbox`) — no protection to bypass; someone merges it into `main` when they want; together with the review PRs it is a second review point.
 
 ## 6. Schedule
 

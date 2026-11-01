@@ -57,12 +57,36 @@ When a source contradicts the brain, never overwrite silently: create or update 
 Every writing operation ends like this:
 
 1. `PB validate <created or changed pages>`. Fix errors and repeat, at most twice. If errors remain, stop and report them; do not commit broken pages.
-2. Condense every page with an `over-budget` warning, then validate again.
+2. Condense every page with an `over-budget` warning and fix every noise warning (below), then validate again.
 3. `PB commit -m "pb(<skill>): <one-line summary>"`. The commit stays on the current branch and travels with the developer's PR. Never push, never open PRs.
 4. If the commit fails with `code: on-default-branch`, ask: "You are on `<branch>`. Create a working branch (recommended) or commit here?" Create the branch with `git switch -c <name>` and rerun, or rerun with `--allow-default`.
 5. Summarise: pages created/updated (as `[[links]]`), open questions raised, anything dropped by the significance gate worth mentioning.
 
 The nightly routine uses its own closing flow (see `templates/routine/prompt.md`).
+
+## Noise warnings
+
+`PB validate` checks the pages created or updated since the last commit. Each warning points to likely noise:
+
+| Code | Fix |
+|---|---|
+| `possible-duplicate` | A new page whose title is close to an existing one: update that page instead, or make the titles clearly distinct |
+| `new-orphan` | A new page nobody links: link it from the page it belongs to (feature, module, epic) |
+| `missing-source` | Empty `sources`: cite where the knowledge comes from |
+| `log-heading` | A dated or "update" section: consolidate into the page |
+| `ephemeral` | Status words (today, this sprint, TODO…): state the lasting fact or drop it |
+| `verbatim` | A long quote: summarise and link the source |
+
+Fix them before committing. A warning that is a false positive can stay, but with `noise_to_review: true` in `brain/schema/review.md` the page then waits for a reviewer.
+
+## Confidence and review
+
+`brain/schema/review.md` decides which changes reach the branch directly and which wait in a PR, by the points of the schema they touch (`watch`) and by how sure the writer is. Rate every page you create or update:
+- **high**: stated explicitly and settled in the source;
+- **medium**: inferred, or from one voice in a discussion that did not visibly conclude;
+- **low**: an interpretation, an ambiguous name resolution, a contradiction, a type chosen with doubt.
+
+Only the routine passes ratings to the toolkit (`--confidence PATH=LEVEL`, high is the default). In interactive skills the user is there: show what you rated medium or low in the plan or preview and let them decide. Developer PRs are routed by CI: watched changes get the area reviewers and are not auto-merged.
 
 ## Schema signals
 

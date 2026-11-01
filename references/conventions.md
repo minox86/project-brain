@@ -15,7 +15,8 @@ Every `pb` skill reads this file before acting. Skills that write to the brain a
 | Command | Use |
 |---|---|
 | `PB version` | `brain` is the brain path, or `null` outside a brain |
-| `PB validate [paths…]` | Check pages against the schema, secrets, budgets (warnings never fail) |
+| `PB validate [paths…] [--base REF]` | Check pages against the schema, secrets, budgets and the review policy; noise warnings on pages created or updated since `REF` (default `HEAD`). Warnings never fail |
+| `PB review [--base REF] [--confidence PATH=LEVEL…]` | Apply `brain/schema/review.md` to the pages changed since `REF`: which go straight to the branch, which are held for a PR, why, and the reviewers per area |
 | `PB resolve "<name>" [--type T]` | Candidate pages for a name (`title`, `alias`, `partial`, `fuzzy`) |
 | `PB context (--jira KEY \| --feature T \| --paths P…) [--max-words N]` | Context pack: pages + markdown (`--jira` matches epics and features; `--feature` takes any feature or epic title) |
 | `PB prs --since ISO [--repo owner/name]` | Merged PRs since the cursor that touch a module (via `gh`): only those reach you, with modules, matched files, diff size and description; plus the new `cursor` |
@@ -25,7 +26,7 @@ Every `pb` skill reads this file before acting. Skills that write to the brain a
 | `PB state suppress <source> "<claim>"` | Claim corrected by `/pb:fix` that sync must not re-ingest |
 | `PB correction --page P --wrong W --right R --evidence E` | Append to `brain/.pb/corrections.md` |
 | `PB commit -m MSG [--allow-default] [--include PATH…]` | Commit `brain/` changes (generated files excluded), plus any `--include` paths, on the current branch |
-| `PB routine start --branch B [--worktree DIR]` / `PB routine finish --branch B -m MSG` / `PB routine discard` / `PB routine cleanup --worktree DIR` | Routine runs: checkout target branch (or, for manual local runs, a detached worktree that leaves the user's checkout alone); commit, rebase, push (no PR); drop the run's brain changes except digests; remove the worktree |
+| `PB routine start --branch B [--worktree DIR]` / `PB routine finish --branch B -m MSG [--confidence PATH=LEVEL…]` / `PB routine discard` / `PB routine cleanup --worktree DIR` | Routine runs: checkout target branch (or, for manual local runs, a detached worktree that leaves the user's checkout alone); commit, rebase, push; pages the review policy holds go to a `pb/review/<timestamp>` branch with a PR and reviewers; drop the run's brain changes except digests; remove the worktree |
 | `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap |
 | `PB scaffold --product NAME [--repo DIR]` | Create `brain/`, CI workflows, CLAUDE.md pointer, vendored toolkit |
 | `PB generate` | CI only: index, glossary, context packs, backlinks, digest retention |

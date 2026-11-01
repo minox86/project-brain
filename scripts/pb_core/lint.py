@@ -1,13 +1,12 @@
 """Structural maintenance checks on top of validate."""
 import datetime
-import difflib
 import os
 
 from . import links
 from .context import path_matches
 from .generate import is_archived
 from .stats import stats
-from .validate import validate
+from .validate import looks_duplicate, page_targets, validate
 
 SKIP_DIRS = {".git", "node_modules", "dist", "build", ".venv", "venv", "vendor", "target", "brain", "__pycache__"}
 
@@ -22,7 +21,7 @@ def lint(brain, today):
             item["related"] = related
         findings.append(item)
 
-    checked = validate(brain)
+    checked = validate(brain, base=None)
     for f in checked["errors"]:
         add(f["code"], f["path"], f["message"])
     for f in checked["warnings"]:
@@ -30,7 +29,7 @@ def lint(brain, today):
             add(f["code"], f["path"], f["message"])
 
     pages = [p for p in brain.pages() if p.type in brain.types]
-    outgoing = {p.rel: _targets(brain, p) for p in pages}
+    outgoing = {p.rel: page_targets(brain, p) for p in pages}
     incoming = {p.rel: 0 for p in pages}
     for rel, targets in outgoing.items():
         for t in targets:
@@ -55,17 +54,6 @@ def lint(brain, today):
     return {"findings": findings, "stats": stats(brain)}
 
 
-def _targets(brain, page, skip_fields=()):
-    names = links.extract(page.body) + [t for field, t in links.meta_links(page.meta, brain.types.get(page.type))
-                                        if field not in skip_fields]
-    found = (brain.lookup(n)[0] for n in names)
-    unique = {}
-    for f in found:
-        if f is not None:
-            unique[f.rel] = f
-    return list(unique.values())
-
-
 def _age(page, today):
     try:
         return (today - datetime.date.fromisoformat(str(page.get("updated")))).days
@@ -74,16 +62,9 @@ def _age(page, today):
 
 
 def _duplicates(pages, add):
-    seen = set()
     for i, a in enumerate(pages):
         for b in pages[i + 1:]:
-            if a.type != b.type or (b.rel, a.rel) in seen:
-                continue
-            names_a = {a.title.lower()} | {str(x).lower() for x in _as_list(a.get("aliases"))}
-            names_b = {b.title.lower()} | {str(x).lower() for x in _as_list(b.get("aliases"))}
-            ratio = difflib.SequenceMatcher(None, a.title.lower(), b.title.lower()).ratio()
-            if ratio >= 0.85 or names_a & names_b:
-                seen.add((a.rel, b.rel))
+            if looks_duplicate(a, b):
                 add("duplicate-candidate", a, f"looks like a duplicate of [[{b.title}]]: merge them", [b.rel])
 
 
@@ -112,7 +93,7 @@ def _superseded_refs(brain, pages, add):
                 if found is not None:
                     successors.setdefault(found.rel, []).append(p)
     for p in pages:
-        targets = {t.rel: t for t in _targets(brain, p, skip_fields=("supersedes",))}
+        targets = {t.rel: t for t in page_targets(brain, p, skip_fields=("supersedes",))}
         for t in targets.values():
             if t.type != "decision" or t.get("status") != "superseded" or t.rel == p.rel:
                 continue
@@ -121,8 +102,3 @@ def _superseded_refs(brain, pages, add):
                 hint = ", ".join(f"[[{n.title}]]" for n in newer) or "its successor"
                 add("superseded-referenced", p, f"links superseded [[{t.title}]]: link {hint} instead or as well")
 
-
-def _as_list(value):
-    if value is None:
-        return []
-    return value if isinstance(value, list) else [value]

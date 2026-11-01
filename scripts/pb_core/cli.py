@@ -19,6 +19,7 @@ from .scan import scan
 from .errors import PbError, UsageError
 from .prs import merged_prs
 from .resolve import resolve
+from .review import review
 from .validate import validate
 
 
@@ -70,8 +71,12 @@ def _cmd_prs(args):
 
 
 def _cmd_validate(args):
-    result = validate(_brain(args), args.paths or None)
+    result = validate(_brain(args), args.paths or None, args.base)
     return result, 1 if result["errors"] else 0
+
+
+def _cmd_review(args):
+    return review(_brain(args), args.base, args.confidence or ()), 0
 
 
 def _cmd_context(args):
@@ -138,7 +143,7 @@ def _cmd_routine(args):
         return gitops.routine_start(brain, args.branch, args.worktree), 0
     if not args.message:
         raise UsageError("pb routine finish needs -m MESSAGE")
-    result = gitops.routine_finish(brain, args.branch, args.message)
+    result = gitops.routine_finish(brain, args.branch, args.message, args.confidence or ())
     return result, 1 if result["conflict"] else 0
 
 
@@ -211,7 +216,14 @@ def build_parser():
     p.add_argument("--branch")
     p.add_argument("--worktree", help="manual runs: work in a detached worktree at this path")
     p.add_argument("-m", "--message")
+    p.add_argument("--confidence", nargs="+", action="extend", metavar="PATH=LEVEL",
+                   help="finish: pages written with less than high confidence (low, medium)")
     p.set_defaults(handler=_cmd_routine)
+    p = sub.add_parser("review")
+    p.add_argument("--base", default="HEAD", help="git commit to compare with (default: HEAD, uncommitted changes)")
+    p.add_argument("--confidence", nargs="+", action="extend", metavar="PATH=LEVEL",
+                   help="pages written with less than high confidence (low, medium)")
+    p.set_defaults(handler=_cmd_review)
     p = sub.add_parser("scan")
     p.add_argument("--repo")
     p.set_defaults(handler=_cmd_scan)
@@ -226,5 +238,6 @@ def build_parser():
     p.set_defaults(handler=_cmd_lint)
     p = sub.add_parser("validate")
     p.add_argument("paths", nargs="*")
+    p.add_argument("--base", default="HEAD", help="git commit the noise checks compare with (default: HEAD)")
     p.set_defaults(handler=_cmd_validate)
     return parser

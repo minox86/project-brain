@@ -73,6 +73,7 @@ class Brain:
         self.config = dict(DEFAULTS)
         self.config.update(self._meta_of(self.root / "schema" / "brain.md"))
         self.sources = self._meta_of(self.root / "schema" / "sources.md")
+        self.review = self._meta_of(self.root / "schema" / "review.md")
         self.types = self._load_types()
         self.load_errors = []
         self._pages = None

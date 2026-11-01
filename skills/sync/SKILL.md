@@ -96,11 +96,13 @@ For each configured series (`meetings:` entries):
        - <n> threads ignored; <source ref>: <reason>
        ## Deferred
        - <n> active threads
+       ## Pending review
+       - [[Page]]: <reasons from PB review>
        ## Problems
        - <missing connectors, errors, previous run failures>
        ## Brain size
        - <pages> pages, <words> words; over budget: <titles>
 
-   Take the size from `PB stats`.
+   Take the size from `PB stats`. For "Pending review": rate the confidence of every page you created or updated (see **Confidence and review** in the writing conventions), run `PB review --confidence <path>=<level>…` passing only pages below high, and list the pages it holds with their reasons. Keep the same `--confidence` arguments for `PB routine finish`.
 3. Only after the pages are written and valid, move the cursors: `PB state set <source> <key> '<json>'`.
 4. Interactive run: closing flow (`PB commit -m "pb(sync): <sources> <date>"`). Routine run: the routine prompt handles commit and push.

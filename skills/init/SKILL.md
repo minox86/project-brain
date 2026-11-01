@@ -20,8 +20,9 @@ Arguments: `$ARGUMENTS`
 Never ask the user what you can find yourself.
 
 - `PB scan` → module candidates, API specs, ADRs, CODEOWNERS, READMEs, CI files, top-level folders.
-- Read the base preset: `BASE/../../presets/software-product/brain.md` and every file in `BASE/../../presets/software-product/types/`.
+- Read the base preset: `BASE/../../presets/software-product/brain.md`, `BASE/../../presets/software-product/review.md` and every file in `BASE/../../presets/software-product/types/`.
 - Read the root README and the READMEs of the main module candidates; skim a sample of ADRs and the first lines of each spec.
+- Reviewer candidates: owners in CODEOWNERS (per path: backend, frontend, design system…); with `gh` available, the repo's teams (`gh api repos/<owner>/<repo>/teams`) and top committers per module path.
 - Infer: product name (README title, package name), domain vocabulary (recurring nouns), module boundaries (workspaces, deployables), whether UX decisions are likely (frontend apps present), glossary languages.
 - Only if the user names them: a Confluence space (Atlassian connector: pages tree) and Jira epics (JQL) to seed features and concepts. If the Atlassian connector is missing, guide the user to connect it (see **Connectors** in the conventions) or skip the seeding.
 
@@ -36,6 +37,11 @@ The decisions that define the schema, each with the decisions that hang off it:
 - Glossary languages (default `[en, it]`).
 - Module map: which scan candidates are modules, their names, their `paths`, groupings.
 - Thresholds in `brain.md` (archive, stale open questions, digest retention, context pack cap, raw cap).
+- Review policy (`brain/schema/review.md`, the preset's template as the starting point): which changes reach the branch directly and which wait in a PR.
+  - Points of attention, once the types are settled: for each kept type, which changes need a human (any change, creation only, deletion, or only when given fields change, e.g. feature `status`, module `paths`). Recommend the preset's `watch` rules adapted to the kept and added types.
+  - Confidence: below which level the writer's own rating holds a change (`direct_min_confidence`: `high` recommended; `medium` for a team that wants fewer PRs; `low` never holds by confidence).
+  - Noise: whether pages still carrying a noise warning wait for review (`noise_to_review`, recommended `true`).
+  - Reviewers per area: who reviews **technical** changes (modules, interfaces, environments, technical decisions), **functional** ones (features, concepts, functional decisions) and **design** ones (`ux` decisions); GitHub users or `org/team`. Recommend from the reviewer candidates. Cross-cutting pages (epics, open questions without area) ask every area.
 - Sources to register now or later via `/pb:routine-setup` (Teams channels, Confluence spaces, Jira projects whose epics the brain follows).
 - Bootstrap scope: which modules, specs and ADRs to turn into pages now.
 
@@ -58,12 +64,12 @@ Interview the user relentlessly until the schema is fully settled. Work the tree
 
 ## 4. Confirm
 
-Show the final schema in one block: types table (area, folder, fields, budget), thresholds, glossary languages, module map, bootstrap scope. Ask for explicit confirmation. Do not write anything before it.
+Show the final schema in one block: types table (area, folder, fields, budget), thresholds, glossary languages, review policy (watched points, confidence threshold, reviewers per area), module map, bootstrap scope. Ask for explicit confirmation. Do not write anything before it.
 
 ## 5. Scaffold and apply the schema
 
 1. `PB scaffold --product "<name>"` (creates `brain/`, CI workflows, the CLAUDE.md pointer, `.gitignore` entry, vendored toolkit). Report `skipped` workflows if any already existed, and confirm `default_branch` with the user: it is the branch `pb-generate.yml` runs on (fix the workflow if it is wrong).
-2. Apply the interview results by editing `brain/schema/brain.md` and `brain/schema/types/*.md`: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; add new type files in the same format.
+2. Apply the interview results by editing `brain/schema/brain.md`, `brain/schema/review.md` and `brain/schema/types/*.md`. In `review.md` set `watch`, `direct_min_confidence`, `noise_to_review` and `reviewers`; check each handle with `gh api users/<login>` or `gh api orgs/<org>/teams/<slug>` when `gh` is available, and keep the prose in sync with the rules. For the types: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; add new type files in the same format.
 3. `PB validate` must pass on the empty brain.
 
 ## 6. Bootstrap content
@@ -80,6 +86,6 @@ Ask: "Create all / choose by number / none". Apply the significance gate and the
 
 Closing flow of the writing conventions, committing the files scaffold created outside `brain/` too: `PB commit -m "pb(init): create brain for <product>" --include CLAUDE.md .gitignore .github/workflows/pb-validate.yml .github/workflows/pb-generate.yml` (leave out workflows reported as `skipped`). Then explain the next steps:
 - the brain travels with this branch's PR; once merged, CI keeps `index.md`, `glossary.md` and `context/` up to date;
-- enable auto-merge in the repo settings so brain-only PRs merge once `pb-validate` passes; `pb-generate` also runs hourly, because merges made by auto-merge do not trigger push workflows;
+- enable auto-merge in the repo settings so brain-only PRs merge once `pb-validate` passes, unless they touch a point watched in `brain/schema/review.md`: then CI requests the area reviewers instead; `pb-generate` also runs hourly, because merges made by auto-merge do not trigger push workflows;
 - `/pb:routine-setup` to feed the brain nightly from Teams, Confluence and merged PRs;
 - non-developers read the brain from Cowork through the GitHub connector.

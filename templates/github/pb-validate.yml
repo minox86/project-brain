@@ -28,20 +28,49 @@ jobs:
           [ -f "$toolkit" ] || toolkit=brain/.pb/toolkit/pb.py
           python3 "$toolkit" --brain brain validate
 
-  automerge:
+  route:
     needs: validate
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Auto-merge brain-only pull requests
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check out the base branch toolkit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .pb-base
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Apply the review policy (brain/schema/review.md), then auto-merge or request reviewers
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.html_url }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
+          toolkit=.pb-base/brain/.pb/toolkit/pb.py
+          [ -f "$toolkit" ] || toolkit=brain/.pb/toolkit/pb.py
+          if ! python3 "$toolkit" --brain brain review --base "$BASE" > "$RUNNER_TEMP/review.json"; then
+            echo "The toolkit on the base branch cannot apply the review policy: normal review flow"
+            exit 0
+          fi
+          route=$(jq -r '.route' "$RUNNER_TEMP/review.json")
+          if [ "$route" = "pr" ]; then
+            jq -r '.markdown' "$RUNNER_TEMP/review.json" >> "$GITHUB_STEP_SUMMARY"
+            reviewers=$(jq -r '.reviewers.handles | join(",")' "$RUNNER_TEMP/review.json")
+            if [ -n "$reviewers" ]; then
+              gh pr edit "$PR" --add-reviewer "$reviewers" || echo "Could not request $reviewers (the author cannot review, teams need org access)"
+            fi
+          fi
           files=$(gh pr diff --name-only "$PR")
           # Brain content only: code, and the vendored toolkit in brain/.pb/toolkit/, go through review.
-          if [ -n "$files" ] && ! echo "$files" | grep -qv '^brain/' && ! echo "$files" | grep -q '^brain/\.pb/toolkit/'; then
+          # Routine review PRs (pb/review/*) hold what the routine was not sure of: always a human merge.
+          if [ "$route" = "direct" ] && [ -n "$files" ] && ! echo "$files" | grep -qv '^brain/' \
+             && ! echo "$files" | grep -q '^brain/\.pb/toolkit/' && [ "${HEAD_REF#pb/review/}" = "$HEAD_REF" ]; then
             gh pr merge --auto --squash "$PR"
           else
-            echo "PR touches code or the pb toolkit: normal review flow"
+            echo "Normal review flow: watched brain changes, code, the pb toolkit or a routine review PR"
           fi

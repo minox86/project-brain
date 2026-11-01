@@ -1,9 +1,11 @@
 """Checks pages against the schema; scans every brain text for secrets."""
+import difflib
 import os
 import re
 from pathlib import Path
 
-from . import frontmatter, links
+from . import frontmatter, links, policy
+from .changes import changed_pages
 from .errors import FrontmatterError
 from .secrets import scan
 
@@ -11,8 +13,18 @@ IMPLICIT = {"type", "title", "aliases", "summary", "created", "updated", "source
 BAD_TITLE = re.compile(r'[\\/:*?"<>|#^\[\]]')
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}$")
 
+# Noise checks: warnings on the pages a change creates or updates (against a git base).
+NOISE = ("possible-duplicate", "new-orphan", "missing-source", "log-heading", "ephemeral", "verbatim")
+LOG_HEADING = re.compile(r"^#{1,6}\s.*(\d{4}-\d{2}-\d{2}|\b(updates?|changelog|history|aggiornament[oi]|storico)\b)",
+                         re.IGNORECASE)
+EPHEMERAL = re.compile(r"\b((this|next|last) (sprint|week)|today|yesterday|tomorrow|wip|todo"
+                       r"|(questo|prossimo|scorso) sprint|(questa|prossima|scorsa) settimana|oggi|ieri|domani)\b",
+                       re.IGNORECASE)
+VERBATIM_WORDS = 40
+DUPLICATE_RATIO = 0.85
 
-def validate(brain, paths=None):
+
+def validate(brain, paths=None, base="HEAD"):
     errors, warnings = [], []
     scope = _scope(brain, paths)
 
@@ -43,6 +55,10 @@ def validate(brain, paths=None):
         _check_page(brain, p, lambda c, m, bucket=errors: report(bucket, p.rel, c, m),
                     lambda c, m: report(warnings, p.rel, c, m))
 
+    changed = changed_pages(brain, base) if base else None
+    for p, code, message in noise(brain, changed):
+        report(warnings, p.rel, code, message)
+
     for p in brain.pages():
         for hit in scan(p.path.read_text(encoding="utf-8")):
             report(errors, p.rel, "secret", f"line {hit['line']}: looks like a {hit['kind']} secret")
@@ -68,6 +84,9 @@ def validate(brain, paths=None):
         problem = schedule_problem(str(routine.get("schedule")))
         if problem:
             report(errors, "schema/sources.md", "bad-schedule", problem)
+
+    for problem in policy.problems(brain):
+        report(errors, "schema/review.md", "bad-review-policy", problem)
 
     errors.sort(key=lambda f: (f["path"], f["code"]))
     warnings.sort(key=lambda f: (f["path"], f["code"]))
@@ -140,6 +159,79 @@ def _check_page(brain, p, error, warn):
         warn("over-budget", f"{p.words} words, budget {typedef.max_words}: condense the page")
 
 
+def noise(brain, changed):
+    """[(page, code, message)] for the created or updated pages in `changed` (see changes.changed_pages)."""
+    if not changed:
+        return []
+    pages = [p for p in brain.pages() if p.type in brain.types]
+    touched = [p for p in pages if p.rel in changed and changed[p.rel]["change"] != "delete"]
+    incoming = {}
+    for p in pages:
+        for t in page_targets(brain, p):
+            if t.rel != p.rel:
+                incoming.setdefault(t.rel, set()).add(p.rel)
+    out = []
+    for p in touched:
+        if changed[p.rel]["change"] == "create":
+            for other in pages:
+                if other is not p and looks_duplicate(p, other):
+                    out.append((p, "possible-duplicate",
+                                f"looks like [[{other.title}]]: update that page instead, or make the titles distinct"))
+                    break
+            if not incoming.get(p.rel):
+                out.append((p, "new-orphan", "new page that no other page links: link it from the page it belongs to"))
+        if not _as_list(p.get("sources")):
+            out.append((p, "missing-source", "'sources' is empty: cite where this knowledge comes from"))
+        out += [(p, code, message) for code, message in _body_noise(p.body)]
+    return out
+
+
+def _body_noise(body):
+    found, quote, quote_line, fenced = {}, 0, 0, False
+    for n, line in enumerate(body.splitlines() + [""], 1):
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        if line.startswith(">"):
+            quote_line = quote_line or n
+            quote += len(line.lstrip("> ").split())
+            continue
+        if quote > VERBATIM_WORDS and "verbatim" not in found:
+            found["verbatim"] = f"line {quote_line}: a {quote}-word quote: summarise it and link the source"
+        quote, quote_line = 0, 0
+        if LOG_HEADING.match(line) and "log-heading" not in found:
+            found["log-heading"] = (f"line {n}: '{line.strip()}' reads like a log entry: "
+                                    "consolidate into the page instead of dated or update sections")
+        hit = EPHEMERAL.search(line)
+        if hit and not line.startswith("#") and "ephemeral" not in found:
+            found["ephemeral"] = (f"line {n}: '{hit.group(0)}' is status, not durable knowledge: "
+                                  "state the lasting fact or drop it")
+    return list(found.items())
+
+
+def looks_duplicate(a, b):
+    if a.type != b.type:
+        return False
+    names_a = {a.title.lower()} | {str(x).lower() for x in _as_list(a.get("aliases"))}
+    names_b = {b.title.lower()} | {str(x).lower() for x in _as_list(b.get("aliases"))}
+    ratio = difflib.SequenceMatcher(None, a.title.lower(), b.title.lower()).ratio()
+    return ratio >= DUPLICATE_RATIO or bool(names_a & names_b)
+
+
+def page_targets(brain, page, skip_fields=()):
+    """Distinct pages that `page` links to, from its body and its link fields."""
+    names = links.extract(page.body) + [t for field, t in links.meta_links(page.meta, brain.types.get(page.type))
+                                        if field not in skip_fields]
+    unique = {}
+    for name in names:
+        found, _ = brain.lookup(name)
+        if found is not None:
+            unique[found.rel] = found
+    return list(unique.values())
+
+
 def _check_value(name, spec, value, error):
     kind = spec.get("kind", "string")
     if kind == "list":
@@ -183,16 +275,18 @@ def _other_texts(brain):
 def _scope(brain, paths):
     if not paths:
         return None
-    scope = set()
-    for raw in paths:
-        path = Path(raw)
-        if not path.is_absolute():
-            path = Path(os.getcwd()) / path
-        try:
-            scope.add(path.resolve().relative_to(brain.root).as_posix())
-        except ValueError:
-            scope.add(raw)
-    return scope
+    return {brain_rel(brain, raw) for raw in paths}
+
+
+def brain_rel(brain, raw):
+    """A path given on the command line (absolute, or relative to the cwd or to brain/) as brain-relative."""
+    path = Path(raw)
+    if not path.is_absolute():
+        path = Path(os.getcwd()) / path
+    try:
+        return path.resolve().relative_to(brain.root).as_posix()
+    except ValueError:
+        return raw
 
 
 def _as_list(value):

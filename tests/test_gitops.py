@@ -18,6 +18,8 @@ def git(cwd, *args):
 
 
 class GitRepoCase(unittest.TestCase):
+    review_policy = False
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -28,6 +30,8 @@ class GitRepoCase(unittest.TestCase):
         self.remote = base / "remote.git"
         git(base, "init", "-q", "--bare", "-b", "main", str(self.remote))
         self.repo = make_brain(base / "repo")
+        if not self.review_policy:
+            (self.repo / "brain/schema/review.md").unlink()  # no policy: every change goes straight to the branch
         git(self.repo, "init", "-q", "-b", "main")
         git(self.repo, "remote", "add", "origin", str(self.remote))
         git(self.repo, "add", "-A")
@@ -96,7 +100,7 @@ class GitopsTest(GitRepoCase):
         self.add_page("Approval")
         code, data, err = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "pb(routine): sync", cwd=self.repo)
         self.assertEqual(code, 0, err)
-        self.assertEqual(data, {"committed": True, "pushed": True, "conflict": False})
+        self.assertEqual(data, {"committed": True, "pushed": True, "conflict": False, "review": None})
         log = git(self.remote, "log", "--format=%s", "brain/inbox")
         self.assertEqual(log.splitlines()[0], "pb(routine): sync")
         code, data, _ = run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
@@ -122,7 +126,7 @@ class GitopsTest(GitRepoCase):
         self.write("brain/functional/features/Approval.md", "---\ntype: feature\ntitle: Approval\n---\nOurs.\n")
         code, data, _ = run_cli("routine", "finish", "--branch", "main", "-m", "ours", cwd=self.repo)
         self.assertEqual(code, 1)
-        self.assertEqual(data, {"committed": True, "pushed": False, "conflict": True})
+        self.assertEqual(data, {"committed": True, "pushed": False, "conflict": True, "review": None})
         self.assertEqual(git(self.remote, "log", "--format=%s", "-1", "main"), "theirs")
         self.assertFalse((self.repo / ".git" / "rebase-merge").exists())
 

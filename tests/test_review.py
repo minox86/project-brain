@@ -282,9 +282,10 @@ class TemplatesTest(unittest.TestCase):
     def test_validate_workflow_never_merges_and_guards_the_brain_pr(self):
         from helpers import ROOT
         text = (ROOT / "templates/github/pb-validate.yml").read_text()
-        self.assertIn('review --base "$BASE"', text)
-        self.assertIn("github.base_ref == 'docs/brain'", text)
+        self.assertIn("--brain brain validate", text)
+        self.assertNotIn("paths:", text)
         self.assertIn("github.head_ref == 'docs/brain'", text)
+        self.assertIn("head.repo.full_name == github.repository", text)
         self.assertIn("grep -v -E '^(brain/|", text)
         self.assertNotIn("gh pr merge", text)
         self.assertNotIn("--approve", text)

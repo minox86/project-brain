@@ -45,7 +45,7 @@ So that people who are not developers are not asked to approve every internal st
 
 ```json
 {"permissions": {"allow": [
-  "Bash(python3 <plugin root>/scripts/pb.py *)",
+  "Bash(python3 */scripts/pb.py *)",
   "Bash(gh auth status)",
   "Bash(gh api user)",
   "Bash(gh pr checks *)",
@@ -54,9 +54,9 @@ So that people who are not developers are not asked to approve every internal st
 ]}}
 ```
 
-`<plugin root>` is the absolute path of the plugin (`BASE/../..`, resolved), so the rule allows the pb toolkit and nothing else. The toolkit runs git and `gh` itself, so these cover the everyday flow; anything else still asks.
+The pattern survives plugin upgrades (the plugin's folder changes with its version) and matches how the skills call the toolkit (see **Toolkit** in the conventions). The toolkit runs git and `gh` itself, so these cover the everyday flow; anything else still asks.
 
-Also check that the `pb` plugin is enabled for this clone: the monorepo's `.claude/settings.json` lists `pb@project-brain` in `enabledPlugins` (written by `/pb:init`). If it is missing in an existing brain, say that a maintainer can add it with `/pb:init` (upgrade); the plugin keeps working for this user since they installed it.
+Also check that the `pb` plugin is enabled for this clone: the monorepo's `.claude/settings.json` lists `pb@project-brain` in `enabledPlugins` (written by `/pb:init`). If it is missing, the plugin keeps working for this user since they installed it; for newcomers, a maintainer adds `"enabledPlugins": {"pb@project-brain": true}` and the `project-brain` marketplace to that file in a normal code PR.
 
 ## 7. First read
 

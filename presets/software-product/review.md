@@ -15,11 +15,11 @@ watch:
 ---
 # Review policy
 
-Decides which brain changes reach the branch directly and which wait in a pull request for a human. Written by `/pb:init`, changed with `/pb:schema`. `PB review` applies it; `PB validate` checks it.
+Decides which brain changes are saved to `docs/brain` directly and which wait in a pull request for a human. Written by `/pb:init`, changed with `/pb:schema`. `PB review` applies it; `PB validate` checks it.
 
 Where it applies:
-- **Routine runs**: held changes go to a `pb/review/<timestamp>` branch with a PR towards the routine branch, reviewers requested; everything else is pushed as before.
-- **Pull requests from developers**: CI requests the reviewers and does not auto-merge a brain-only PR when it touches a watched point.
+- **Saves from Claude Code** (`PB save`): changes on watched points go to a `pb/review/<timestamp>` branch with a PR towards `docs/brain`, reviewers requested; everything else is pushed to `docs/brain`. The user confirmed what they save, so confidence and noise never hold a page here. Changes to `schema/` (this file included) and to the toolkit always wait for a review.
+- **Routine runs**: the same, plus the routine's own confidence ratings and, with `noise_to_review`, its noise warnings.
 
 ## Fields
 

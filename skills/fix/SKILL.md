@@ -21,7 +21,7 @@ Find every page asserting the wrong fact:
 - a search across `brain/` for the claim, its key terms, the concept's aliases (`grep -ril`);
 - pages linked from those (`PB context --feature`/`--paths` when relevant).
 
-Ignore generated files (`index.md`, `glossary.md`, `context/`): CI rebuilds them.
+Ignore generated files (`index.md`, `glossary.md`, `context/`): every save rebuilds them.
 
 ## 3. Classify
 
@@ -44,4 +44,4 @@ Show, for every page, the exact lines before and after. After confirmation:
 
 ## 6. Log and close
 
-`PB correction --page <rel path> --wrong "<wrong>" --right "<right>" --evidence "<evidence>"` once per corrected page. Then the closing flow: `PB save -m "pb(fix): <summary>"`.
+`PB correction --page <rel path> --wrong "<wrong>" --right "<right>" --evidence "<evidence>"` once per corrected page. Then the closing flow: `PB save -m "pb(fix): <summary>" <files written>`.

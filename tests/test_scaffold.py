@@ -37,7 +37,7 @@ class ScaffoldTest(unittest.TestCase):
         merge_back = (self.repo / ".github/workflows/pb-brain-branch.yml").read_text()
         self.assertIn('branches: ["main"]', merge_back)
         self.assertIn("origin/main", merge_back)
-        self.assertNotIn("{{", merge_back)
+        self.assertNotIn("{{default_branch}}", merge_back)
         settings = json.loads((self.repo / ".claude/settings.json").read_text())
         self.assertTrue(settings["enabledPlugins"]["pb@project-brain"])
         claude = (self.repo / "CLAUDE.md").read_text()

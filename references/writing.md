@@ -4,6 +4,11 @@ Read by every skill that writes to the brain, after `conventions.md`.
 
 ## Before writing
 
+`PB workspace sync` (see **Modes** in the conventions): write every page under its `brain`, never in the user's checkout. If it reports:
+- `leftovers`: pages written earlier and never saved, maybe by another session. Show them in one line and ask: save them with this work, or discard them (`git -C <worktree> checkout -- brain` and `git -C <worktree> clean -fdq brain`). Never drop them silently.
+- `rebase_in_progress`: a save stopped on a conflict; finish it first (**Conflicts** below).
+- `unpushed`: saves that did not reach GitHub (offline); the next `PB save` sends them, nothing to do.
+
 Read `brain/schema/brain.md`, the `brain/schema/types/<type>.md` files of every type you will write, and `brain/AGENTS.md`. The prose of each type is binding: when to create, when not to, body structure, word budget.
 
 ## Significance gate
@@ -52,17 +57,22 @@ When a source contradicts the brain, never overwrite silently: create or update 
 - Uploaded files: only extracted text in `brain/raw/YYYY/MM/`; binaries stay outside the repo, recorded by link.
 - No judgements about people, no person names in decisions, no personal or customer personal data, no credentials. `PB validate` fails on secret-looking strings: remove them, never work around the check.
 
-## Closing flow (repo mode)
+## Closing flow
 
 Every writing operation ends like this:
 
-1. `PB validate <created or changed pages>`. Fix errors and repeat, at most twice. If errors remain, stop and report them; do not commit broken pages.
+1. `PB --brain <brain> validate <created or changed pages>`. Fix errors and repeat, at most twice. If errors remain, stop and report them; do not save broken pages.
 2. Condense every page with an `over-budget` warning and fix every noise warning (below), then validate again.
-3. `PB commit -m "pb(<skill>): <one-line summary>"`. The commit stays on the current branch and travels with the developer's PR. Never push, never open PRs.
-4. If the commit fails with `code: on-default-branch`, ask: "You are on `<branch>`. Create a working branch (recommended) or commit here?" Create the branch with `git switch -c <name>` and rerun, or rerun with `--allow-default`.
-5. Summarise: pages created/updated (as `[[links]]`), open questions raised, anything dropped by the significance gate worth mentioning.
+3. `PB save -m "pb(<skill>): <one-line summary>"`. It commits, pushes straight to `docs/brain` and returns at once; never wait for CI. Pages the review policy holds go to a review PR (`review.pr`).
+4. Tell the user the outcome in plain words, without git terms: "Saved: everyone sees it now." When `review` is set: "These pages wait for a review by <reviewers>: <link>." When `pushed` is false with `unpushed` > 0: "Saved on this computer; it goes out with the next save (no connection now)." Then the `problems`, if any, in one line each.
+5. Exit 1 with `errors`: fix those pages and save again. Exit 1 with `conflict`: **Conflicts** below.
+6. Summarise: pages created/updated (as `[[links]]`), open questions raised, anything dropped by the significance gate worth mentioning.
 
 The nightly routine uses its own closing flow (see `templates/routine/prompt.md`).
+
+## Conflicts
+
+Someone saved the same page in the meantime. `conflict.paths` lists the files, with `<<<<<<<`, `=======`, `>>>>>>>` markers. Resolve them yourself, never ask the user to use git: merge both versions into one coherent page (keep every fact, drop duplicates, the newer source wins on a contradiction; a real disagreement becomes an `open-question`), remove the markers, then `PB save --continue`. Mention it in one line: "Someone had changed <page> meanwhile: I merged both versions." If the merge needs a judgement only the user can make, ask before continuing.
 
 ## Noise warnings
 
@@ -77,7 +87,7 @@ The nightly routine uses its own closing flow (see `templates/routine/prompt.md`
 | `ephemeral` | Status words (today, this sprint, TODO…): state the lasting fact or drop it |
 | `verbatim` | A long quote: summarise and link the source |
 
-Fix them before committing. A warning that is a false positive can stay, but with `noise_to_review: true` in `brain/schema/review.md` the page then waits for a reviewer.
+Fix them before saving. A warning that is a false positive can stay, but with `noise_to_review: true` in `brain/schema/review.md` the page then waits for a reviewer.
 
 ## Confidence and review
 
@@ -86,7 +96,7 @@ Fix them before committing. A warning that is a false positive can stay, but wit
 - **medium**: inferred, or from one voice in a discussion that did not visibly conclude;
 - **low**: an interpretation, an ambiguous name resolution, a contradiction, a type chosen with doubt.
 
-Only the routine passes ratings to the toolkit (`--confidence PATH=LEVEL`, high is the default). In interactive skills the user is there: show what you rated medium or low in the plan or preview and let them decide. Developer PRs are routed by CI: watched changes get the area reviewers and are not auto-merged.
+Only the routine passes ratings to the toolkit (`--confidence PATH=LEVEL`, high is the default). In interactive skills the user is there: show what you rated medium or low in the plan or preview and let them decide; once they confirm, the page counts as high. Pages on points watched by the policy go to a review PR whatever the confidence.
 
 ## Schema signals
 

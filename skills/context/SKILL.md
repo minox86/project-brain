@@ -19,4 +19,4 @@ Read `BASE/../../references/conventions.md`. Works in repo mode and read mode. I
 
 ## Read mode
 
-For a feature or an active epic, read `brain/context/<title>.md` from the default branch. For a Jira key, find the epic page (`brain/epics/`) or feature whose `jira` field lists it. For paths, find modules whose `paths` cover them (module pages in `brain/technical/modules/`), then follow their links to interfaces, features, decisions (not superseded) and open questions (open only). Present the same sections: Epics, Features, Concepts, Modules, Interfaces, Decisions, Open questions.
+For a feature or an active epic, read `brain/context/<title>.md` from the branch `docs/brain`. For a Jira key, find the epic page (`brain/epics/`) or feature whose `jira` field lists it. For paths, find modules whose `paths` cover them (module pages in `brain/technical/modules/`), then follow their links to interfaces, features, decisions (not superseded) and open questions (open only). Present the same sections: Epics, Features, Concepts, Modules, Interfaces, Decisions, Open questions.

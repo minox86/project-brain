@@ -105,4 +105,4 @@ For each configured series (`meetings:` entries):
 
    Take the size from `PB stats`. For "Pending review": rate the confidence of every page you created or updated (see **Confidence and review** in the writing conventions), run `PB review --confidence <path>=<level>…` passing only pages below high, and list the pages it holds with their reasons. Keep the same `--confidence` arguments for `PB routine finish`.
 3. Only after the pages are written and valid, move the cursors: `PB state set <source> <key> '<json>'`.
-4. Interactive run: closing flow (`PB commit -m "pb(sync): <sources> <date>"`). Routine run: the routine prompt handles commit and push.
+4. Interactive run: closing flow (`PB save -m "pb(sync): <sources> <date>"`). Routine run: the routine prompt handles commit and push.

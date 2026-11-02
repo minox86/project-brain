@@ -15,7 +15,9 @@ Accepted decisions constrain your work. If the code contradicts the brain, say s
 
 ## Writing
 
-Write through the `pb` plugin skills (`/pb:put`, `/pb:capture`, `/pb:fix`) or, by hand, following `brain/schema/types/<type>.md`. Never edit generated files: `index.md`, `glossary.md`, `context/`, `.pb/backlinks.json`.
+The brain lives on the branch `docs/brain`; `brain/` in a code branch is a copy that can be a few days behind (it arrives through a PR from `docs/brain`). The latest version: the `pb` skills, or `git show origin/docs/brain:brain/<path>`.
+
+Write only through the `pb` plugin skills (`/pb:put`, `/pb:capture`, `/pb:fix`): they save to `docs/brain`. Never edit `brain/` in a code branch (it would conflict with the brain coming from `docs/brain`), and never edit generated files: `index.md`, `glossary.md`, `context/`, `.pb/backlinks.json`.
 
 Content enters only if it is:
 - **durable** — still true and useful in a month;

@@ -26,8 +26,9 @@ Project Brain collects that context into `brain/`, a folder of plain Markdown pa
 
 | Who | Where | How they use it |
 |---|---|---|
-| 👩‍💻 **Developers** | Claude Code | Read and write the brain; changes ship with their PR |
-| 🧑‍🎨 **PMs, designers, analysts, QA** | Claude Cowork | Ask questions and get briefings; they keep writing on Confluence and Teams, and the routine brings it in |
+| 👩‍💻 **Developers** | Claude Code | Read and write the brain; their working branch is never touched |
+| 🧑‍🎨 **PMs, designers, analysts, QA** | Claude Code (desktop app) | Read and write the brain without knowing git: `/pb:setup` prepares the computer once |
+| 👀 **Anyone, read-only** | Claude Cowork | Ask questions and get briefings through the GitHub connector |
 | 🤖 **AI agents** | Any session in the repo | Read `brain/AGENTS.md` and the context packs before touching code |
 
 ```mermaid
@@ -37,8 +38,9 @@ flowchart LR
     C[Confluence pages] --> R
     J[Jira epics] --> R
     P[Merged PRs] --> R
-    R([Scheduled routine]) --> B[(brain/ in the monorepo)]
-    D[Developer sessions<br>/pb:capture · /pb:put] --> B
+    R([Scheduled routine]) --> B[(brain/ on docs/brain)]
+    D[Claude Code sessions<br>/pb:capture · /pb:put] --> B
+    B -- one PR, merged when the team wants --> K[default branch]
     B --> A[AI agents in the repo]
     B --> W[Cowork: /pb:ask · /pb:context]
 ```
@@ -84,18 +86,26 @@ Once per product.
 
 ### 1 · Create the brain
 
-> **Who:** a developer, in Claude Code · **Needs:** Python 3.9+ and git
+> **Who:** a developer or the Engineering Manager, in Claude Code · **Needs:** Python 3.9+, git, `gh` logged in
 
-1. Open the monorepo and create a branch: `git switch -c pb/init`.
-2. Run **`/pb:init`**. Claude looks at the repo, then asks a few rounds of questions to shape the wiki around your product, including which parts of it need a human review and who reviews technical, functional and design changes. Answer "yes" to accept its suggestion.
-3. Confirm. Claude creates `brain/`, adds two GitHub workflows and proposes the first pages.
-4. Open a PR and merge it.
+1. Open the monorepo and run **`/pb:init`**. Your checkout is not touched: init works in a temporary copy.
+2. Claude looks at the repo, then asks a few rounds of questions to shape the wiki around your product, including which parts of it need a human review and who reviews technical, functional and design changes. The recommended answer is always the first option.
+3. Confirm. Claude creates the branch `docs/brain` with `brain/`, three GitHub workflows and the first pages, and opens the PR from `docs/brain` to your default branch.
+4. Merge that PR: it turns on the workflows.
+
+**How it works from then on.** The brain lives on `docs/brain`. Every save goes straight there, so everyone sees it at once; only pages on watched points wait for a reviewer in a PR. pb keeps one PR open from `docs/brain` to the default branch: merge it when you want the code branches to carry the brain, with any merge method. Your default branch keeps its protection; `docs/brain` must stay open to pushes from the team.
 
 > [!IMPORTANT]
-> In the monorepo's GitHub settings:
-> - set **Actions → General → Workflow permissions** to *Read and write*;
-> - turn on **General → Allow auto-merge**;
-> - if `main` is protected, allow GitHub Actions to push to it.
+> `docs/brain` must not be covered by a branch protection or ruleset, and workflows must be allowed to push to it (`contents: write`). `/pb:init` checks both and tells you what an admin must change.
+
+> [!NOTE]
+> Coming from an earlier version, with the brain on the default branch? Run `/pb:init` again: it moves the brain to `docs/brain`.
+
+### 1b · Everyone else
+
+> **Who:** each person who will use the brain, in Claude Code (the desktop app is fine) · **Needs:** write access to the monorepo
+
+Run **`/pb:setup`**. Claude installs what is missing (git, Python, GitHub CLI), signs you in to GitHub, clones the monorepo and checks that you can read the brain. Then ask the brain anything, or save what you know: no git involved.
 
 ### 2 · Set up the routine
 
@@ -105,7 +115,6 @@ Once per product.
    - the Teams channels and Confluence spaces to read;
    - the recurring meetings to follow (refinement, design review, demo…): they need transcription on and the routine owner invited;
    - the Jira projects whose epics to follow;
-   - the branch the routine writes to;
    - how often it runs: every night (default), weekdays only, a few times a day, every N hours, once a week, or a custom schedule. At most once an hour.
 2. Claude creates the routine (or prints the steps) and starts a first run.
 3. Check `brain/digests/<today>.md` to see what was added and what was skipped.
@@ -122,16 +131,16 @@ Once the brain and the routine are set up, these happen without anyone running a
   - starts from the context of your feature or epic;
   - follows accepted decisions;
   - flags code that contradicts the brain.
-- ✅ **The brain checks itself on every PR.** CI flags broken links, malformed pages and anything that looks like a password or token. Brain-only PRs merge on their own once the checks pass, unless they touch a point you asked to watch.
-- 🔇 **Noise is caught as it is written.** New pages that look like an existing one, pages nobody links, claims without a source, dated "update" sections, status talk ("this sprint", "TODO") and long verbatim quotes are flagged before the commit.
-- 👀 **Sensitive changes wait for the right reviewer.** `brain/schema/review.md`, written by `/pb:init` and changed with `/pb:schema`, lists the points that need a human (decisions, interfaces, feature status…) and who reviews technical, functional and design changes. The routine pushes what it is sure of and opens a PR, with those reviewers, for the rest.
-- 📚 **Indexes stay fresh.** CI rebuilds the index, the bilingual glossary and a context pack for every feature and active epic after every merge, and at least hourly.
+- ✅ **The brain checks itself.** Every save is validated before it leaves your computer, and CI checks it again: broken links, malformed pages and anything that looks like a password or token. The PR towards the default branch fails if `docs/brain` carries anything other than the brain.
+- 🔇 **Noise is caught as it is written.** New pages that look like an existing one, pages nobody links, claims without a source, dated "update" sections, status talk ("this sprint", "TODO") and long verbatim quotes are flagged before the save.
+- 👀 **Sensitive changes wait for the right reviewer.** `brain/schema/review.md`, written by `/pb:init` and changed with `/pb:schema`, lists the points that need a human (decisions, interfaces, feature status…) and who reviews technical, functional and design changes. Saves and the routine push what passes and open a PR, with those reviewers, for the rest.
+- 📚 **Indexes stay fresh.** CI rebuilds the index, the bilingual glossary and a context pack for every feature and active epic after every save.
 - 🧹 **Old items step aside.** Superseded decisions, answered questions and closed epics leave the index after a while. Git keeps the history.
 - 💬 **No commands to remember.** Ask in plain words: *"what did we decide about approvals?"*, *"save this decision in the brain"*, *"give me the context for FIN-412"*.
 
 ## 🛠 Commands
 
-**In Claude Code (developers)**
+**In Claude Code (everyone)**
 
 | You want to… | Say it, or run |
 |---|---|
@@ -147,9 +156,9 @@ Once the brain and the routine are set up, these happen without anyone running a
 | Change how often the routine runs | `/pb:routine-setup schedule every 4 hours` |
 | Change the wiki structure | `/pb:schema` |
 
-Changes are committed on your current branch and go out with your PR.
+Saves go straight to `docs/brain`, never to your working branch. If someone changed the same page meanwhile, Claude merges both versions for you.
 
-**In Cowork (everyone)**
+**In Cowork (read-only)**
 
 | You want to… | Say it, or run |
 |---|---|
@@ -161,7 +170,7 @@ Changes are committed on your current branch and go out with your PR.
 | Get started on the product | `/pb:brief onboarding` |
 
 > [!TIP]
-> Cowork only reads the brain. To add knowledge, write where you already do: analyses on Confluence, discussions in the Teams channel. Mention the Jira epic key and the routine files the content under that epic.
+> Cowork only reads the brain. To add knowledge, use Claude Code (`/pb:setup` prepares it once), or write where you already do: analyses on Confluence, discussions in the Teams channel. Mention the Jira epic key and the routine files the content under that epic.
 
 ## 🩺 Troubleshooting
 
@@ -169,9 +178,12 @@ Changes are committed on your current branch and go out with your PR.
 |---|---|
 | A connector is missing (Atlassian, Microsoft 365, GitHub) | The command names it, shows how to connect it and offers a workaround. In Cowork: **Customize → Connectors**. Some connectors need an organization Owner to enable them. |
 | Cowork says the brain is not reachable | Connect GitHub with read access to the monorepo |
+| "Saved on this computer" | You were offline: the next save sends it |
+| The brain in my code branch is old | It arrives with the PR from `docs/brain`; the `pb` skills always read the latest |
+| `pb-brain-branch` failed | Someone edited `brain/` on the default branch: merge the default branch into `docs/brain` by hand, keeping the `docs/brain` pages |
 | Nothing was added overnight | Read "Problems" in the latest digest in `brain/digests/` |
-| Wrong information | A developer runs `/pb:fix`; anyone else reports it in the Teams channel |
-| The plugin was updated | In the monorepo, ask Claude to run `pb toolkit-sync` and commit it to the routine's branch, so CI and the routine use the new version (cloud routines load no plugins: they follow the copy in `brain/.pb/toolkit/`) |
+| Wrong information | `/pb:fix` in Claude Code |
+| The plugin was updated | In the monorepo, ask Claude to run `pb toolkit-sync` and save it, so CI and the routine use the new version (cloud routines load no plugins: they follow the copy in `brain/.pb/toolkit/`) |
 
 <div align="center">
 <sub>MIT licensed · built for <a href="https://claude.com/claude-code">Claude Code</a> and Claude Cowork</sub>

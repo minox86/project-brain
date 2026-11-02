@@ -9,7 +9,7 @@ Every `pb` skill reads this file before acting. Skills that write to the brain a
 (`${CLAUDE_PLUGIN_ROOT}/scripts/pb.py` is the same file.)
 
 - Every command prints one JSON object. Exit `0` ok; `1` findings described in the JSON; `2` usage or environment error (read `error`).
-- Run from anywhere inside the monorepo; the brain is found by walking up to `brain/schema/VERSION`. Otherwise pass `--brain <dir>` or set `PB_BRAIN`.
+- Run from anywhere inside the monorepo. In repo mode every command that reads or writes pages takes `--brain <brain>` (the managed copy returned by `PB workspace sync`, see **Modes**); otherwise the brain is found by walking up to `brain/schema/VERSION`, or from `PB_BRAIN`.
 - Never do by hand what the toolkit does: validation, name resolution, context packs, stats, lint, sync cursors, commits.
 
 | Command | Use |
@@ -25,7 +25,9 @@ Every `pb` skill reads this file before acting. Skills that write to the brain a
 | `PB state get <source> [key]` / `PB state set <source> <key> <json>` | Sync cursors (`teams`, `confluence`, `github`, `jira`, `meetings`) |
 | `PB state suppress <source> "<claim>"` | Claim corrected by `/pb:fix` that sync must not re-ingest |
 | `PB correction --page P --wrong W --right R --evidence E` | Append to `brain/.pb/corrections.md` |
-| `PB commit -m MSG [--allow-default] [--include PATH…]` | Commit `brain/` changes (generated files excluded), plus any `--include` paths, on the current branch |
+| `PB workspace sync` | Prepare the managed copy of the brain (`docs/brain`) and bring it up to date: `brain` is the path to pass as `--brain`; also reports `leftovers` (pages written but not saved), `rebase_in_progress`, `unpushed` saves |
+| `PB save -m MSG [--force-review]` / `PB save --continue` | Save the pages written in the managed copy: validate, commit, push to `docs/brain`; held pages go to a `pb/review/<timestamp>` PR; keeps the PR from `docs/brain` to the default branch open. `--continue` after resolving a conflict |
+| `PB commit -m MSG [--allow-default] [--include PATH…]` | Init only: commit `brain/` changes (generated files excluded), plus any `--include` paths, on the current branch |
 | `PB routine start --branch B [--worktree DIR]` / `PB routine finish --branch B -m MSG [--confidence PATH=LEVEL…]` / `PB routine discard` / `PB routine cleanup --worktree DIR` | Routine runs: checkout target branch (or, for manual local runs, a detached worktree that leaves the user's checkout alone); commit, rebase, push; pages the review policy holds go to a `pb/review/<timestamp>` branch with a PR and reviewers; drop the run's brain changes except digests; remove the worktree |
 | `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap |
 | `PB scaffold --product NAME [--repo DIR]` | Create `brain/`, CI workflows, CLAUDE.md pointer, vendored toolkit |
@@ -34,13 +36,19 @@ Every `pb` skill reads this file before acting. Skills that write to the brain a
 
 ## Modes
 
-Run `PB version` first.
+Run `PB workspace sync` first (the brain is not in the user's checkout, so `PB version` alone cannot find it):
 
-- **Repo mode** — `brain` is a path: all skills available. You are in the monorepo (Claude Code).
-- **Read mode** — `brain` is `null` or Python is unavailable, but a GitHub connector or tool can read the monorepo: only `/pb:ask`, `/pb:context` and `/pb:brief`. Read files from the default branch: `brain/index.md` first, then `brain/glossary.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
-- **Neither** — the brain is not reachable. Guide the user as **Connectors** below says for the GitHub connector (Cowork), or tell them to open the monorepo in Claude Code.
+- **Repo mode** — it answers with a `brain`: you are in a clone of the monorepo, with Python and git (Claude Code), and all skills are available. Use its `brain` as `--brain` for every `PB` command and as the folder where you read and write pages. The brain always lives on the branch `docs/brain`; the managed copy sits inside the clone's git folder, so the user's checkout, branch and uncommitted code are never touched and nobody needs to know git. Results of `sync`:
+  - `code: no-brain` → no brain yet: `/pb:init` creates it.
+  - `code: busy` → another session is saving: retry in a moment.
+  - `leftovers` → pages written earlier and never saved: see **Before writing** in `writing.md`.
+  - not a clone, or `git`/`python3` missing → `/pb:setup` prepares the computer.
+- **Read mode** — Python or a clone are not available, but a GitHub connector or tool can read the monorepo: only `/pb:ask`, `/pb:context` and `/pb:brief`. Read files from the branch `docs/brain`: `brain/index.md` first, then `brain/glossary.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
+- **Neither** — the brain is not reachable. Guide the user as **Connectors** below says for the GitHub connector (Cowork), or suggest `/pb:setup` in Claude Code.
 
-In read mode, write skills (`put`, `meeting`, `capture`, `fix`, `sync`, `lint`, `schema`, `init`, `routine-setup`, `routine-run`) do not run. Reply: "The brain is read-only here. Knowledge reaches it through the Teams channels and Confluence spaces the nightly routine reads; a developer can also add it with `/pb:put` or fix it with `/pb:fix`."
+In read mode, write skills (`put`, `meeting`, `capture`, `fix`, `sync`, `lint`, `schema`, `init`, `routine-setup`, `routine-run`) do not run. Reply: "The brain is read-only here. In Claude Code (`/pb:setup` prepares it once) anyone can write it; the nightly routine also brings in the Teams channels and Confluence spaces it reads."
+
+The brain on `docs/brain` is always the latest. It reaches the code branches through one PR from `docs/brain` to the default branch that pb keeps open and the team merges when it wants: the `brain/` folder in a code checkout can be a few days behind, the managed copy never is.
 
 ## Connectors
 

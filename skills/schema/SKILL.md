@@ -28,7 +28,7 @@ Changes like "send feature status changes to review", "design reviews go to @acm
 1. Describe the exact change: type files edited, fields renamed/added/removed, folders moved, pages to migrate (list them).
 2. Refuse to remove `decision` or `open-question` or their base fields (`area`, `status`, `affects`, `supersedes`, `resolved_by`, `resolves`): the toolkit relies on them.
 3. Wait for explicit confirmation.
-4. Edit the type files (and the `watch` rules in `review.md` that name a renamed or removed type or field); migrate pages (rename fields, move files with `git mv`, fix every `[[link]]` when a title changes — search the whole brain).
+4. Edit the type files (and the `watch` rules in `review.md` that name a renamed or removed type or field); migrate pages (rename fields, move files, fix every `[[link]]` when a title changes — search the whole brain).
 5. Mark the proposal `- [x]` in `proposals.md`.
-6. `PB validate` must pass with no new errors.
-7. Commit as a dedicated commit: `PB commit -m "pb(schema): <change>"`, following the closing flow.
+6. `PB --brain <brain> validate` must pass with no new errors.
+7. Save on its own: `PB save -m "pb(schema): <change>" --force-review` (schema changes always wait for a review), following the closing flow.

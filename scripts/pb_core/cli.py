@@ -14,7 +14,7 @@ from .generate import generate
 from .lint import lint
 from .stats import stats
 from . import gitops, state, workspace
-from .scaffold import scaffold, sync_toolkit
+from .scaffold import scaffold, sync_toolkit, upgrade
 from .scan import scan
 from .errors import PbError, UsageError
 from .prs import merged_prs
@@ -174,6 +174,10 @@ def _cmd_scan(args):
 
 
 def _cmd_scaffold(args):
+    if args.upgrade:
+        return upgrade(_repo_arg(args)), 0
+    if not args.product:
+        raise UsageError("pb scaffold needs --product NAME")
     return scaffold(_repo_arg(args), args.product, args.preset), 0
 
 
@@ -245,7 +249,8 @@ def build_parser():
     p.set_defaults(handler=_cmd_scan)
     p = sub.add_parser("scaffold")
     p.add_argument("--repo")
-    p.add_argument("--product", required=True)
+    p.add_argument("--product")
+    p.add_argument("--upgrade", action="store_true", help="existing brain: current workflows, plugin settings, toolkit")
     p.add_argument("--preset", default="software-product")
     p.set_defaults(handler=_cmd_scaffold)
     p = sub.add_parser("workspace")

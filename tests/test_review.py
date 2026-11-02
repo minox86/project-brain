@@ -285,7 +285,7 @@ class TemplatesTest(unittest.TestCase):
         self.assertIn('review --base "$BASE"', text)
         self.assertIn("github.base_ref == 'docs/brain'", text)
         self.assertIn("github.head_ref == 'docs/brain'", text)
-        self.assertIn("grep -v '^brain/'", text)
+        self.assertIn("grep -v -E '^(brain/|", text)
         self.assertNotIn("gh pr merge", text)
         self.assertNotIn("--approve", text)
         self.assertIn("contents: read", text)

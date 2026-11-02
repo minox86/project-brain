@@ -28,7 +28,7 @@ Project Brain collects that context into `brain/`, a folder of plain Markdown pa
 |---|---|---|
 | 👩‍💻 **Developers** | Claude Code | Read and write the brain; their working branch is never touched |
 | 🧑‍🎨 **PMs, designers, analysts, QA** | Claude Code (desktop app) | Read and write the brain without knowing git: `/pb:setup` prepares the computer once |
-| 👀 **Anyone, read-only** | Claude Cowork | Ask questions and get briefings through the GitHub connector |
+| 👀 **Anyone, read-only** | Claude Cowork | Ask questions and get context through the GitHub connector |
 | 🤖 **AI agents** | Any session in the repo | Read `brain/AGENTS.md` and the context packs before touching code |
 
 ```mermaid
@@ -149,7 +149,6 @@ Once the brain and the routine are set up, these happen without anyone running a
 | Save what you learned in this session | `/pb:capture` |
 | Add a document, Confluence page or Jira ticket | `/pb:put <file \| link \| jira:KEY \| text>` |
 | Save a one-off Teams meeting | `/pb:meeting last` |
-| Get a briefing for a role | `/pb:brief qa FIN-412` · `/pb:brief dev <feature>` |
 | Correct something wrong | `/pb:fix <what is wrong and what is right>` |
 | Clean up the brain | `/pb:lint --fix` |
 | Run the routine now | `/pb:routine-run` (`--local` to run it here, `--check` to preview) |
@@ -164,10 +163,6 @@ Saves go straight to `docs/brain`, never to your working branch. If someone chan
 |---|---|
 | Ask something | `/pb:ask what is still open on multi-level approval?` |
 | Get the full context | `/pb:context <feature, epic or Jira key>` |
-| Test scenarios (QA) | `/pb:brief qa <feature or epic>` |
-| Release notes (PM) | `/pb:brief pm <epic>` |
-| UX constraints and open points (design) | `/pb:brief design <feature>` |
-| Get started on the product | `/pb:brief onboarding` |
 
 > [!TIP]
 > Cowork only reads the brain. To add knowledge, use Claude Code (`/pb:setup` prepares it once), or write where you already do: analyses on Confluence, discussions in the Teams channel. Mention the Jira epic key and the routine files the content under that epic.

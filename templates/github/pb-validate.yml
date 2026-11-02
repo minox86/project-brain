@@ -1,11 +1,16 @@
 name: pb-validate
 
+# Brain pages are saved straight to docs/brain: this checks them after each push, and checks every PR
+# that touches brain/ (review PRs towards docs/brain, the PR from docs/brain to {{default_branch}}).
 on:
+  push:
+    branches: ["docs/brain"]
+    paths: ["brain/**"]
   pull_request:
     paths: ["brain/**"]
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
 
 jobs:
@@ -14,6 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check out the base branch toolkit (a PR cannot change the check that judges it)
+        if: github.event_name == 'pull_request'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha }}
@@ -24,19 +30,39 @@ jobs:
       - name: Validate brain
         run: |
           toolkit=.pb-base/brain/.pb/toolkit/pb.py
-          # The PR that introduces the brain has no toolkit on the base branch yet.
+          # Pushes, and the PR that introduces the brain, use the toolkit of the checked-out branch.
           [ -f "$toolkit" ] || toolkit=brain/.pb/toolkit/pb.py
           python3 "$toolkit" --brain brain validate
 
-  route:
+  brain-only:
+    # The PR from docs/brain carries the brain to the code: it must not carry code.
+    if: github.event_name == 'pull_request' && github.head_ref == 'docs/brain'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only brain/ changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          files=$(gh api --paginate "repos/$REPO/pulls/$NUMBER/files" --jq '.[] | .filename, (.previous_filename // empty)')
+          outside=$(printf '%s\n' "$files" | grep -v '^brain/' || true)
+          if [ -n "$outside" ]; then
+            echo "docs/brain carries changes outside brain/. Move them to a code PR and remove them from docs/brain:"
+            echo "$outside"
+            exit 1
+          fi
+
+  reviewers:
+    # Review PRs towards docs/brain: ask the reviewers of the areas the review policy names.
     needs: validate
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'pull_request' && github.base_ref == 'docs/brain' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check out the base branch toolkit
+      - name: Check out the base branch policy and toolkit
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha }}
@@ -44,33 +70,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Apply the review policy (brain/schema/review.md), then auto-merge or request reviewers
+      - name: Apply the review policy of docs/brain
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.html_url }}
           BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD_REF: ${{ github.head_ref }}
         run: |
           toolkit=.pb-base/brain/.pb/toolkit/pb.py
-          [ -f "$toolkit" ] || toolkit=brain/.pb/toolkit/pb.py
-          if ! python3 "$toolkit" --brain brain review --base "$BASE" > "$RUNNER_TEMP/review.json"; then
-            echo "The toolkit on the base branch cannot apply the review policy: normal review flow"
-            exit 0
-          fi
-          route=$(jq -r '.route' "$RUNNER_TEMP/review.json")
-          if [ "$route" = "pr" ]; then
-            jq -r '.markdown' "$RUNNER_TEMP/review.json" >> "$GITHUB_STEP_SUMMARY"
-            reviewers=$(jq -r '.reviewers.handles | join(",")' "$RUNNER_TEMP/review.json")
-            if [ -n "$reviewers" ]; then
-              gh pr edit "$PR" --add-reviewer "$reviewers" || echo "Could not request $reviewers (the author cannot review, teams need org access)"
-            fi
-          fi
-          files=$(gh pr diff --name-only "$PR")
-          # Brain content only: code, and the vendored toolkit in brain/.pb/toolkit/, go through review.
-          # Routine review PRs (pb/review/*) hold what the routine was not sure of: always a human merge.
-          if [ "$route" = "direct" ] && [ -n "$files" ] && ! echo "$files" | grep -qv '^brain/' \
-             && ! echo "$files" | grep -q '^brain/\.pb/toolkit/' && [ "${HEAD_REF#pb/review/}" = "$HEAD_REF" ]; then
-            gh pr merge --auto --squash "$PR"
-          else
-            echo "Normal review flow: watched brain changes, code, the pb toolkit or a routine review PR"
+          [ -f "$toolkit" ] || exit 0
+          python3 "$toolkit" --brain brain review --base "$BASE" > "$RUNNER_TEMP/review.json" || exit 0
+          jq -r '.markdown' "$RUNNER_TEMP/review.json" >> "$GITHUB_STEP_SUMMARY"
+          reviewers=$(jq -r '.reviewers.handles | join(",")' "$RUNNER_TEMP/review.json")
+          if [ -n "$reviewers" ]; then
+            gh pr edit "$PR" --add-reviewer "$reviewers" || echo "Could not request $reviewers"
           fi

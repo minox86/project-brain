@@ -7,8 +7,9 @@ from .errors import UsageError
 from .validate import brain_rel, noise, page_targets
 
 
-def review(brain, base="HEAD", confidence=()):
-    """Which changed pages need a PR, why, and who reviews them. `confidence` holds "PATH=LEVEL" items."""
+def review(brain, base="HEAD", confidence=(), noise_holds=True):
+    """Which changed pages need a PR, why, and who reviews them. `confidence` holds "PATH=LEVEL" items.
+    `noise_holds=False` (interactive saves, where the user confirmed the pages): noise warnings never hold."""
     rules = policy.load(brain)
     changed = changed_pages(brain, base)
     if changed is None:
@@ -31,7 +32,7 @@ def review(brain, base="HEAD", confidence=()):
         level = levels.get(rel, "high")
         if policy.LEVELS.index(level) < policy.LEVELS.index(rules["direct_min_confidence"]):
             flag(rel, f"confidence: {level}")
-    if rules["noise_to_review"]:
+    if rules["noise_to_review"] and noise_holds:
         for p, code, _ in noise(brain, changed):
             flag(p.rel, f"noise: {code}")
 

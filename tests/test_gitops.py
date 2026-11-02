@@ -100,7 +100,8 @@ class GitopsTest(GitRepoCase):
         self.add_page("Approval")
         code, data, err = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "pb(routine): sync", cwd=self.repo)
         self.assertEqual(code, 0, err)
-        self.assertEqual(data, {"committed": True, "pushed": True, "conflict": False, "review": None})
+        self.assertEqual(data, {"committed": True, "pushed": True, "conflict": False, "review": None,
+                                "promotion": None, "problems": []})
         log = git(self.remote, "log", "--format=%s", "brain/inbox")
         self.assertEqual(log.splitlines()[0], "pb(routine): sync")
         code, data, _ = run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)

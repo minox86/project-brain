@@ -13,6 +13,9 @@ PROPOSALS = "# Schema proposals\n\nOne line per proposal: `- [ ] P<n> · <propos
 # Skills the cloud routine follows from the repo: sync, and those sync defers to (put's analysis, meeting's step 3).
 ROUTINE_SKILLS = ("sync", "put", "meeting")
 ROUTINE_SYNC_SKILL = "skills/sync/SKILL.md"
+WORKFLOWS = ("pb-validate.yml", "pb-generate.yml", "pb-brain-branch.yml")
+MARKETPLACE = {"project-brain": {"source": {"source": "github", "repo": "minox86/project-brain"}}}
+PLUGIN_ID = "pb@project-brain"
 NEEDS_QUOTES =re.compile(r"""^[\[\]{}#&*!|>'"%@`-]|[:#]\s|,\s""")
 
 
@@ -55,7 +58,7 @@ def scaffold(repo_root, product, preset="software-product"):
     default = _default_branch(repo)
     workflows = repo / ".github" / "workflows"
     workflows.mkdir(parents=True, exist_ok=True)
-    for name in ("pb-validate.yml", "pb-generate.yml"):
+    for name in WORKFLOWS:
         target = workflows / name
         if target.exists():
             skipped.append(target.relative_to(repo).as_posix())
@@ -66,6 +69,8 @@ def scaffold(repo_root, product, preset="software-product"):
 
     if ensure_claude_pointer(repo):
         created.append("CLAUDE.md")
+    if enable_plugin(repo):
+        created.append(".claude/settings.json")
     gitignore = repo / ".gitignore"
     existing = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
     if "brain/.pb/cache/" not in existing.splitlines():
@@ -107,6 +112,22 @@ def ensure_claude_pointer(repo):
         return False
     sep = "" if not text else ("\n" if text.endswith("\n") else "\n\n")
     path.write_text(text + sep + POINTER + "\n", encoding="utf-8")
+    return True
+
+
+def enable_plugin(repo):
+    """Add the marketplace and enable the pb plugin in the repo's shared .claude/settings.json. True when changed."""
+    import json
+    path = Path(repo) / ".claude" / "settings.json"
+    settings = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    markets = settings.setdefault("extraKnownMarketplaces", {})
+    plugins = settings.setdefault("enabledPlugins", {})
+    if "project-brain" in markets and plugins.get(PLUGIN_ID) is True:
+        return False
+    markets.setdefault("project-brain", MARKETPLACE["project-brain"])
+    plugins[PLUGIN_ID] = True
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
     return True
 
 

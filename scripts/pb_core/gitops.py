@@ -8,6 +8,7 @@ from pathlib import Path
 from .brain import GENERATED
 from .errors import GitError
 from .review import review
+from .workspace import BRAIN_BRANCH, ensure_promotion
 
 REVIEW_PREFIX = "pb/review/"
 
@@ -123,9 +124,15 @@ def routine_finish(brain, branch, message, confidence=()):
             _git(repo, "rebase", "--abort", check=False)
             return {"committed": done["committed"], "pushed": False, "conflict": True, "review": None}
     _git(repo, "push", "-q", "origin", f"HEAD:refs/heads/{branch}")
-    result = {"committed": done["committed"], "pushed": True, "conflict": False, "review": None}
+    result = {"committed": done["committed"], "pushed": True, "conflict": False, "review": None,
+              "promotion": None, "problems": []}
     if held_commit:
         result["review"] = _open_review(brain, repo, branch, message, routed, held_commit)
+    if branch == BRAIN_BRANCH and done["committed"]:
+        owner = (brain.sources.get("github") or {}).get("repo") or _origin_repo(repo)
+        result["promotion"], problem = ensure_promotion(repo, owner)
+        if problem:
+            result["problems"].append(problem)
     return result
 
 

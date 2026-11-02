@@ -13,7 +13,7 @@ from .context import build_context
 from .generate import generate
 from .lint import lint
 from .stats import stats
-from . import gitops, state
+from . import gitops, state, workspace
 from .scaffold import scaffold, sync_toolkit
 from .scan import scan
 from .errors import PbError, UsageError
@@ -76,7 +76,7 @@ def _cmd_validate(args):
 
 
 def _cmd_review(args):
-    return review(_brain(args), args.base, args.confidence or ()), 0
+    return review(_brain(args), args.base, args.confidence or (), noise_holds=not args.no_noise), 0
 
 
 def _cmd_context(args):
@@ -145,6 +145,21 @@ def _cmd_routine(args):
         raise UsageError("pb routine finish needs -m MESSAGE")
     result = gitops.routine_finish(brain, args.branch, args.message, args.confidence or ())
     return result, 1 if result["conflict"] else 0
+
+
+def _cmd_workspace(args):
+    return workspace.sync(workspace.repo_root(Path.cwd())), 0
+
+
+def _cmd_save(args):
+    repo = workspace.repo_root(Path.cwd())
+    if args.cont:
+        result = workspace.save_continue(repo)
+    else:
+        if not args.message:
+            raise UsageError("pb save needs -m MESSAGE")
+        result = workspace.save(repo, args.message, force_review=args.force_review)
+    return result, 1 if (result["conflict"] or result["errors"]) else 0
 
 
 def _repo_arg(args):
@@ -223,6 +238,7 @@ def build_parser():
     p.add_argument("--base", default="HEAD", help="git commit to compare with (default: HEAD, uncommitted changes)")
     p.add_argument("--confidence", nargs="+", action="extend", metavar="PATH=LEVEL",
                    help="pages written with less than high confidence (low, medium)")
+    p.add_argument("--no-noise", action="store_true", help="noise warnings never hold a page")
     p.set_defaults(handler=_cmd_review)
     p = sub.add_parser("scan")
     p.add_argument("--repo")
@@ -232,6 +248,14 @@ def build_parser():
     p.add_argument("--product", required=True)
     p.add_argument("--preset", default="software-product")
     p.set_defaults(handler=_cmd_scaffold)
+    p = sub.add_parser("workspace")
+    p.add_argument("action", choices=["sync"])
+    p.set_defaults(handler=_cmd_workspace)
+    p = sub.add_parser("save")
+    p.add_argument("-m", "--message")
+    p.add_argument("--continue", dest="cont", action="store_true", help="resume after resolving a conflict")
+    p.add_argument("--force-review", action="store_true", help="configuration or toolkit changes: review PR only")
+    p.set_defaults(handler=_cmd_save)
     sub.add_parser("toolkit-sync").set_defaults(handler=_cmd_toolkit_sync)
     p = sub.add_parser("lint")
     p.add_argument("--today")

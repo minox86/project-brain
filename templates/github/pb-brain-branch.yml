@@ -1,0 +1,40 @@
+name: pb-brain-branch
+
+# Keeps docs/brain on top of {{default_branch}}: every push there (the merged brain PR included, whatever
+# the merge method) is merged into docs/brain, so the next PR from docs/brain shows only new pages.
+on:
+  push:
+    branches: ["{{default_branch}}"]
+  workflow_dispatch:
+
+concurrency:
+  group: pb-docs-brain
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/brain
+          fetch-depth: 0
+      - name: Merge {{default_branch}} into docs/brain
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch -q origin {{default_branch}} docs/brain
+            git reset -q --hard origin/docs/brain
+            if ! git merge --no-edit -m "pb: update docs/brain from {{default_branch}} [skip ci]" origin/{{default_branch}}; then
+              echo "brain/ was changed on {{default_branch}} and on docs/brain in different ways."
+              echo "Merge {{default_branch}} into docs/brain by hand, keeping the docs/brain version of brain/ pages."
+              exit 1
+            fi
+            git push origin HEAD:docs/brain && exit 0
+            sleep 5
+          done
+          exit 1

@@ -15,10 +15,24 @@ Read `brain/schema/brain.md`, the `brain/schema/types/<type>.md` files of every 
 
 Content enters the brain only if it is:
 - **durable** — still true and useful in a month (not status updates, not who-is-doing-what-today);
-- **non-derivable** — not obvious from the code, the diff, Jira fields or the linked document itself;
+- **non-derivable** — not obvious from the code, the diff, Jira fields or the linked document itself (see **Derivability** below);
 - **decision-relevant** — it changes how someone would build, test, design or explain the product.
 
 What fails the gate is dropped. When ingesting for the routine, list it in the digest as skipped with a short reason.
+
+## Derivability
+
+The technical part of the brain holds **all and only** what cannot be found in the code. For every technical statement ask: would an agent reading the code, the manifests, the specs and the infrastructure code find it in a few minutes? If yes, drop it.
+
+| Drop: the code says it | Keep: the code cannot say it |
+|---|---|
+| folder structure, dependencies, imports, who calls whom | why a boundary is where it is, what a module deliberately does not do |
+| function signatures, payloads, endpoints (the spec) | semantics the spec omits: ordering, idempotency, compatibility promises |
+| configuration values, build and run commands | rules the code relies on but does not enforce, and their reason |
+| the current implementation of an algorithm | lessons from incidents, pitfalls, known debt and the intended direction |
+| | how external systems really behave (`integration` pages) |
+
+Functional pages describe the product as the business sees it (features, terms, roles, rules), so they are kept even where the code implements them: the code says what it does, not what it should do nor why.
 
 ## Writing rules
 
@@ -45,7 +59,7 @@ For every entity mentioned run `PB resolve "<name>"`:
 
 | Fact | Source of truth |
 |---|---|
-| Decisions, concepts, modules, interfaces, environments | The brain |
+| Decisions, concepts, roles, modules, interfaces, integrations, environments | The brain |
 | Requirement detail (PRD on Confluence, acceptance criteria on Jira) | The external source; the brain summarises and links |
 | Epic status and breakdown into stories | Jira; the `epic` page mirrors the status and keeps what was agreed around it |
 

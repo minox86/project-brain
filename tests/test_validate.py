@@ -114,11 +114,11 @@ class ValidateTest(unittest.TestCase):
         self.assertEqual(codes(data, "warnings"), ["link-type", "unknown-field"])
 
     def test_over_budget_warning_not_error(self):
-        code, data, _ = self.run_on(files_of(page("concept", "Invoice", "term_en: Invoice", "word " * 201)))
+        code, data, _ = self.run_on(files_of(page("concept", "Invoice", "term_en: Invoice", "word " * 251)))
         self.assertEqual(code, 0)
         warning = [w for w in data["warnings"] if w["code"] == "over-budget"][0]
-        self.assertIn("201", warning["message"])
-        self.assertIn("200", warning["message"])
+        self.assertIn("251", warning["message"])
+        self.assertIn("250", warning["message"])
 
     def test_raw_too_long_warning(self):
         code, data, _ = self.run_on({"raw/2026/10/x.md": "---\nkind: file\n---\n" + "w " * 3001})

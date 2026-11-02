@@ -1,12 +1,12 @@
 # {{product}} brain — instructions for agents
 
-`brain/` is the product knowledge base of {{product}}: functional concepts and features, epics in progress, technical modules and interfaces, decisions and open questions. It is the source of truth for decisions, concepts, modules and interfaces.
+`brain/` is the product knowledge base of {{product}}: on the functional side the glossary, the features, the roles and the domain pages of the schema; on the technical side only what the code cannot say (module boundaries and invariants, contract semantics, external integrations, environments); plus epics in progress, decisions and open questions. It is the source of truth for decisions and for what it describes.
 
 ## Reading
 
 1. Start from `brain/index.md` (one line per page).
-2. Use `brain/glossary.md` for domain terms (in the glossary languages of `brain/schema/brain.md`): use the canonical English term in code and docs.
-3. Working on a feature? Read `brain/context/<feature>.md` first: it bundles the feature, its concepts, modules, interfaces, accepted decisions and open questions.
+2. Use `brain/glossary.md` for domain terms (in the glossary languages of `brain/schema/brain.md`): use the canonical English term in code and docs. `brain/features.md` lists the features by capability.
+3. Working on a feature? Read `brain/context/<feature>.md` first: it bundles the feature, its roles, concepts, modules, interfaces, integrations, the domain pages that apply to it, accepted decisions and open questions.
 4. Working on a Jira ticket? Find its epic in `brain/epics/` (the `jira` field holds the key) and read `brain/context/<epic>.md`: the scope, constraints and open points agreed for the change in progress, plus the features and modules it touches.
 5. Working on code? Find the module whose `paths` covers the files you touch (`brain/technical/modules/`), then follow its links.
 6. Pages link with `[[Title]]`; the file is `<Title>.md` in the type's folder.
@@ -17,11 +17,11 @@ Accepted decisions constrain your work. If the code contradicts the brain, say s
 
 The brain lives on the branch `docs/brain`; `brain/` in a code branch is a copy that can be a few days behind (it arrives through a PR from `docs/brain`). The latest version: the `pb` skills, or `git show origin/docs/brain:brain/<path>`.
 
-Write only through the `pb` plugin skills (`/pb:put`, `/pb:capture`, `/pb:fix`): they save to `docs/brain`. Never edit `brain/` in a code branch (it would conflict with the brain coming from `docs/brain`), and never edit generated files: `index.md`, `glossary.md`, `context/`, `.pb/backlinks.json`.
+Write only through the `pb` plugin skills (`/pb:put`, `/pb:capture`, `/pb:fix`): they save to `docs/brain`. Never edit `brain/` in a code branch (it would conflict with the brain coming from `docs/brain`), and never edit generated files: `index.md`, `glossary.md`, `features.md`, `context/`, `.pb/backlinks.json`.
 
 Content enters only if it is:
 - **durable** — still true and useful in a month;
-- **non-derivable** — not obvious from the code, the diff, Jira fields or the linked document;
+- **non-derivable** — not obvious from the code, the diff, Jira fields or the linked document: never describe in the brain what reading the code tells;
 - **decision-relevant** — it changes how someone would build, test, design or explain the product.
 
 Rules:

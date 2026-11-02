@@ -38,10 +38,10 @@ class BrainTest(unittest.TestCase):
 
     def test_types_loaded_from_preset(self):
         brain = Brain(make_brain(self.tmp.name) / "brain")
-        self.assertEqual(len(brain.types), 8)
+        self.assertEqual(len(brain.types), 10)
         self.assertTrue(brain.types["decision"].system)
         self.assertFalse(brain.types["feature"].system)
-        self.assertEqual(brain.types["concept"].max_words, 200)
+        self.assertEqual(brain.types["concept"].max_words, 250)
         self.assertEqual(brain.types["module"].required, ["paths"])
         self.assertEqual(brain.config["digest_retention_days"], 30)
 

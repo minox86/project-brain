@@ -37,11 +37,13 @@ Not a question: say it once, in plain words. The brain lives on the branch `docs
 Never ask the user what you can find yourself.
 
 - `PB scan` → module candidates, API specs, ADRs, CODEOWNERS, READMEs, CI files, top-level folders, and the **documentation inventory** (`docs`: every Markdown, MDX, reStructuredText and AsciiDoc file outside ADR folders, hidden folders and test data, with `kind` `readme` / `docs` / `root` / `other`, `title` and `words`; `docs_words` is the total).
-- Read the base preset: `BASE/../../presets/software-product/brain.md`, `BASE/../../presets/software-product/review.md` and every file in `BASE/../../presets/software-product/types/`.
+- Read the base preset: `BASE/../../presets/software-product/brain.md`, `BASE/../../presets/software-product/review.md` and every file in `BASE/../../presets/software-product/types/`; then the catalogue of domain types, `BASE/../../presets/domain-types/README.md`.
 - Read the root README and the READMEs of the main module candidates; skim a sample of ADRs and the first lines of each spec.
 - **Documentation discovery.** Turn the inventory into groups by folder (e.g. `docs/architecture`, `docs/guides`, root files, module READMEs). Drop what is not product knowledge even if the scan kept it: tool or agent configuration (files with `name:`/`description:` frontmatter, prompt templates), generated API references, vendored or copied third-party docs. For each group, read the headings (`grep -n '^#' <files>`, or the first lines) and the last change (`git log -1 --format=%cs -- <path>`), and note which types its content would feed (features, concepts, modules, interfaces, environments, decisions, open questions). These facts also shape the schema: recurring subjects with no matching type are candidates for additional types, vocabulary in the docs feeds the glossary languages.
 - Reviewer candidates: owners in CODEOWNERS (per path: backend, frontend, design system…); with `gh` available, the repo's teams (`gh api repos/<owner>/<repo>/teams`) and top committers per module path.
 - Infer: product name (README title, package name), domain vocabulary (recurring nouns), module boundaries (workspaces, deployables), whether UX decisions are likely (frontend apps present), glossary languages.
+- External systems (future `integration` pages): SDK and client dependencies in the manifests (payment, identity, e-invoicing, messaging), base URLs and env var names such as `*_API_URL` in config samples (names only, never values), integration folders (`integrations/`, `clients/`, `adapters/`).
+- Domain signals for the questions of section D: the signals column of the domain types catalogue, looked up in the code and the docs (calculation or rules code, workflows and approvals, authority names, entitlements per plan, analytics events).
 - Only if the user names them: a Confluence space (Atlassian connector: pages tree) and Jira epics (JQL) to seed features and concepts. If the Atlassian connector is missing, guide the user to connect it (see **Connectors** in the conventions) or skip the seeding.
 
 ## 2. Build the design tree
@@ -49,9 +51,10 @@ Never ask the user what you can find yourself.
 The decisions that define the schema, each with the decisions that hang off it:
 
 - Product name.
-- For each preset type (`feature`, `epic`, `concept`, `module`, `interface`, `environment`, `decision`, `open-question`): keep / extend / drop. Keep `epic` when the team plans work in Jira epics; drop it otherwise. `decision` and `open-question` are system types: they can be extended, never dropped.
+- For each preset type (`feature`, `epic`, `concept`, `role`, `module`, `interface`, `integration`, `environment`, `decision`, `open-question`): keep / extend / drop. The preset's shape is the recommendation: on the functional side a glossary (`concept`), a feature catalogue grouped by `capability` (`feature`, generated as `features.md`) and the roles; on the technical side **all and only** what the code cannot say (the **Derivability** rule in `writing.md`): never add technical fields or sections that restate the code. Keep `epic` when the team plans work in Jira epics; drop it otherwise. `decision` and `open-question` are system types: they can be extended, never dropped.
   - For kept types: extra fields, enum values (e.g. feature `status`, interface `kind`, environment `kind`), word budget (`max_words`), body sections.
-- Additional types the project needs (only with a clear recurring need: e.g. `persona`, `integration-partner`, `metric`), each with area, folder, fields, budget, prose.
+  - Feature `capability` values: propose the functional areas found in the docs, the navigation of the frontend apps and the Confluence tree (e.g. "Invoicing", "Master data"), so the catalogue starts grouped.
+- **Product domain** (section D): the domain types the product needs, from the catalogue or designed for it.
 - Glossary languages (default `[en, it]`).
 - Module map: which scan candidates are modules, their names, their `paths`, groupings.
 - Thresholds in `brain.md` (archive, stale open questions, digest retention, context pack cap, raw cap).
@@ -74,6 +77,14 @@ Interview the user relentlessly until the schema is fully settled. Work the tree
 - After each answer, recompute the frontier. Facts are your job: if a question needs a fact from the repo or connectors, look it up instead of asking.
 - Stop when the frontier is empty: every branch visited, nothing silently assumed.
 
+## D. Product domain
+
+The functional part beyond glossary, features and roles depends on the domain: settle it with the user, never by default.
+
+1. **Ask about the domain**, in one round, with the questions of the **Interview** in `BASE/../../presets/domain-types/README.md` (who uses it and for what, rules, regulation, processes, commercial shape, measures). Each question carries the signals you found (e.g. "the repo has `services/tax/` and the docs cite the Agenzia delle Entrate…") and its recommended answer, derived from them; skip the questions the facts already answer, and say what you assumed.
+2. **Propose the domain types** that the answers call for, in one `AskUserQuestion` (`multiSelect`): one option per type, each with what it would hold for *this* product and an example page title drawn from the docs (e.g. `rule` → "Invoice totals are rounded per line"), the type's frontmatter as a `preview`. A need the catalogue does not cover becomes a new type designed in the same format (`applies_to` towards what it governs). Recommend only types with a clear recurring need; none is a valid answer.
+3. For each chosen type, the follow-up decisions join the frontier: fields and enum values for this domain, budget, and the `watch` rules (e.g. a `regulation` page always reviewed by the functional reviewers).
+
 ## G. GitHub
 
 Collect the facts first, never ask what `gh` can tell: the rules on `docs/brain` (`gh api repos/<repo>/rules/branches/docs/brain`, empty when nothing covers it), the Actions workflow permissions (`gh api repos/<repo>/actions/permissions/workflow`), and the product's CI (`PB scan` → `ci`). Then, in one round:
@@ -85,24 +96,26 @@ Collect the facts first, never ask what `gh` can tell: the rules on `docs/brain`
 
 ## 4. Confirm
 
-Show the final schema in one block in the chat: types table (area, folder, fields, budget), thresholds, glossary languages, review policy (watched points, confidence threshold, reviewers per area), module map, bootstrap scope, documentation to ingest (groups, files, words), GitHub changes (applied now or for an admin) and workflow edits. Then one `AskUserQuestion`: confirm / change something / stop. Do not write anything before it.
+Show the final schema in one block in the chat: types table (area, folder, fields, budget; domain types marked as such), thresholds, glossary languages, review policy (watched points, confidence threshold, reviewers per area), module map, bootstrap scope, documentation to ingest (groups, files, words), GitHub changes (applied now or for an admin) and workflow edits. Then one `AskUserQuestion`: confirm / change something / stop. Do not write anything before it.
 
 ## 5. Scaffold and apply the schema
 
 1. Temporary worktree from the default branch, so the user's checkout is never touched: `git fetch -q origin`, then `git worktree add -q --detach <tmp> origin/<default>`. Run every following command and edit every file there.
 2. `PB scaffold --repo <tmp> --product "<name>"` (creates `brain/`, the `pb-validate` and `pb-brain-branch` workflows, the CLAUDE.md pointer, the shared `.claude/settings.json` that enables the plugin for every clone, vendored toolkit). Report `skipped` workflows if any already existed, and check them against the templates.
-3. Apply the interview results by editing `<tmp>/brain/schema/brain.md`, `review.md` and `types/*.md`. In `review.md` set `watch`, `direct_min_confidence`, `noise_to_review` and `reviewers`; check each handle with `gh api users/<login>` or `gh api orgs/<org>/teams/<slug>`, and keep the prose in sync with the rules. For the types: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; add new type files in the same format.
+3. Apply the interview results by editing `<tmp>/brain/schema/brain.md`, `review.md` and `types/*.md`. In `review.md` set `watch`, `direct_min_confidence`, `noise_to_review` and `reviewers`; check each handle with `gh api users/<login>` or `gh api orgs/<org>/teams/<slug>`, and keep the prose in sync with the rules. For the types: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; copy the domain types chosen in section D from `BASE/../../presets/domain-types/<type>.md` and adapt them; add new type files in the same format.
 4. `PB --brain <tmp>/brain validate` must pass on the empty brain.
 
 ## 6. Bootstrap content
 
 Propose, as one numbered list, the initial pages:
-- one `module` per confirmed module, with `paths` and a 2–4 line `## Responsibility` drawn from its README/manifest;
+- one `module` per confirmed module, with `paths` and a 2–4 line `## Responsibility` drawn from its README and the docs: what it owns and what it does not; add `## Invariants`, `## Pitfalls` or `## Direction` only from a source that says them (docs, ADRs), never from reading the code — what the code says stays out;
+- one `integration` per external system found (section 1), with `used_by` and `provider`, and only the behaviour the docs record;
+- `role` pages for the user roles the docs and the frontend apps name;
 - one `interface` per spec worth a page (`spec_path` set, `provided_by` the owning module);
 - one `decision` (`area: technical`, `status: accepted`) per existing ADR, summarised and linked to the ADR file — never copied;
 - optionally `feature` and `concept` pages from the Confluence space the user named, and `epic` pages for the active Jira epics that are discussed beyond their ticket.
 
-Ask with `AskUserQuestion` (`multiSelect`, one option per group of pages: modules, interfaces, decisions, features and concepts, epics; "none" is the empty selection). Write them under `<tmp>/brain`, applying the significance gate and the writing rules; prefer fewer, accurate pages.
+Ask with `AskUserQuestion` (`multiSelect`, one option per group of pages: modules, interfaces, integrations, roles, decisions, features and concepts, epics; "none" is the empty selection). Write them under `<tmp>/brain`, applying the significance gate and the writing rules; prefer fewer, accurate pages.
 
 ## 6b. Ingest the existing documentation
 
@@ -110,7 +123,8 @@ Skip when the discovery of section 1 found nothing worth ingesting; say so in on
 
 1. **Ask.** One `AskUserQuestion`, with the facts in the question: "The repo has <N> documentation files (<W> words) in <G> groups: <group (files)>, … Ingest all of it into the brain now, following the schema we just agreed?". Options: **Ingest all (Recommended)** · **Choose the groups** · **Not now** (later with `/pb:put <folder>`). On "Choose the groups", a second `multiSelect` question, one option per group (more than 4 groups: by top folder, or several calls).
 2. **Read and analyse**, group by group, one file at a time, with the schema of section 5 (the types in `<tmp>/brain/schema/types/`). Apply the **Analyse** rules of `/pb:put` (`BASE/../put/SKILL.md`, section 3) to each file:
-   - extract features, concepts, modules, interfaces, environments, decisions and open questions; route each item to the type whose prose says it belongs there;
+   - extract features (with their `capability`), concepts, roles, modules, interfaces, integrations, environments, decisions, open questions and the pages of the domain types chosen in section D (rules, regulations, processes…); route each item to the type whose prose says it belongs there;
+   - apply **Derivability** (`writing.md`) to every technical statement: architecture docs often list structure, dependencies and endpoints that the code already says — drop those lines and keep the reasons, the boundaries, the invariants and the pitfalls;
    - the significance gate holds: setup steps, how-tos for running the code, changelogs and plans of finished work are dropped; implementation plans keep only the decisions they record;
    - **merge, never duplicate**: resolve each entity with `PB --brain <tmp>/brain resolve` against the pages already written (section 6 and earlier files); a module README enriches the module page, an ADR already turned into a decision is not ingested twice;
    - the doc stays authoritative in the repo: summarise and link it, never copy it; cite it inline and in `sources` as `repo:<path>`; do not capture it in `raw/`, it is already versioned;

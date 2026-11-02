@@ -1,6 +1,6 @@
 ---
 name: put
-description: Feeds the project brain with content — pasted text or notes, local files (PDF, docx, markdown), Confluence pages, Jira issues or JQL, GitHub PRs or issues, Figma links, web pages — extracting features, epics, concepts, modules, interfaces, decisions and open questions and updating the right pages. Use when the user says to add, ingest, import or save something into the brain, or shares knowledge to remember ("we decided that…", "the billing service actually…").
+description: Feeds the project brain with content — pasted text or notes, local files (PDF, docx, markdown), Confluence pages, Jira issues or JQL, GitHub PRs or issues, Figma links, web pages — extracting features, epics, concepts, roles, modules, interfaces, integrations, decisions, open questions and the domain pages of the schema, and updating the right pages. Use when the user says to add, ingest, import or save something into the brain, or shares knowledge to remember ("we decided that…", "the billing service actually…").
 argument-hint: "<text | file | confluence:… | jira:… | gh:pr/N | url> [--as <type>] [--plan]"
 ---
 
@@ -52,7 +52,7 @@ For any other local file (not for external sources, not for pasted text):
 
 ## 3. Analyse
 
-1. Extract candidate knowledge: features and their expected behaviour, scope agreements, constraints and risks of an epic in progress (on its `epic` page; what stays true after delivery goes on features and decisions), domain concepts (with the Italian term if used), modules and interfaces and their non-obvious behaviour, decisions (with options and reasons), open questions, contradictions with what the brain says.
+1. Extract candidate knowledge: features and their expected behaviour, scope agreements, constraints and risks of an epic in progress (on its `epic` page; what stays true after delivery goes on features and decisions), domain concepts (with the Italian term if used), roles, pages of the domain types the schema defines (rules, regulations, processes…), modules, interfaces and external integrations and their non-obvious behaviour (only what the code cannot say: **Derivability** in `writing.md`), decisions (with options and reasons), open questions, contradictions with what the brain says.
 2. Apply the **significance gate** to each item. Drop what fails it.
 3. Resolve every entity with `PB resolve`; prefer updating existing pages.
 4. For external requirement detail (PRD, acceptance criteria) keep only a short summary and the link: the source stays authoritative.

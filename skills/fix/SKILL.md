@@ -21,7 +21,7 @@ Find every page asserting the wrong fact:
 - a search across `brain/` for the claim, its key terms, the concept's aliases (`grep -ril`);
 - pages linked from those (`PB context --feature`/`--paths` when relevant).
 
-Ignore generated files (`index.md`, `glossary.md`, `context/`): every save rebuilds them.
+Ignore generated files (`index.md`, `glossary.md`, `features.md`, `context/`): every save rebuilds them.
 
 ## 3. Classify
 

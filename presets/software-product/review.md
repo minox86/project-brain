@@ -8,6 +8,7 @@ reviewers:
 watch:
   - {type: decision, why: "decisions constrain future work"}
   - {type: interface, why: "contracts between modules"}
+  - {type: integration, change: [create, delete], why: "external systems the product depends on"}
   - {type: feature, fields: [status], why: "feature status changes"}
   - {type: concept, change: create, why: "new glossary terms"}
   - {type: module, fields: [paths], why: "module boundaries"}
@@ -25,7 +26,7 @@ Where it applies:
 
 - `direct_min_confidence`: `low`, `medium` or `high`. A page the writer rated below this level is held for review. `high`: only what the model is sure of goes straight in. `low`: confidence never holds anything.
 - `noise_to_review`: `true` holds pages that still carry a noise warning from `PB validate` (`possible-duplicate`, `new-orphan`, `missing-source`, `log-heading`, `ephemeral`, `verbatim`).
-- `reviewers`: GitHub users (`login`) or teams (`org/team-slug`) per area: `technical` (modules, interfaces, environments, technical decisions), `functional` (features, concepts, functional decisions), `ux` (design decisions). A page with no area of its own (epics, open questions, decisions without `area`) asks every area.
+- `reviewers`: GitHub users (`login`) or teams (`org/team-slug`) per area: `technical` (modules, interfaces, integrations, environments, technical decisions), `functional` (features, concepts, roles, functional decisions), `ux` (design decisions). A page with no area of its own (epics, open questions, decisions without `area`) asks every area.
 - `watch`: the points of the schema where any change needs a review. Each rule matches when all its keys match:
   - `type`: a type name, a list, or `"*"`;
   - `change`: `create`, `update`, `delete`, or a list (default: any);

@@ -35,7 +35,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("bad-enum", self.codes(data))
 
     def test_over_budget(self):
-        _, data, _ = self.lint(files_of(*self.linked_module(), page("concept", "Invoice", 'term_en: Invoice', "w " * 201 + "[[F]]")),
+        _, data, _ = self.lint(files_of(*self.linked_module(), page("concept", "Invoice", 'term_en: Invoice', "w " * 251 + "[[F]]")),
                                ["services/billing/a.py"])
         self.assertIn("over-budget", self.codes(data))
 

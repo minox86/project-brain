@@ -82,7 +82,8 @@ def locked(repo):
                 age = time.time() - lock.stat().st_mtime
             except FileNotFoundError:
                 continue
-            if _alive(holder) and age < LOCK_STALE_SECONDS:
+            # An empty lock is being written by its holder right now.
+            if (_alive(holder) or (not holder and age < 5)) and age < LOCK_STALE_SECONDS:
                 raise GitError(message, {"error": message, "code": "busy"})
             with contextlib.suppress(FileNotFoundError):
                 lock.unlink()
@@ -141,6 +142,9 @@ def sync(repo):
 def _sync(repo):
     online = _fetch(repo)
     if not _remote_has(repo, BRAIN_BRANCH):
+        if not online:
+            message = "GitHub cannot be reached from this computer: check the connection and retry"
+            raise GitError(message, {"error": message, "code": "offline"})
         raise _no_brain()
     wt = worktree_path(repo)
     created = False
@@ -150,6 +154,9 @@ def _sync(repo):
         _git(repo, "worktree", "add", "-q", "--detach", str(wt), f"origin/{BRAIN_BRANCH}")
         created = True
     leftovers, rebasing, unpushed = _state(wt)
+    if not rebasing:
+        _unpark(repo, wt)
+        leftovers, _, _ = _state(wt)
     if not leftovers and not rebasing:
         if unpushed:
             # Saved but not pushed yet: keep those commits, replayed on the latest brain.
@@ -166,6 +173,7 @@ def _sync(repo):
 # --- saving -------------------------------------------------------------------------------------------------
 
 FORCED_NOTE = "Configuration or toolkit change: always reviewed by a person (policy of the pb toolkit).\n"
+ALWAYS_REVIEWED = ("brain/schema/", "brain/.pb/toolkit/")
 
 
 def _brain_of(repo):
@@ -174,6 +182,11 @@ def _brain_of(repo):
     if not (wt / ".git").exists():
         raise UsageError("the managed brain copy does not exist: run `PB workspace sync` first")
     return Brain(wt / "brain"), wt
+
+
+def _fresh(wt):
+    from .brain import Brain
+    return Brain(wt / "brain")
 
 
 def _pending_path(repo):
@@ -188,6 +201,10 @@ def _read_pending(repo):
         return json.loads(path.read_text(encoding="utf-8"))
     except ValueError:
         return None
+
+
+def _write_pending(repo, data):
+    _pending_path(repo).write_text(json.dumps(data), encoding="utf-8")
 
 
 def _clear_pending(repo):
@@ -205,74 +222,169 @@ def _result(**extra):
 def _check(brain, wt, files):
     """Validation errors on the pages touched by this save (other pages' problems never block it)."""
     from .validate import validate
-    pages = [str(wt / f) for f in files if f.startswith("brain/") and f.endswith(".md")]
+    pages = [str(wt / f) for f in files if f.startswith("brain/") and f.endswith(".md") and (wt / f).is_file()]
     if not pages:
         return []
     return validate(brain, pages, "HEAD")["errors"]
 
 
-def save(repo, message, confidence=(), force_review=False):
+def _head(wt):
+    return _git(wt, "rev-parse", "HEAD").stdout.strip()
+
+
+def _held_on_top(wt, pending):
+    subject = _git(wt, "log", "-1", "--format=%s", check=False).stdout.strip()
+    return bool(pending.get("held")) and subject == f"{pending['message']} (review)"
+
+
+def _as_worktree_path(wt, raw):
+    path = Path(raw)
+    if path.is_absolute():
+        try:
+            return path.resolve().relative_to(wt.resolve()).as_posix()
+        except ValueError:
+            return path.as_posix()
+    rel = path.as_posix()
+    return rel if rel.startswith("brain/") else f"brain/{rel}"
+
+
+def _commit_paths(wt, message, files):
+    _git(wt, "add", "-A", "--", *files)
+    if _git(wt, "diff", "--cached", "--quiet", "--", *files, check=False).returncode == 0:
+        return False
+    _git(wt, "commit", "-q", "-m", message, "--", *files)
+    return True
+
+
+# Drafts: brain files in the copy that are not part of the save running now (another session's pages, or pages
+# the user did not confirm). They are parked outside the worktree while it rebases and pushes, then put back.
+
+def _parked(repo):
+    return pb_dir(repo) / "parked"
+
+
+def _park(repo, wt):
+    leftovers, _, _ = _state(wt)
+    if not leftovers:
+        return
+    folder = _parked(repo)
+    manifest = {"files": [], "deleted": []}
+    for rel in leftovers:
+        source = wt / rel
+        if source.is_file():
+            target = folder / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(source.read_bytes())
+            manifest["files"].append(rel)
+        else:
+            manifest["deleted"].append(rel)
+        _git(wt, "reset", "-q", "--", rel, check=False)
+        if _git(wt, "cat-file", "-e", f"HEAD:{rel}", check=False).returncode == 0:
+            _git(wt, "checkout", "-q", "HEAD", "--", rel)
+        elif source.exists():
+            source.unlink()
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def _unpark(repo, wt):
+    folder = _parked(repo)
+    manifest_path = folder / "manifest.json"
+    if not manifest_path.is_file():
+        return
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for rel in manifest["files"]:
+        target = wt / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((folder / rel).read_bytes())
+    for rel in manifest["deleted"]:
+        with contextlib.suppress(FileNotFoundError):
+            (wt / rel).unlink()
+    import shutil
+    shutil.rmtree(str(folder))
+
+
+def regenerate(brain_root, wt):
+    """Refresh index, glossary, context packs and backlinks from the committed pages; commit them if they changed.
+    Runs after the rebase on the latest brain, so generated files never conflict."""
+    import datetime as _dt
+    from .brain import Brain, GENERATED
+    from .generate import generate
+    done = generate(Brain(brain_root), _dt.date.today())
+    prefix = Path(brain_root).resolve().relative_to(Path(wt).resolve()).as_posix()
+    specs = [f"{prefix}/{g.rstrip('/')}" for g in GENERATED] + [f"{prefix}/{d}" for d in done["deleted"]]
+    specs = [spec for spec in specs if (Path(wt) / spec).exists()
+             or _git(wt, "cat-file", "-e", f"HEAD:{spec}", check=False).returncode == 0]
+    return bool(specs) and _commit_paths(wt, "pb(generate): refresh generated files", specs)
+
+
+def save(repo, message, paths=(), confidence=(), force_review=False):
     with locked(repo):
-        return _save(Path(repo), message, confidence, force_review)
+        return _save(Path(repo), message, paths, confidence, force_review)
 
 
-def _save(repo, message, confidence, force_review):
-    from .gitops import commit
+def _save(repo, message, paths, confidence, force_review):
     from .review import review
     brain, wt = _brain_of(repo)
     leftovers, rebasing, _ = _state(wt)
     if rebasing:
         message_ = "a conflict is being resolved in the brain copy: finish it, then run `PB save --continue`"
         raise UsageError(message_, {"error": message_, "code": "rebase-in-progress"})
+    _unpark(repo, wt)
     pending = _read_pending(repo)
+    restored = set()
     if pending:
-        # Held pages from an earlier save that did not go out: route them again together with the new ones.
+        # Held pages from an earlier save that did not go out: route them again, never less strictly.
+        force_review = force_review or bool(pending.get("force"))
         if _held_on_top(wt, pending):
             _git(wt, "reset", "-q", "--soft", "HEAD~1")
             _git(wt, "reset", "-q")
+        restored = {f"brain/{p}" for p in pending.get("pages", [])}
         _clear_pending(repo)
-        leftovers, _, _ = _state(wt)
+    leftovers, _, _ = _state(wt)
+    scope = leftovers
+    if paths:
+        wanted = {_as_worktree_path(wt, p) for p in paths} | restored
+        scope = [f for f in leftovers if f in wanted]
     committed = False
-    if leftovers:
-        errors = _check(brain, wt, leftovers)
+    if scope:
+        errors = _check(brain, wt, scope)
         if errors:
             return _result(errors=errors)
+        in_scope = {f[len("brain/"):] for f in scope}
         routed = review(brain, "HEAD", confidence, noise_holds=False)
-        held = sorted({f[len("brain/"):] for f in leftovers}) if force_review else \
-            [item["path"] for item in routed["review"]]
-        if force_review:
-            routed = dict(routed, markdown=FORCED_NOTE + routed.get("markdown", ""))
-        done = commit(brain, message, allow_default=True, exclude=held)
-        committed = done["committed"]
+        guarded = {f[len("brain/"):] for f in scope if f.startswith(ALWAYS_REVIEWED)}
+        held = set(in_scope) if force_review else \
+            ({item["path"] for item in routed["review"]} & in_scope) | guarded
+        markdown = routed.get("markdown", "")
+        if force_review or guarded:
+            markdown = FORCED_NOTE + markdown
+        direct = sorted(in_scope - held)
+        if direct:
+            committed = _commit_paths(wt, message, [f"brain/{rel}" for rel in direct])
         if held:
-            specs = [f"brain/{rel}" for rel in held]
-            _git(wt, "add", "-A", "--", *specs)
-            if _git(wt, "diff", "--cached", "--quiet", check=False).returncode:
-                _git(wt, "commit", "-q", "-m", f"{message} (review)", "--", *specs)
-                _pending_path(repo).write_text(json.dumps({
-                    "message": message, "pages": held, "markdown": routed.get("markdown", ""),
-                    "reviewers": routed.get("reviewers") or {"users": [], "teams": []}}), encoding="utf-8")
+            if _commit_paths(wt, f"{message} (review)", [f"brain/{rel}" for rel in sorted(held)]):
+                _write_pending(repo, {"message": message, "pages": sorted(held), "markdown": markdown,
+                                      "reviewers": routed.get("reviewers") or {"users": [], "teams": []},
+                                      "force": force_review, "held": True})
                 committed = True
-    return _publish(repo, brain, wt, committed)
+    return _publish(repo, wt, committed)
 
 
 def save_continue(repo):
     with locked(repo):
         repo = Path(repo)
-        brain, wt = _brain_of(repo)
+        _, wt = _brain_of(repo)
         _, rebasing, _ = _state(wt)
         if not rebasing:
             raise UsageError("there is no conflict to continue: run `PB save -m MESSAGE`")
-        _git(wt, "add", "-A", "--", "brain")
+        conflicted = _conflict(wt)["files"]
+        if conflicted:
+            _git(wt, "add", "-A", "--", *conflicted)
         step = _git(wt, "rebase", "--continue", check=False, env={"GIT_EDITOR": "true"})
         if step.returncode:
             return _result(committed=True, conflict=_conflict(wt))
-        return _publish(repo, brain, wt, True, rebased=True)
-
-
-def _held_on_top(wt, pending):
-    subject = _git(wt, "log", "-1", "--format=%s", check=False).stdout.strip()
-    return subject == f"{pending['message']} (review)"
+        return _publish(repo, wt, True, rebased=True)
 
 
 def _conflict(wt):
@@ -283,13 +395,20 @@ def _conflict(wt):
                    "(keep every fact, drop duplicates, newer wins on contradictions), then `PB save --continue`"}
 
 
-def _publish(repo, brain, wt, committed, rebased=False):
-    """Rebase on the latest brain, push to docs/brain (retrying a lost race), send held pages to review."""
+def _publish(repo, wt, committed, rebased=False):
+    """Rebase on the latest brain, regenerate, push to docs/brain (retrying a lost race), send held pages to
+    review. Drafts outside this save are parked meanwhile and put back at the end, unless a conflict stops it."""
+    _park(repo, wt)
+    out = _publish_parked(repo, wt, committed, rebased)
+    if not out["conflict"]:
+        _unpark(repo, wt)
+    return out
+
+
+def _publish_parked(repo, wt, committed, rebased):
     pending = _read_pending(repo)
-    if pending and not _held_on_top(wt, pending):
-        _clear_pending(repo)
-        pending = None
     problems = []
+    held = None
     for attempt in range(PUSH_ATTEMPTS):
         if not (rebased and attempt == 0):
             if not _fetch(repo):
@@ -300,24 +419,37 @@ def _publish(repo, brain, wt, committed, rebased=False):
             step = _git(wt, "rebase", "-q", f"origin/{BRAIN_BRANCH}", check=False, env={"GIT_EDITOR": "true"})
             if step.returncode:
                 return _result(committed=committed, conflict=_conflict(wt))
+        if pending and not _held_on_top(wt, pending):
+            # The rebase dropped the held commit: its content is already on docs/brain.
+            _clear_pending(repo)
+            pending = None
         if rebased or attempt:
             touched = _git(wt, "-c", "core.quotePath=false", "diff", "--name-only", f"origin/{BRAIN_BRANCH}",
                            "HEAD", "--", "brain").stdout.split("\n")
-            errors = _check(brain, wt, [f for f in touched if f])
+            errors = _check(_fresh(wt), wt, [f for f in touched if f])
             if errors:
                 return _result(committed=committed, errors=errors)
-        tip = "HEAD~1" if pending else "HEAD"
-        ahead = int(_git(wt, "rev-list", "--count", f"origin/{BRAIN_BRANCH}..{tip}").stdout.strip() or 0)
+        held = _head(wt) if pending else None
+        if held:
+            _git(wt, "reset", "-q", "--hard", "HEAD~1")
+        ahead = int(_git(wt, "rev-list", "--count", f"origin/{BRAIN_BRANCH}..HEAD").stdout.strip() or 0)
         if not ahead:
             break
-        if _git(wt, "push", "-q", "origin", f"{tip}:refs/heads/{BRAIN_BRANCH}", check=False).returncode == 0:
+        generated = regenerate(wt / "brain", wt)
+        if _git(wt, "push", "-q", "origin", f"HEAD:refs/heads/{BRAIN_BRANCH}", check=False).returncode == 0:
             break
+        # Lost a race (or the push was refused): back to the commits of this save, then try again.
+        if generated:
+            _git(wt, "reset", "-q", "--hard", "HEAD~1")
+        if held:
+            _git(wt, "reset", "-q", "--hard", held)
+            held = None
     else:
         _, _, unpushed = _state(wt)
         return _result(saved=True, committed=committed, unpushed=unpushed,
                        problems=["the brain changed many times while saving: retry the save in a moment"])
     pushed = bool(ahead)
-    review_out = _send_to_review(repo, wt, pending) if pending else None
+    review_out = _send_to_review(repo, wt, pending, held) if held else None
     if review_out:
         problems += review_out.pop("problems")
     promotion = None
@@ -330,28 +462,41 @@ def _publish(repo, brain, wt, committed, rebased=False):
                    unpushed=unpushed, problems=problems)
 
 
-def _send_to_review(repo, wt, pending):
-    """The held commit (HEAD) goes to a pb/review/ branch with a PR towards docs/brain; the copy drops it."""
+def _restore_held(repo, wt, pending, held):
+    """The held pages could not be sent: put them back as unsaved changes; the next save sends them again."""
+    for rel in pending["pages"]:
+        path = f"brain/{rel}"
+        if _git(wt, "cat-file", "-e", f"{held}:{path}", check=False).returncode == 0:
+            _git(wt, "checkout", "-q", held, "--", path)
+            _git(wt, "reset", "-q", "--", path)
+        elif (wt / path).exists():
+            (wt / path).unlink()
+    _write_pending(repo, dict(pending, held=False))
+
+
+def _send_to_review(repo, wt, pending, held):
+    """The held commit goes to a pb/review/ branch with a PR towards docs/brain."""
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
     head = f"{REVIEW_PREFIX}{stamp}"
     out = {"branch": head, "pages": pending["pages"], "pr": None, "problems": []}
-    if _git(wt, "push", "-q", "origin", f"HEAD:refs/heads/{head}", check=False).returncode:
-        # Keep the pages as unsaved changes: the next save sends them again.
-        _git(wt, "reset", "-q", "--soft", "HEAD~1")
-        _clear_pending(repo)
+    if _git(wt, "push", "-q", "origin", f"{held}:refs/heads/{head}", check=False).returncode:
+        _restore_held(repo, wt, pending, held)
         out["branch"] = None
-        out["problems"].append("the pages that need a review could not be sent: retry the save")
+        out["problems"].append("the pages that need a review could not be sent: they are sent with the next save")
         return out
-    _git(wt, "reset", "-q", "--hard", "HEAD~1")
-    _clear_pending(repo)
     owner = gh_repo(repo)
     body = pending["markdown"] + "\nSaved with pb. Merge to accept, edit the pages here to correct them, " \
                                  "close to drop them.\n"
     pr = _gh_json(["api", f"repos/{owner}/pulls", "-X", "POST", "-f", f"title={pending['message']} (review)",
                    "-f", f"head={head}", "-f", f"base={BRAIN_BRANCH}", "-f", f"body={body}"]) if owner else None
     if not pr:
-        out["problems"].append(f"the review PR could not be opened: open it by hand from {head} to {BRAIN_BRANCH}")
+        _git(wt, "push", "-q", "origin", f":refs/heads/{head}", check=False)
+        _restore_held(repo, wt, pending, held)
+        out["branch"] = None
+        out["problems"].append("the review PR could not be opened (GitHub not reachable?): the pages that need "
+                               "a review are sent with the next save")
         return out
+    _clear_pending(repo)
     out["pr"] = pr.get("html_url")
     people = pending["reviewers"]
     if people.get("users") or people.get("teams"):
@@ -370,10 +515,10 @@ def ensure_promotion(repo, owner=None):
     if not owner:
         return None, "no GitHub repo for origin: the PR from docs/brain to the default branch was not opened"
     base = default_branch(repo)
-    found = _gh_json(["pr", "list", "--repo", owner, "--head", BRAIN_BRANCH, "--base", base, "--state", "open",
-                      "--json", "url"])
+    # gh api, not gh pr: cloud routines can only reach the REST API.
+    found = _gh_json(["api", f"repos/{owner}/pulls?head={owner.split('/')[0]}:{BRAIN_BRANCH}&base={base}&state=open"])
     if found:
-        return found[0].get("url"), None
+        return found[0].get("html_url"), None
     if found is None:
         return None, "GitHub could not be reached (gh): the PR towards the code is checked at the next save"
     pr = _gh_json(["api", f"repos/{owner}/pulls", "-X", "POST", "-f", f"title={PROMOTION_TITLE}",

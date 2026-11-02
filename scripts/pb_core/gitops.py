@@ -8,7 +8,7 @@ from pathlib import Path
 from .brain import GENERATED
 from .errors import GitError
 from .review import review
-from .workspace import BRAIN_BRANCH, ensure_promotion
+from .workspace import BRAIN_BRANCH, ensure_promotion, regenerate
 
 REVIEW_PREFIX = "pb/review/"
 
@@ -123,6 +123,7 @@ def routine_finish(brain, branch, message, confidence=()):
         if rebase.returncode != 0:
             _git(repo, "rebase", "--abort", check=False)
             return {"committed": done["committed"], "pushed": False, "conflict": True, "review": None}
+    regenerate(brain.root, repo)
     _git(repo, "push", "-q", "origin", f"HEAD:refs/heads/{branch}")
     result = {"committed": done["committed"], "pushed": True, "conflict": False, "review": None,
               "promotion": None, "problems": []}

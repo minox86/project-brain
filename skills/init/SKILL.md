@@ -77,7 +77,7 @@ Interview the user relentlessly until the schema is fully settled. Work the tree
 Collect the facts first, never ask what `gh` can tell: the rules on `docs/brain` (`gh api repos/<repo>/rules/branches/docs/brain`, empty when nothing covers it), the Actions workflow permissions (`gh api repos/<repo>/actions/permissions/workflow`), and the product's CI (`PB scan` → `ci`). Then, in one round:
 
 1. **`docs/brain` open to pushes.** If a ruleset or a protection pattern (e.g. `docs/*`, `*`) covers it, saves would fail: propose excluding `docs/brain` from it. Only a repo admin can change it: apply it with `gh api` if the user is one (`gh api repos/<repo> --jq .permissions.admin`), otherwise put it in the admin checklist of section 7.
-2. **Workflows may push.** `pb-generate` and `pb-brain-branch` push to `docs/brain` with the workflow token: the workflows declare `contents: write`, which an organisation policy limited to read-only overrides. If so, say what an org owner must allow.
+2. **Workflows may push.** `pb-brain-branch` pushes to `docs/brain` with the workflow token: the workflows declare `contents: write`, which an organisation policy limited to read-only overrides. If so, say what an org owner must allow.
 3. **Product pipelines.** Saves are pushes to `docs/brain`, the brain PR is a PR with only `brain/`: pipelines that build, test or deploy on every push or PR would run for nothing. For each GitHub Actions workflow of the product that runs on `push` without a branch filter, or on `pull_request` without `paths-ignore`, offer (`multiSelect`, the edit as a `preview`) to add `branches-ignore: ["docs/brain"]` under `push` and `paths-ignore: ["brain/**"]` under `pull_request`; never add `paths-ignore` to a workflow whose jobs are **required** checks on the default branch (the brain PR would wait for a check that never runs): leave those as they are. Pipelines outside GitHub Actions: give the exact instructions, do not edit them.
 
 ## 4. Confirm
@@ -87,7 +87,7 @@ Show the final schema in one block in the chat: types table (area, folder, field
 ## 5. Scaffold and apply the schema
 
 1. Temporary worktree from the default branch, so the user's checkout is never touched: `git fetch -q origin`, then `git worktree add -q --detach <tmp> origin/<default>`. Run every following command and edit every file there.
-2. `PB scaffold --repo <tmp> --product "<name>"` (creates `brain/`, the three `pb-*` workflows, the CLAUDE.md pointer, the shared `.claude/settings.json` that enables the plugin for every clone, `.gitignore` entry, vendored toolkit). Report `skipped` workflows if any already existed, and check them against the templates.
+2. `PB scaffold --repo <tmp> --product "<name>"` (creates `brain/`, the `pb-validate` and `pb-brain-branch` workflows, the CLAUDE.md pointer, the shared `.claude/settings.json` that enables the plugin for every clone, `.gitignore` entry, vendored toolkit). Report `skipped` workflows if any already existed, and check them against the templates.
 3. Apply the interview results by editing `<tmp>/brain/schema/brain.md`, `review.md` and `types/*.md`. In `review.md` set `watch`, `direct_min_confidence`, `noise_to_review` and `reviewers`; check each handle with `gh api users/<login>` or `gh api orgs/<org>/teams/<slug>`, and keep the prose in sync with the rules. For the types: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; add new type files in the same format.
 4. `PB --brain <tmp>/brain validate` must pass on the empty brain.
 
@@ -103,7 +103,7 @@ Ask with `AskUserQuestion` (`multiSelect`, one option per group of pages: module
 
 ## 7. Close
 
-1. Commit in the temporary worktree: `PB --brain <tmp>/brain commit -m "pb(init): create brain for <product>" --allow-default --include CLAUDE.md .gitignore .claude/settings.json .github/workflows/pb-validate.yml .github/workflows/pb-generate.yml .github/workflows/pb-brain-branch.yml` (leave out workflows reported as `skipped`).
+1. Commit in the temporary worktree: `PB --brain <tmp>/brain commit -m "pb(init): create brain for <product>" --allow-default --include CLAUDE.md .gitignore .claude/settings.json .github/workflows/pb-validate.yml .github/workflows/pb-brain-branch.yml` (leave out workflows reported as `skipped`). Then the generated files: `PB --brain <tmp>/brain generate`, `git -C <tmp> add brain`, `git -C <tmp> commit -qm "pb(generate): refresh generated files"`.
 2. Create `docs/brain` with it: `git -C <tmp> push -q origin HEAD:refs/heads/docs/brain`.
 3. Open the brain PR: `gh pr create --head docs/brain --base <default> --title "Brain updates" --body <what this first PR brings: the brain, the pb workflows, the CLAUDE.md pointer and the plugin settings; merging it turns on the workflows on the default branch; afterwards the PR is reopened by pb with each new save>`. The product pipeline edits of section G are code: put them in a separate branch and PR towards the default branch, never on `docs/brain`.
 4. `git worktree remove --force <tmp>`, then `PB workspace sync` in the user's clone: it must return the brain.
@@ -121,6 +121,6 @@ Then explain the next steps, in a few lines:
 A brain from an earlier pb version lives on the default branch. Explain the move in plain words (where the brain will live, what changes for the team: saves no longer go through their code PRs) and ask to confirm. Then:
 
 1. Run section G (GitHub).
-2. Temporary worktree from the default branch (as in section 5), `PB scaffold --repo <tmp> --upgrade` (rewrites the `pb-*` workflows, adds `pb-brain-branch`, enables the plugin, refreshes the toolkit), commit with `PB --brain <tmp>/brain commit -m "pb(init): move the brain to docs/brain" --allow-default --include .claude/settings.json .github/workflows/pb-validate.yml .github/workflows/pb-generate.yml .github/workflows/pb-brain-branch.yml`, then steps 2–4 of section 7.
-3. If `routine.branch` in `brain/schema/sources.md` is not `docs/brain`, set it to `docs/brain` with `PB save`, and update the routine's prompt with `/pb:routine-setup`.
+2. Temporary worktree from the default branch (as in section 5), `PB scaffold --repo <tmp> --upgrade` (rewrites `pb-validate`, adds `pb-brain-branch`, deletes `pb-generate` (every save regenerates now), enables the plugin, refreshes the toolkit and the writing rule in `brain/AGENTS.md`), commit with `PB --brain <tmp>/brain commit -m "pb(init): move the brain to docs/brain" --allow-default --include .claude/settings.json .github/workflows/pb-validate.yml .github/workflows/pb-generate.yml .github/workflows/pb-brain-branch.yml`, then steps 2–4 of section 7.
+3. If `routine.branch` in `brain/schema/sources.md` is not `docs/brain`, run `/pb:routine-setup`: it sets it and updates the routine's prompt. Until that review PR is merged, the routine keeps writing where it did.
 4. Tell developers: pages written in code branches before the move still arrive with their PRs; from now on, use the `pb` skills.

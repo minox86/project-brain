@@ -1,14 +1,16 @@
 name: pb-brain-branch
 
-# Keeps docs/brain on top of {{default_branch}}: every push there (the merged brain PR included, whatever
-# the merge method) is merged into docs/brain, so the next PR from docs/brain shows only new pages.
+# After the brain PR (docs/brain -> {{default_branch}}) is merged, with any merge method, bring
+# {{default_branch}} back into docs/brain, so the next brain PR shows only new pages. On a conflict
+# docs/brain wins: it is where the brain lives.
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches: ["{{default_branch}}"]
   workflow_dispatch:
 
 concurrency:
-  group: pb-docs-brain
+  group: pb-brain-branch
   cancel-in-progress: false
 
 permissions:
@@ -16,6 +18,7 @@ permissions:
 
 jobs:
   merge:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged && github.head_ref == 'docs/brain')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,9 +32,8 @@ jobs:
           for attempt in 1 2 3; do
             git fetch -q origin {{default_branch}} docs/brain
             git reset -q --hard origin/docs/brain
-            if ! git merge --no-edit -m "pb: update docs/brain from {{default_branch}} [skip ci]" origin/{{default_branch}}; then
-              echo "brain/ was changed on {{default_branch}} and on docs/brain in different ways."
-              echo "Merge {{default_branch}} into docs/brain by hand, keeping the docs/brain version of brain/ pages."
+            if ! git merge --no-edit -X ours -m "pb: update docs/brain from {{default_branch}}" origin/{{default_branch}}; then
+              echo "docs/brain cannot take {{default_branch}} automatically: merge it by hand."
               exit 1
             fi
             git push origin HEAD:docs/brain && exit 0

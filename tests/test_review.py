@@ -293,8 +293,12 @@ class TemplatesTest(unittest.TestCase):
     def test_brain_branch_workflow_merges_default_into_docs_brain(self):
         from helpers import ROOT
         text = (ROOT / "templates/github/pb-brain-branch.yml").read_text()
-        self.assertIn('branches: ["{{default_branch}}"]', text)
-        self.assertIn("git merge --no-edit", text)
+        self.assertIn("types: [closed]", text)
+        self.assertIn("github.event.pull_request.merged", text)
+        self.assertIn("github.head_ref == 'docs/brain'", text)
+        self.assertIn("git merge --no-edit -X ours", text)
+        self.assertNotIn("[skip ci]", text)
+        self.assertFalse((ROOT / "templates/github/pb-generate.yml").exists())
         self.assertIn("git push origin HEAD:docs/brain", text)
 
     def test_scaffold_ships_the_review_policy(self):

@@ -13,7 +13,8 @@ PROPOSALS = "# Schema proposals\n\nOne line per proposal: `- [ ] P<n> · <propos
 # Skills the cloud routine follows from the repo: sync, and those sync defers to (put's analysis, meeting's step 3).
 ROUTINE_SKILLS = ("sync", "put", "meeting")
 ROUTINE_SYNC_SKILL = "skills/sync/SKILL.md"
-WORKFLOWS = ("pb-validate.yml", "pb-generate.yml", "pb-brain-branch.yml")
+WORKFLOWS = ("pb-validate.yml", "pb-brain-branch.yml")
+RETIRED_WORKFLOWS = ("pb-generate.yml",)  # generated files are now refreshed by every save
 MARKETPLACE = {"project-brain": {"source": {"source": "github", "repo": "minox86/project-brain"}}}
 PLUGIN_ID = "pb@project-brain"
 NEEDS_QUOTES =re.compile(r"""^[\[\]{}#&*!|>'"%@`-]|[:#]\s|,\s""")
@@ -28,9 +29,32 @@ def upgrade(repo_root):
     created = [sync_toolkit(brain).relative_to(repo).as_posix()]
     default = _default_branch(repo)
     created += _write_workflows(repo, default, overwrite=True)[0]
+    for name in RETIRED_WORKFLOWS:
+        old = repo / ".github" / "workflows" / name
+        if old.is_file():
+            old.unlink()
+            created.append(f"deleted {old.relative_to(repo).as_posix()}")
+    _refresh_agents(brain)
     if enable_plugin(repo):
         created.append(".claude/settings.json")
     return {"brain": str(brain), "created": created, "skipped": [], "default_branch": default}
+
+
+AGENTS_OLD = "Write through the `pb` plugin skills"
+
+
+def _refresh_agents(brain):
+    """Older AGENTS.md told agents to write brain/ in code branches: replace that paragraph."""
+    path = brain / "AGENTS.md"
+    if not path.is_file():
+        return
+    lines = path.read_text(encoding="utf-8").split("\n")
+    template = (PLUGIN_ROOT / "templates" / "brain" / "AGENTS.md").read_text(encoding="utf-8")
+    start = template.index("The brain lives on the branch `docs/brain`")
+    end = template.index("\n", template.index("Write only through the `pb` plugin skills"))
+    new = template[start:end]
+    out = [new if line.startswith(AGENTS_OLD) else line for line in lines]
+    path.write_text("\n".join(out), encoding="utf-8")
 
 
 def _write_workflows(repo, default, overwrite=False):

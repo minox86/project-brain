@@ -63,7 +63,8 @@ class LocalRunTest(GitRepoCase):
         self.assertEqual(code, 0, err)
         self.assertEqual(data, {"committed": True, "pushed": True, "conflict": False, "review": None,
                                 "promotion": None, "problems": []})
-        self.assertEqual(git(self.remote, "log", "--format=%s", "-1", "brain/inbox"), "pb(routine): manual")
+        self.assertEqual(git(self.remote, "log", "--format=%s", "-2", "brain/inbox").splitlines(),
+                         ["pb(generate): refresh generated files", "pb(routine): manual"])
 
         code, data, err = run_cli("routine", "cleanup", "--worktree", wt, cwd=self.repo)
         self.assertEqual(code, 0, err)

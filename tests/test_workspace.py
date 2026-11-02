@@ -124,6 +124,14 @@ class SyncTest(WorkspaceCase):
         self.assertEqual(data["leftovers"], [rel])
         self.assertTrue((self.wt / rel).is_file())
 
+    def test_commands_from_the_checkout_use_the_managed_copy(self):
+        # The user's checkout has its own (stale) brain/: pb must read the managed copy instead.
+        code, data, _ = run_cli("version", cwd=self.repo)
+        self.assertEqual(Path(data["brain"]).resolve(), (self.wt / "brain").resolve())
+        sub = self.repo / "brain" / "schema"
+        code, data, _ = run_cli("version", cwd=sub)
+        self.assertEqual(Path(data["brain"]).resolve(), (self.wt / "brain").resolve())
+
     def test_busy_when_another_live_process_holds_the_lock(self):
         lock = self.wt.parent / "lock"
         lock.write_text(str(os.getppid()))

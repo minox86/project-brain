@@ -31,7 +31,9 @@ If the connector or tool for the input is missing, guide the user as **Connector
 
 ## 2. Capture local files
 
-For a local file (not for external sources, not for pasted text):
+A file versioned in the monorepo (`git ls-files --error-unmatch <path>` succeeds) is not captured: it stays authoritative in the repo; summarise it and cite it as `repo:<path>`.
+
+For any other local file (not for external sources, not for pasted text):
 - extract the text and write `brain/raw/YYYY/MM/YYYY-MM-DD-<slug>.md`:
 
       ---

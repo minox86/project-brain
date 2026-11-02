@@ -29,7 +29,7 @@ Resolve the path once (no `..`, no quotes unless it contains spaces), so permiss
 | `PB save -m MSG [PATH…] [--force-review]` / `PB save --continue` | Save the pages written in the managed copy: only the `PATH`s given (the pages this work created, changed or deleted; without paths, every unsaved file), so another session's drafts are never swept in. Validates, commits, regenerates index and context packs, pushes to `docs/brain`; pages on watched points, and every change under `schema/` or `.pb/toolkit/`, go to a `pb/review/<timestamp>` PR instead; keeps the PR from `docs/brain` to the default branch open. `--continue` after resolving a conflict |
 | `PB commit -m MSG [--allow-default] [--include PATH…]` | Init only: commit `brain/` changes (generated files excluded), plus any `--include` paths, on the current branch |
 | `PB routine start --branch B [--worktree DIR]` / `PB routine finish --branch B -m MSG [--confidence PATH=LEVEL…]` / `PB routine discard` / `PB routine cleanup --worktree DIR` | Routine runs: checkout target branch (or, for manual local runs, a detached worktree that leaves the user's checkout alone); commit, rebase, push; pages the review policy holds go to a `pb/review/<timestamp>` branch with a PR and reviewers; drop the run's brain changes except digests; remove the worktree |
-| `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap |
+| `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap, including the documentation inventory (`docs`, `docs_words`) |
 | `PB scaffold --product NAME [--repo DIR]` / `PB scaffold --upgrade [--repo DIR]` | Create `brain/`, CI workflows, CLAUDE.md pointer, plugin settings, vendored toolkit / move an older brain to `docs/brain` (current workflows, plugin settings, toolkit, `AGENTS.md` writing rule) |
 | `PB generate` | Index, glossary, context packs, backlinks, digest retention. `PB save` and `PB routine finish` run it: never by hand |
 | `PB toolkit-sync` | Refresh `brain/.pb/toolkit` (scripts, plus the sync/put/meeting skills and these references the cloud routine follows, since routines load no plugins) after a plugin upgrade |
@@ -85,7 +85,7 @@ The routine is not interactive: there, a missing connector skips that source, an
 - Implicit fields for every type: `type`, `title`, `aliases`, `summary` (one line, shown in the index), `created`, `updated`, `sources`.
 - Dates are ISO `YYYY-MM-DD`; convert relative expressions against the date of the source.
 - Quote frontmatter strings containing `, ` `: ` ` #` or starting with a symbol.
-- External references: `jira:<KEY>`, `confluence:<SPACE>/<pageId>`, `teams:<team>/<channel>/<messageId>`, `teams:meeting/<id>`, `gh:pr/<n>`, `gh:issue/<n>`, `figma:<fileKey>/<nodeId>`, `url:<url>`, `raw:<path without .md>`.
+- External references: `jira:<KEY>`, `confluence:<SPACE>/<pageId>`, `teams:<team>/<channel>/<messageId>`, `teams:meeting/<id>`, `gh:pr/<n>`, `gh:issue/<n>`, `figma:<fileKey>/<nodeId>`, `url:<url>`, `raw:<path without .md>`, `repo:<path>` (a file versioned in the monorepo, e.g. `repo:docs/architecture/billing.md`).
 - Relevant claims cite their source inline `^[jira:FIN-412]`; the same references go in `sources`.
 - Never write a field you cannot infer with reasonable confidence: omit it.
 

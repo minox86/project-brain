@@ -1,6 +1,6 @@
 ---
 name: init
-description: Creates the project brain (brain/ folder, living on the docs/brain branch) in the product monorepo through an interview that tailors the software-product schema to this project, sets up the GitHub workflows and bootstraps modules, interfaces and decisions from the code; also moves an existing brain from the default branch to docs/brain. Use when the user wants to initialise, create, set up or upgrade the project brain or pb, or when a pb command reports that there is no brain.
+description: Creates the project brain (brain/ folder, living on the docs/brain branch) in the product monorepo through an interview that tailors the software-product schema to this project, sets up the GitHub workflows, bootstraps modules, interfaces and decisions from the code and ingests the documentation already in the repo into the chosen schema; also moves an existing brain from the default branch to docs/brain. Use when the user wants to initialise, create, set up or upgrade the project brain or pb, or when a pb command reports that there is no brain.
 argument-hint: "[product name]"
 ---
 
@@ -36,9 +36,10 @@ Not a question: say it once, in plain words. The brain lives on the branch `docs
 
 Never ask the user what you can find yourself.
 
-- `PB scan` → module candidates, API specs, ADRs, CODEOWNERS, READMEs, CI files, top-level folders.
+- `PB scan` → module candidates, API specs, ADRs, CODEOWNERS, READMEs, CI files, top-level folders, and the **documentation inventory** (`docs`: every Markdown, MDX, reStructuredText and AsciiDoc file outside ADR folders, hidden folders and test data, with `kind` `readme` / `docs` / `root` / `other`, `title` and `words`; `docs_words` is the total).
 - Read the base preset: `BASE/../../presets/software-product/brain.md`, `BASE/../../presets/software-product/review.md` and every file in `BASE/../../presets/software-product/types/`.
 - Read the root README and the READMEs of the main module candidates; skim a sample of ADRs and the first lines of each spec.
+- **Documentation discovery.** Turn the inventory into groups by folder (e.g. `docs/architecture`, `docs/guides`, root files, module READMEs). Drop what is not product knowledge even if the scan kept it: tool or agent configuration (files with `name:`/`description:` frontmatter, prompt templates), generated API references, vendored or copied third-party docs. For each group, read the headings (`grep -n '^#' <files>`, or the first lines) and the last change (`git log -1 --format=%cs -- <path>`), and note which types its content would feed (features, concepts, modules, interfaces, environments, decisions, open questions). These facts also shape the schema: recurring subjects with no matching type are candidates for additional types, vocabulary in the docs feeds the glossary languages.
 - Reviewer candidates: owners in CODEOWNERS (per path: backend, frontend, design system…); with `gh` available, the repo's teams (`gh api repos/<owner>/<repo>/teams`) and top committers per module path.
 - Infer: product name (README title, package name), domain vocabulary (recurring nouns), module boundaries (workspaces, deployables), whether UX decisions are likely (frontend apps present), glossary languages.
 - Only if the user names them: a Confluence space (Atlassian connector: pages tree) and Jira epics (JQL) to seed features and concepts. If the Atlassian connector is missing, guide the user to connect it (see **Connectors** in the conventions) or skip the seeding.
@@ -62,6 +63,7 @@ The decisions that define the schema, each with the decisions that hang off it:
 - Sources to register now or later via `/pb:routine-setup` (Teams channels, Confluence spaces, Jira projects whose epics the brain follows).
 - **GitHub** (section G).
 - Bootstrap scope: which modules, specs and ADRs to turn into pages now.
+- Existing documentation (section 6b): ingest all of it (recommended), only some groups, or none. Asked once the types are settled, since it is ingested into the chosen schema.
 
 ## 3. Grill in rounds
 
@@ -83,7 +85,7 @@ Collect the facts first, never ask what `gh` can tell: the rules on `docs/brain`
 
 ## 4. Confirm
 
-Show the final schema in one block in the chat: types table (area, folder, fields, budget), thresholds, glossary languages, review policy (watched points, confidence threshold, reviewers per area), module map, bootstrap scope, GitHub changes (applied now or for an admin) and workflow edits. Then one `AskUserQuestion`: confirm / change something / stop. Do not write anything before it.
+Show the final schema in one block in the chat: types table (area, folder, fields, budget), thresholds, glossary languages, review policy (watched points, confidence threshold, reviewers per area), module map, bootstrap scope, documentation to ingest (groups, files, words), GitHub changes (applied now or for an admin) and workflow edits. Then one `AskUserQuestion`: confirm / change something / stop. Do not write anything before it.
 
 ## 5. Scaffold and apply the schema
 
@@ -102,6 +104,21 @@ Propose, as one numbered list, the initial pages:
 
 Ask with `AskUserQuestion` (`multiSelect`, one option per group of pages: modules, interfaces, decisions, features and concepts, epics; "none" is the empty selection). Write them under `<tmp>/brain`, applying the significance gate and the writing rules; prefer fewer, accurate pages.
 
+## 6b. Ingest the existing documentation
+
+Skip when the discovery of section 1 found nothing worth ingesting; say so in one line.
+
+1. **Ask.** One `AskUserQuestion`, with the facts in the question: "The repo has <N> documentation files (<W> words) in <G> groups: <group (files)>, … Ingest all of it into the brain now, following the schema we just agreed?". Options: **Ingest all (Recommended)** · **Choose the groups** · **Not now** (later with `/pb:put <folder>`). On "Choose the groups", a second `multiSelect` question, one option per group (more than 4 groups: by top folder, or several calls).
+2. **Read and analyse**, group by group, one file at a time, with the schema of section 5 (the types in `<tmp>/brain/schema/types/`). Apply the **Analyse** rules of `/pb:put` (`BASE/../put/SKILL.md`, section 3) to each file:
+   - extract features, concepts, modules, interfaces, environments, decisions and open questions; route each item to the type whose prose says it belongs there;
+   - the significance gate holds: setup steps, how-tos for running the code, changelogs and plans of finished work are dropped; implementation plans keep only the decisions they record;
+   - **merge, never duplicate**: resolve each entity with `PB --brain <tmp>/brain resolve` against the pages already written (section 6 and earlier files); a module README enriches the module page, an ADR already turned into a decision is not ingested twice;
+   - the doc stays authoritative in the repo: summarise and link it, never copy it; cite it inline and in `sources` as `repo:<path>`; do not capture it in `raw/`, it is already versioned;
+   - check claims that the code can contradict (module boundaries, endpoints, names) against the code; a contradiction, or two docs that disagree, becomes an `open-question` citing both, never a silent pick. A doc not changed for over a year while the code it describes changed since (`git log -1 --format=%cs -- <module paths>`) is a weak source: say so in the page and prefer an `open-question` for its doubtful claims.
+   With many files (more than ~30, or over ~50,000 words), you may hand each group to a subagent with `writing.md`, the schema files and these rules: it returns proposed changes (page · create/update · content · sources), it writes nothing; you merge the proposals and resolve overlaps.
+3. **Plan.** Show the list of pages to create or update, grouped by type, each with the docs it comes from, plus the files that gave nothing and why (one line per group). Confirm with one `AskUserQuestion`: write all / change something / skip.
+4. **Write** under `<tmp>/brain`, following each type's prose and budget, then `PB --brain <tmp>/brain validate`: fix every error before going on.
+
 ## 7. Close
 
 1. Commit in the temporary worktree: `PB --brain <tmp>/brain commit -m "pb(init): create brain for <product>" --allow-default --include CLAUDE.md .claude/settings.json .github/workflows/pb-validate.yml .github/workflows/pb-brain-branch.yml` (leave out workflows reported as `skipped`). Then the generated files: `PB --brain <tmp>/brain generate`, `git -C <tmp> add brain`, `git -C <tmp> commit -qm "pb(generate): refresh generated files"` (init is the only place that runs `PB generate` by hand: there is no save yet).
@@ -110,6 +127,7 @@ Ask with `AskUserQuestion` (`multiSelect`, one option per group of pages: module
 4. `git worktree remove --force <tmp>`, then `PB workspace sync` in the user's clone: it must return the brain.
 
 Then explain the next steps, in a few lines:
+- what the documentation ingestion brought in (pages per type, files skipped), and how to ingest more later (`/pb:put <path>`);
 - everyone reads and writes the brain from Claude Code with the `pb` skills; git stays invisible, every save is visible to everyone at once on `docs/brain`; pages on points watched in `brain/schema/review.md` wait for the area reviewers in a PR;
 - merge the brain PR now, to turn on the workflows; later, merge it whenever the code branches should carry the brain (any merge method);
 - newcomers run `/pb:setup` (tools, GitHub login, clone);

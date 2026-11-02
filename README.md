@@ -92,8 +92,9 @@ Once per product.
 1. Open the monorepo and run **`/pb:init`**. Your checkout is not touched: init works in a temporary copy.
 2. Claude looks at the repo, then asks a few rounds of questions to shape the wiki around your product, including which parts of it need a human review and who reviews technical, functional and design changes. The recommended answer is always the first option.
 3. Claude checks GitHub: `docs/brain` must not be covered by a branch protection or ruleset, and workflows must be allowed to push. It applies what it can (as an admin) or lists it for an admin. It also offers to make product pipelines skip brain-only changes.
-4. Confirm. Claude creates the branch `docs/brain` with `brain/` and the first pages, and opens the **brain PR** from `docs/brain` to your default branch. Besides the brain, this first PR brings the two pb workflows, a pointer in `CLAUDE.md` and `.claude/settings.json`, which offers the plugin to everyone who opens the repo in Claude Code.
-5. Merge the brain PR.
+4. Confirm the schema. Claude then lists the documentation already in the repo (READMEs, `docs/`, architecture notes…) and offers to ingest all of it into the schema you chose: it summarises and links each doc (`repo:<path>`), merges what overlaps and turns disagreements into open questions.
+5. Claude creates the branch `docs/brain` with `brain/` and the first pages, and opens the **brain PR** from `docs/brain` to your default branch. Besides the brain, this first PR brings the two pb workflows, a pointer in `CLAUDE.md` and `.claude/settings.json`, which offers the plugin to everyone who opens the repo in Claude Code.
+6. Merge the brain PR.
 
 > [!TIP]
 > Make `validate` and `brain-only` (from `pb-validate`) required checks on the default branch: they run on every PR and pass when no brain page changed.

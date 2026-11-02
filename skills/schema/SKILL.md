@@ -21,7 +21,7 @@ Table of types from `brain/schema/types/*.md`: name, area, folder, fields (with 
 
 ## Review policy
 
-Changes like "send feature status changes to review", "design reviews go to @acme/design", "only low confidence needs a PR" edit `brain/schema/review.md`: `watch` rules, `direct_min_confidence`, `noise_to_review`, `reviewers`. The file's prose lists the fields. Missing file (brain created before the policy existed): copy `BASE/../../presets/software-product/review.md` and adapt it with the user. Show the rule before and after, confirm, then `PB validate` (it reports `bad-review-policy`) and commit like any schema change. When a type is renamed or dropped, update the rules that name it.
+Changes like "send feature status changes to review", "design reviews go to @acme/design", "only low confidence needs a PR" edit `brain/schema/review.md`: `watch` rules, `direct_min_confidence`, `noise_to_review`, `reviewers`. The file's prose lists the fields. Missing file (brain created before the policy existed): copy `BASE/../../presets/software-product/review.md` and adapt it with the user. Show the rule before and after, confirm, then `PB validate` (it reports `bad-review-policy`) and save like any schema change (it goes to a review PR). When a type is renamed or dropped, update the rules that name it.
 
 ## apply <Pn> or a change in plain words
 
@@ -30,5 +30,5 @@ Changes like "send feature status changes to review", "design reviews go to @acm
 3. Wait for explicit confirmation.
 4. Edit the type files (and the `watch` rules in `review.md` that name a renamed or removed type or field); migrate pages (rename fields, move files, fix every `[[link]]` when a title changes — search the whole brain).
 5. Mark the proposal `- [x]` in `proposals.md`.
-6. `PB --brain <brain> validate` must pass with no new errors.
-7. Save on its own: `PB save -m "pb(schema): <change>" --force-review` (schema changes always wait for a review), following the closing flow.
+6. `PB validate` must pass with no new errors.
+7. Save on its own: `PB save -m "pb(schema): <change>" <files written> --force-review` (schema changes always wait for a review), following the closing flow.

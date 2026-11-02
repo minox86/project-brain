@@ -32,4 +32,4 @@ For each item show: target page · create/update · the exact lines added or cha
 
 ## 4. Write and close
 
-Write, then the closing flow: `PB save -m "pb(capture): <summary>"`. Like every save it goes to `docs/brain`, not to the current code branch: the knowledge is visible to the whole team at once, whatever happens to this branch.
+Write, then the closing flow: `PB save -m "pb(capture): <summary>" <files written>`. Like every save it goes to `docs/brain`, not to the current code branch: the knowledge is visible to the whole team at once, whatever happens to this branch.

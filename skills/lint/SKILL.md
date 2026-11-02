@@ -19,7 +19,7 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
    - **orphan** — link it from the right page, or delete it if it fails the significance gate;
    - **stale-open-question** — ask whether it is resolved (→ decision), dropped, or still open (refresh `updated`);
    - **archivable** — delete it (history stays in git) or keep it; for an epic, first check that what is still true lives on feature, concept, module or decision pages;
-   - **dead-module-paths** — update `paths` from the current repo layout, or delete the module;
+   - **dead-module-paths** — check the paths in the user's checkout first: the managed copy's code can lag behind the default branch until the brain PR is merged; then update `paths` from the current repo layout, or delete the module;
    - **superseded-referenced** — relink to the successor decision.
 4. Apply what the user confirms. Deletions and merges are destructive: list them explicitly before applying.
-5. Closing flow: `PB save -m "pb(lint): <summary>"`.
+5. Closing flow: `PB save -m "pb(lint): <summary>" <files written>`.

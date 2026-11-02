@@ -18,13 +18,16 @@ permissions:
 
 jobs:
   merge:
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged && github.head_ref == 'docs/brain')
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged && github.head_ref == 'docs/brain' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: docs/brain
           fetch-depth: 0
+          # The workflow token cannot push changes to .github/workflows/ that the default branch brings in:
+          # PB_BRAIN_TOKEN (a token with contents and workflows write on this repo), when set, can.
+          token: ${{ secrets.PB_BRAIN_TOKEN || github.token }}
       - name: Merge {{default_branch}} into docs/brain
         run: |
           git config user.name "github-actions[bot]"
@@ -36,7 +39,13 @@ jobs:
               echo "docs/brain cannot take {{default_branch}} automatically: merge it by hand."
               exit 1
             fi
-            git push origin HEAD:docs/brain && exit 0
+            if git push origin HEAD:docs/brain 2> push.err; then exit 0; fi
+            cat push.err
+            if grep -q "workflow" push.err; then
+              echo "The default branch changed GitHub workflows, which the workflow token cannot push."
+              echo "Add a PB_BRAIN_TOKEN secret (contents and workflows write) and re-run, or merge {{default_branch}} into docs/brain by hand."
+              exit 1
+            fi
             sleep 5
           done
           exit 1

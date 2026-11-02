@@ -69,7 +69,7 @@ class ScaffoldBranchTest(unittest.TestCase):
                 code, data, _ = run_cli("scaffold", "--repo", repo, "--product", "P")
                 self.assertEqual(code, 0)
                 self.assertEqual(data["default_branch"], "main")
-                self.assertIn('branches: ["main"]', (repo / ".github/workflows/pb-generate.yml").read_text())
+                self.assertIn('branches: ["main"]', (repo / ".github/workflows/pb-brain-branch.yml").read_text())
         finally:
             for k, v in saved.items():
                 if v is None:
@@ -96,11 +96,12 @@ class SecretsReviewTest(unittest.TestCase):
 
 
 class TemplatesTest(unittest.TestCase):
-    def test_generate_runs_without_push_events(self):
+    def test_generate_runs_on_docs_brain(self):
         text = (ROOT / "templates/github/pb-generate.yml").read_text()
+        self.assertIn('branches: ["docs/brain"]', text)
         self.assertIn("workflow_dispatch:", text)
-        self.assertIn("schedule:", text)
         self.assertIn("concurrency:", text)
+        self.assertIn("git push origin HEAD:docs/brain", text)
 
     def test_validate_uses_base_toolkit_and_never_automerges_toolkit(self):
         text = (ROOT / "templates/github/pb-validate.yml").read_text()

@@ -279,13 +279,23 @@ class RoutineSplitTest(BrainRepoCase):
 
 
 class TemplatesTest(unittest.TestCase):
-    def test_validate_workflow_routes_by_policy(self):
+    def test_validate_workflow_never_merges_and_guards_the_brain_pr(self):
         from helpers import ROOT
         text = (ROOT / "templates/github/pb-validate.yml").read_text()
         self.assertIn('review --base "$BASE"', text)
-        self.assertIn("fetch-depth: 0", text)
-        self.assertIn("pb/review/", text)
-        self.assertIn('[ "$route" = "direct" ]', text)
+        self.assertIn("github.base_ref == 'docs/brain'", text)
+        self.assertIn("github.head_ref == 'docs/brain'", text)
+        self.assertIn("grep -v '^brain/'", text)
+        self.assertNotIn("gh pr merge", text)
+        self.assertNotIn("--approve", text)
+        self.assertIn("contents: read", text)
+
+    def test_brain_branch_workflow_merges_default_into_docs_brain(self):
+        from helpers import ROOT
+        text = (ROOT / "templates/github/pb-brain-branch.yml").read_text()
+        self.assertIn('branches: ["{{default_branch}}"]', text)
+        self.assertIn("git merge --no-edit", text)
+        self.assertIn("git push origin HEAD:docs/brain", text)
 
     def test_scaffold_ships_the_review_policy(self):
         with tempfile.TemporaryDirectory() as tmp:

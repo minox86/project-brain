@@ -5,7 +5,7 @@
 ## Reading
 
 1. Start from `brain/index.md` (one line per page).
-2. Use `brain/glossary.md` for domain terms (English and Italian): use the canonical English term in code and docs.
+2. Use `brain/glossary.md` for domain terms (in the glossary languages of `brain/schema/brain.md`): use the canonical English term in code and docs.
 3. Working on a feature? Read `brain/context/<feature>.md` first: it bundles the feature, its concepts, modules, interfaces, accepted decisions and open questions.
 4. Working on a Jira ticket? Find its epic in `brain/epics/` (the `jira` field holds the key) and read `brain/context/<epic>.md`: the scope, constraints and open points agreed for the change in progress, plus the features and modules it touches.
 5. Working on code? Find the module whose `paths` covers the files you touch (`brain/technical/modules/`), then follow its links.

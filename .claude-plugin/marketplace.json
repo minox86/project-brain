@@ -6,7 +6,7 @@
     {
       "name": "pb",
       "source": "./",
-      "description": "project-brain: product wiki in the monorepo for humans and AI agents."
+      "description": "project-brain: product wiki in the monorepo (docs/brain branch) for humans and AI agents."
     }
   ]
 }

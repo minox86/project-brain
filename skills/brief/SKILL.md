@@ -20,7 +20,7 @@ A brief is **derived** from the brain: show it in the conversation, never write 
 ## 2. Gather
 
 - **Repo mode:** `PB context --jira <KEY>` or `PB context --feature "<title>"` (resolve the title with `PB resolve` first). For `onboarding`: `brain/index.md`, `brain/glossary.md`, and `PB stats`.
-- **Read mode:** `brain/context/<title>.md` from the default branch (for a Jira key, find the epic or feature page that lists it); for `onboarding`, `brain/index.md` and `brain/glossary.md`.
+- **Read mode:** `brain/context/<title>.md` from the branch `docs/brain` (for a Jira key, find the epic or feature page that lists it); for `onboarding`, `brain/index.md` and `brain/glossary.md`.
 - Nothing found: say so and suggest the closest titles from the index. Never fill gaps from general knowledge: a brief contains only what the brain says, and says what is missing.
 
 ## 3. Write the brief

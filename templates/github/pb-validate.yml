@@ -46,7 +46,8 @@ jobs:
           NUMBER: ${{ github.event.pull_request.number }}
         run: |
           files=$(gh api --paginate "repos/$REPO/pulls/$NUMBER/files" --jq '.[] | .filename, (.previous_filename // empty)')
-          outside=$(printf '%s\n' "$files" | grep -v '^brain/' || true)
+          # Besides brain/, only what pb itself writes (the first PR, from /pb:init, brings these too).
+          outside=$(printf '%s\n' "$files" | grep -v -E '^(brain/|\.github/workflows/pb-[a-z-]+\.yml$|CLAUDE\.md$|\.gitignore$|\.claude/settings\.json$)' || true)
           if [ -n "$outside" ]; then
             echo "docs/brain carries changes outside brain/. Move them to a code PR and remove them from docs/brain:"
             echo "$outside"

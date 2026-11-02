@@ -22,4 +22,4 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
    - **dead-module-paths** — update `paths` from the current repo layout, or delete the module;
    - **superseded-referenced** — relink to the successor decision.
 4. Apply what the user confirms. Deletions and merges are destructive: list them explicitly before applying.
-5. Closing flow: `PB commit -m "pb(lint): <summary>"`.
+5. Closing flow: `PB save -m "pb(lint): <summary>"`.

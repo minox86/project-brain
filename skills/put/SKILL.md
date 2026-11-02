@@ -64,4 +64,4 @@ Show it and wait for confirmation if `--plan`, or if a new page resembles an exi
 
 ## 5. Write and close
 
-Write pages following each type's prose and budget; set `created`/`updated`, `summary`, `sources`; cite inline. Then the closing flow (`PB commit -m "pb(put): <summary>"`).
+Write pages following each type's prose and budget; set `created`/`updated`, `summary`, `sources`; cite inline. Then the closing flow (`PB save -m "pb(put): <summary>"`).

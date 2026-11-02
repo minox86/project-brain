@@ -19,11 +19,41 @@ PLUGIN_ID = "pb@project-brain"
 NEEDS_QUOTES =re.compile(r"""^[\[\]{}#&*!|>'"%@`-]|[:#]\s|,\s""")
 
 
+def upgrade(repo_root):
+    """An existing brain moves to docs/brain: current workflows (overwritten), plugin settings, toolkit."""
+    repo = Path(repo_root).resolve()
+    brain = repo / "brain"
+    if not (brain / "schema" / "VERSION").is_file():
+        raise UsageError(f"no brain in {brain} to upgrade")
+    created = [sync_toolkit(brain).relative_to(repo).as_posix()]
+    default = _default_branch(repo)
+    created += _write_workflows(repo, default, overwrite=True)[0]
+    if enable_plugin(repo):
+        created.append(".claude/settings.json")
+    return {"brain": str(brain), "created": created, "skipped": [], "default_branch": default}
+
+
+def _write_workflows(repo, default, overwrite=False):
+    created, skipped = [], []
+    workflows = repo / ".github" / "workflows"
+    workflows.mkdir(parents=True, exist_ok=True)
+    for name in WORKFLOWS:
+        target = workflows / name
+        rel = target.relative_to(repo).as_posix()
+        if target.exists() and not overwrite:
+            skipped.append(rel)
+            continue
+        text = (PLUGIN_ROOT / "templates" / "github" / name).read_text(encoding="utf-8")
+        target.write_text(text.replace("{{default_branch}}", default), encoding="utf-8")
+        created.append(rel)
+    return created, skipped
+
+
 def scaffold(repo_root, product, preset="software-product"):
     repo = Path(repo_root).resolve()
     brain = repo / "brain"
     if (brain / "schema" / "VERSION").is_file():
-        raise UsageError(f"a brain already exists in {brain}")
+        raise UsageError(f"a brain already exists in {brain}: use --upgrade to move it to docs/brain")
     preset_dir = PLUGIN_ROOT / "presets" / preset
     if not (preset_dir / "VERSION").is_file():
         raise UsageError(f"unknown preset '{preset}'")
@@ -56,16 +86,8 @@ def scaffold(repo_root, product, preset="software-product"):
     note(sync_toolkit(brain))
 
     default = _default_branch(repo)
-    workflows = repo / ".github" / "workflows"
-    workflows.mkdir(parents=True, exist_ok=True)
-    for name in WORKFLOWS:
-        target = workflows / name
-        if target.exists():
-            skipped.append(target.relative_to(repo).as_posix())
-            continue
-        text = (PLUGIN_ROOT / "templates" / "github" / name).read_text(encoding="utf-8")
-        target.write_text(text.replace("{{default_branch}}", default), encoding="utf-8")
-        note(target)
+    written, skipped = _write_workflows(repo, default)
+    created += written
 
     if ensure_claude_pointer(repo):
         created.append("CLAUDE.md")

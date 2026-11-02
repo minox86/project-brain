@@ -10,7 +10,7 @@ Question: `$ARGUMENTS`
 
 Read `BASE/../../references/conventions.md`. Works in repo mode and read mode. In Cowork without a GitHub connector that reads the monorepo, guide the user to connect it (see **Connectors** in the conventions) before answering: never answer about the product from memory.
 
-1. Read `brain/index.md` and `brain/glossary.md` (in read mode, from the monorepo's default branch through the GitHub connector).
+1. Read `brain/index.md` and `brain/glossary.md` (in read mode, from the monorepo's branch `docs/brain` through the GitHub connector).
 2. Pick the relevant pages from the index; for a feature or an active epic read `brain/context/<title>.md` first; for code paths use `PB context --paths` (repo mode).
 3. Follow `[[links]]` only as far as needed. Prefer accepted decisions over superseded ones; mention open questions that affect the answer.
 4. Answer concisely, in the user's language. Cite every claim with `[[Page]]` and, when useful, its external source (`jira:…`, `confluence:…`, `gh:pr/…`).

@@ -46,6 +46,15 @@ class ScaffoldTest(unittest.TestCase):
         self.assertIn("brain/.pb/cache/", (self.repo / ".gitignore").read_text())
         self.assertIn("brain/AGENTS.md", data["created"])
 
+    def test_upgrade_rewrites_workflows_of_an_existing_brain(self):
+        self.scaffold()
+        (self.repo / ".github/workflows/pb-generate.yml").write_text("old\n")
+        (self.repo / ".github/workflows/pb-brain-branch.yml").unlink()
+        code, data, err = run_cli("scaffold", "--repo", self.repo, "--upgrade")
+        self.assertEqual(code, 0, err)
+        self.assertIn('branches: ["docs/brain"]', (self.repo / ".github/workflows/pb-generate.yml").read_text())
+        self.assertTrue((self.repo / ".github/workflows/pb-brain-branch.yml").is_file())
+
     def test_scaffold_refuses_existing_brain(self):
         self.scaffold()
         code, data, _ = self.scaffold()

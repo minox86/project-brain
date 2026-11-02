@@ -1,6 +1,6 @@
 ---
 name: routine-setup
-description: Configures the nightly routine that feeds the project brain from Microsoft Teams channels and recurring meetings, Confluence spaces, Jira epics and merged GitHub PRs — picks channels, spaces and projects, the target branch the routine pushes to without PRs, writes the configuration and generates the cloud routine prompt. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion or routine.
+description: Configures the nightly routine that feeds the project brain from Microsoft Teams channels and recurring meetings, Confluence spaces, Jira epics and merged GitHub PRs — picks channels, spaces and projects, writes the configuration and generates the cloud routine prompt. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion or routine.
 argument-hint: "[show | schedule <frequency>]"
 ---
 
@@ -48,9 +48,7 @@ With the Atlassian connector: `getVisibleJiraProjects`. Let the user pick the pr
 
 ## 5. Target branch
 
-The routine pushes **directly** to one branch what the review policy (`brain/schema/review.md`) lets through; what it holds goes to a `pb/review/…` PR towards that branch, with the area reviewers. The routine's account must be able to create `pb/review/*` branches and open PRs. Explain and let the user choose:
-- **default branch (`main`)** — knowledge lands immediately and CI regenerates index and context packs at once; the owner's account must be allowed to push to it past branch protection (a bypass for this account, or a ruleset exception for `brain/**`). Check with the user that this is in place.
-- **a long-lived branch** (e.g. `brain/inbox`) — no protection to bypass; someone merges it into `main` when they want; together with the review PRs it is a second review point.
+The routine writes where everyone writes: the branch `docs/brain` (`routine.branch: docs/brain`). It pushes directly what the review policy (`brain/schema/review.md`) lets through; what it holds goes to a `pb/review/…` PR towards `docs/brain`, with the area reviewers; and it keeps the PR from `docs/brain` to the default branch open, like every save. The routine's account must be able to push to `docs/brain`, create `pb/review/*` branches and open PRs. Nothing to choose: say it in one line.
 
 ## 6. Schedule
 
@@ -86,13 +84,13 @@ Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule
 
 Cloud routines do not load plugins: the routine follows the copy of the toolkit and of its instructions (sync, put, meeting skills and the references) vendored in `brain/.pb/toolkit/`. Refresh it from this plugin with `PB toolkit-sync`, so the routine runs the same version as the plugin.
 
-Validate, then the closing flow (`PB commit -m "pb(routine-setup): configure nightly routine"`, which includes the refreshed `brain/.pb/toolkit/`). The routine reads configuration and instructions from the target branch: make sure the commit reaches it (merge the PR, or push to the target branch). After every plugin upgrade, `PB toolkit-sync` and commit again, or the routine keeps following the old instructions.
+Validate, then the closing flow (`PB save -m "pb(routine-setup): configure nightly routine"`, which includes the refreshed `brain/.pb/toolkit/`). The routine reads configuration and instructions from `docs/brain`, where the save puts them. After every plugin upgrade, `PB --brain <brain> toolkit-sync` and save again, or the routine keeps following the old instructions.
 
 ## 8. Create the routine
 
 Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo}}`, `{{channels}}`, `{{spaces}}`, `{{projects}}`, `{{meetings}}`.
 
-**If you can manage routines here** (Claude Code with the `schedule` skill or the remote-trigger tool): create the routine yourself on the monorepo `<repo>`, with the rendered prompt, the schedule `<cron>` and the Microsoft 365 and Atlassian connectors. When `routine.trigger_id` already exists, update that routine instead of creating a new one. Relay the routine's link and next run time. Write the routine id to `routine.trigger_id` in `sources.md` and commit it (`PB commit -m "pb(routine-setup): record routine id"`).
+**If you can manage routines here** (Claude Code with the `schedule` skill or the remote-trigger tool): create the routine yourself on the monorepo `<repo>`, with the rendered prompt, the schedule `<cron>` and the Microsoft 365 and Atlassian connectors. When `routine.trigger_id` already exists, update that routine instead of creating a new one. Relay the routine's link and next run time. Write the routine id to `routine.trigger_id` in `sources.md` and commit it (`PB save -m "pb(routine-setup): record routine id"`).
 
 **Otherwise** give the user the steps:
 1. Run `/schedule` in Claude Code (or open claude.ai/code/routines) and create a routine on the monorepo `<repo>` with schedule `<cron>`.

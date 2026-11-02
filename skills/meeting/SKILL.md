@@ -39,4 +39,4 @@ Drop: status updates, scheduling, small talk, who-will-do-what (that belongs to 
 
 ## 4. Plan, write, close
 
-Show the plan (page · create/update · what) and wait for confirmation. Write following the writing rules; link decisions to the features/modules they affect; set `resolved_by` on open questions answered in the meeting. Closing flow: `PB commit -m "pb(meeting): <meeting title> <date>"`.
+Show the plan (page · create/update · what) and wait for confirmation. Write following the writing rules; link decisions to the features/modules they affect; set `resolved_by` on open questions answered in the meeting. Closing flow: `PB save -m "pb(meeting): <meeting title> <date>"`.

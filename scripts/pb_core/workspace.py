@@ -10,15 +10,14 @@ import contextlib
 import datetime
 import json
 import os
+import re
 import subprocess
-import time
 from pathlib import Path
 
 from .errors import GitError, UsageError
 
 BRAIN_BRANCH = "docs/brain"
 REVIEW_PREFIX = "pb/review/"
-LOCK_STALE_SECONDS = 600
 PUSH_ATTEMPTS = 3
 PROMOTION_TITLE = "Brain updates"
 PROMOTION_BODY = (
@@ -33,6 +32,23 @@ def _git(cwd, *args, check=True, env=None):
     if check and proc.returncode != 0:
         raise GitError(f"git {' '.join(args)} failed: {proc.stderr.strip() or proc.stdout.strip()}")
     return proc
+
+
+def default_branch(repo):
+    proc = _git(repo, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD", check=False)
+    if proc.returncode == 0 and proc.stdout.strip():
+        return proc.stdout.strip().rsplit("refs/remotes/origin/", 1)[-1]
+    for name in ("main", "master"):
+        if _git(repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{name}", check=False).returncode == 0:
+            return name
+    return "main"
+
+
+def origin_repo(repo):
+    """owner/name from a GitHub origin URL, or None."""
+    url = _git(repo, "remote", "get-url", "origin", check=False).stdout.strip()
+    found = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?/?$", url)
+    return found.group(1) if found else None
 
 
 def repo_root(start):
@@ -53,53 +69,52 @@ def worktree_path(repo):
     return pb_dir(repo) / "brain-worktree"
 
 
-def _alive(pid):
-    if os.name == "nt":
-        # os.kill(pid, 0) would terminate the process on Windows: rely on the lock's age there.
-        return bool(str(pid).strip())
+def _try_lock(fd):
+    """An OS lock on the open lock file: the system releases it when the holder ends, so it is never stale."""
     try:
-        os.kill(int(pid), 0)
-    except (ValueError, ProcessLookupError, OverflowError):
+        if os.name == "nt":
+            import msvcrt
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
         return False
-    except PermissionError:
-        return True
     return True
+
+
+def _unlock(fd):
+    with contextlib.suppress(OSError):
+        if os.name == "nt":
+            import msvcrt
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_UN)
 
 
 @contextlib.contextmanager
 def locked(repo):
-    """One pb operation per clone at a time. A lock whose process is gone, or older than LOCK_STALE_SECONDS,
-    is taken over; only the lock's own holder removes it."""
+    """One pb operation per clone at a time. The lock file stays; holding it means holding an OS lock on it,
+    which ends with the process: no stale lock to take over, so two sessions can never both hold it."""
     folder = pb_dir(repo)
     folder.mkdir(parents=True, exist_ok=True)
-    lock = folder / "lock"
-    mine = str(os.getpid())
-    message = "another Claude session is working on the brain of this clone: retry in a moment"
-    for _ in range(2):
-        try:
-            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            break
-        except FileExistsError:
-            try:
-                holder = lock.read_text().strip()
-                age = time.time() - lock.stat().st_mtime
-            except FileNotFoundError:
-                continue
-            # An empty lock is being written by its holder right now.
-            if (_alive(holder) or (not holder and age < 5)) and age < LOCK_STALE_SECONDS:
-                raise GitError(message, {"error": message, "code": "busy"})
-            with contextlib.suppress(FileNotFoundError):
-                lock.unlink()
-    else:
+    fd = os.open(str(folder / "lock"), os.O_RDWR | os.O_CREAT)
+    if not _try_lock(fd):
+        os.close(fd)
+        message = "another Claude session is working on the brain of this clone: retry in a moment"
         raise GitError(message, {"error": message, "code": "busy"})
-    os.write(fd, mine.encode())
-    os.close(fd)
     try:
+        if os.name != "nt":
+            # Who holds it, for a human looking at the file (Windows keeps byte 0 locked: left empty there).
+            os.ftruncate(fd, 0)
+            os.write(fd, str(os.getpid()).encode())
         yield
     finally:
-        with contextlib.suppress(FileNotFoundError):
-            if lock.read_text().strip() == mine:
-                lock.unlink()
+        _unlock(fd)
+        os.close(fd)
 
 
 def _remote_has(repo, branch):
@@ -363,12 +378,12 @@ def regenerate(brain_root, wt):
     return bool(specs) and _commit_paths(wt, "pb(generate): refresh generated files", specs)
 
 
-def save(repo, message, paths=(), confidence=(), force_review=False):
+def save(repo, message, paths=(), force_review=False):
     with locked(repo):
-        return _save(Path(repo), message, paths, confidence, force_review)
+        return _save(Path(repo), message, paths, force_review)
 
 
-def _save(repo, message, paths, confidence, force_review):
+def _save(repo, message, paths, force_review):
     from .review import review
     brain, wt = _brain_of(repo)
     leftovers, rebasing, _ = _state(wt)
@@ -408,7 +423,7 @@ def _save(repo, message, paths, confidence, force_review):
             _unpark(repo, wt)
             return _result(errors=errors)
         in_scope = {f[len("brain/"):] for f in scope}
-        routed = review(brain, "HEAD", confidence, noise_holds=False)
+        routed = review(brain, "HEAD", noise_holds=False)
         guarded = {f[len("brain/"):] for f in scope if f.startswith(ALWAYS_REVIEWED)}
         held = set(in_scope) if force_review else \
             ({item["path"] for item in routed["review"]} & in_scope) | guarded
@@ -556,12 +571,11 @@ def _send_to_review(repo, wt, pending, held):
         out["branch"] = None
         out["problems"].append("the pages that need a review could not be sent: they are sent with the next save")
         return out
-    owner = gh_repo(repo)
     body = pending["markdown"] + "\nSaved with pb. Merge to accept, edit the pages here to correct them, " \
                                  "close to drop them.\n"
-    pr = _gh_json(["api", f"repos/{owner}/pulls", "-X", "POST", "-f", f"title={pending['message']} (review)",
-                   "-f", f"head={head}", "-f", f"base={BRAIN_BRANCH}", "-f", f"body={body}"]) if owner else None
-    if not pr:
+    url, problems = open_review_pr(gh_repo(repo), head, f"{pending['message']} (review)", body,
+                                   pending["reviewers"])
+    if not url:
         _git(wt, "push", "-q", "origin", f":refs/heads/{head}", check=False)
         _restore_held(repo, wt, pending, held)
         out["branch"] = None
@@ -569,20 +583,32 @@ def _send_to_review(repo, wt, pending, held):
                                "a review are sent with the next save")
         return out
     _clear_pending(repo)
-    out["pr"] = pr.get("html_url")
-    people = pending["reviewers"]
-    if people.get("users") or people.get("teams"):
-        args = ["api", f"repos/{owner}/pulls/{pr.get('number')}/requested_reviewers", "-X", "POST"]
-        args += [x for u in people.get("users", []) for x in ("-f", f"reviewers[]={u}")]
-        args += [x for t in people.get("teams", []) for x in ("-f", f"team_reviewers[]={t}")]
-        if _gh_json(args) is None:
-            out["problems"].append("reviewers not requested on the review PR")
+    out["pr"] = url
+    out["problems"] += problems
     return out
+
+
+def open_review_pr(owner, head, title, body, reviewers, base=BRAIN_BRANCH):
+    """The PR from a pb/review/ branch towards `base` (docs/brain), with the area reviewers. Returns (url, problems)."""
+    if not owner:
+        return None, [f"no GitHub repo (github.repo in sources.md): open a PR from {head} to {BRAIN_BRANCH} by hand"]
+    pr = _gh_json(["api", f"repos/{owner}/pulls", "-X", "POST", "-f", f"title={title}",
+                   "-f", f"head={head}", "-f", f"base={base}", "-f", f"body={body}"])
+    if not pr:
+        return None, [f"the review PR could not be opened: open it by hand from {head} to {base}"]
+    problems = []
+    users, teams = (reviewers or {}).get("users") or [], (reviewers or {}).get("teams") or []
+    if users or teams:
+        args = ["api", f"repos/{owner}/pulls/{pr.get('number')}/requested_reviewers", "-X", "POST"]
+        args += [x for u in users for x in ("-f", f"reviewers[]={u}")]
+        args += [x for t in teams for x in ("-f", f"team_reviewers[]={t}")]
+        if _gh_json(args) is None:
+            problems.append("reviewers not requested on the review PR")
+    return pr.get("html_url"), problems
 
 
 def ensure_promotion(repo, owner=None):
     """The open PR from docs/brain to the default branch: found, or opened. Returns (url, problem)."""
-    from .gitops import default_branch
     owner = owner or gh_repo(repo)
     if not owner:
         return None, "no GitHub repo for origin: the PR from docs/brain to the default branch was not opened"
@@ -603,7 +629,6 @@ def ensure_promotion(repo, owner=None):
 def gh_repo(repo):
     """owner/name of the monorepo: github.repo in the brain's sources.md, else the origin URL."""
     from . import frontmatter
-    from .gitops import _origin_repo
     sources = worktree_path(repo) / "brain/schema/sources.md"
     if sources.is_file():
         try:
@@ -613,7 +638,7 @@ def gh_repo(repo):
         github = (meta or {}).get("github")
         if isinstance(github, dict) and github.get("repo"):
             return github["repo"]
-    return _origin_repo(repo)
+    return origin_repo(repo)
 
 
 def _gh_json(args):

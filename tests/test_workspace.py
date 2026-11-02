@@ -19,6 +19,9 @@ with open(os.environ["FAKE_GH_LOG"], "a") as log:
     log.write(" ".join(sys.argv[1:]) + "\\n")
 args = sys.argv[1:]
 key = args[1] if args[:1] == ["api"] and len(args) > 1 else " ".join(a for a in args if not a.startswith("-"))
+if key == os.environ.get("FAKE_GH_FAIL"):
+    sys.stderr.write("HTTP 422\\n")
+    sys.exit(1)
 for k, v in fixtures.items():
     if key == k or (args[:1] != ["api"] and key.startswith(k)):
         sys.stdout.write(json.dumps(v))
@@ -132,15 +135,37 @@ class SyncTest(WorkspaceCase):
         code, data, _ = run_cli("version", cwd=sub)
         self.assertEqual(Path(data["brain"]).resolve(), (self.wt / "brain").resolve())
 
+    def hold_lock(self):
+        # A lock held by another live pb process: an OS lock on the file, released when the process ends.
+        fd = os.open(str(self.wt.parent / "lock"), os.O_RDWR | os.O_CREAT)
+        self.addCleanup(os.close, fd)
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return fd
+
     def test_busy_when_another_live_process_holds_the_lock(self):
-        lock = self.wt.parent / "lock"
-        lock.write_text(str(os.getppid()))
+        self.hold_lock()
         code, data, _ = run_cli("workspace", "sync", cwd=self.repo)
         self.assertEqual(code, 2)
         self.assertEqual(data["code"], "busy")
-        lock.write_text("999999")  # a dead process: taken over
-        code, _, _ = run_cli("workspace", "sync", cwd=self.repo)
-        self.assertEqual(code, 0)
+
+    def test_an_old_lock_still_held_is_never_taken_over(self):
+        # Two sessions judging a lock stale at once could both take it over: a held lock is never stale.
+        self.hold_lock()
+        lock = self.wt.parent / "lock"
+        os.utime(str(lock), (1, 1))
+        code, data, _ = run_cli("workspace", "sync", cwd=self.repo)
+        self.assertEqual(data["code"], "busy")
+
+    def test_a_lock_left_by_a_finished_process_is_free(self):
+        # The pid in the file may belong to an unrelated live process now: only the OS lock counts.
+        (self.wt.parent / "lock").write_text(str(os.getppid()))
+        code, data, err = run_cli("workspace", "sync", cwd=self.repo)
+        self.assertEqual(code, 0, err)
 
 
 class SaveTest(WorkspaceCase):
@@ -378,6 +403,34 @@ class RoutineTest(WorkspaceCase):
         self.assertEqual(git(self.remote, "show", f"docs/brain:{rel}"), (clone / rel).read_text().strip())
         self.assertEqual(data["promotion"], PR["html_url"])
         self.assertIn("head=docs/brain", self.gh_log.read_text())
+
+    def test_routine_sends_held_pages_to_a_review_pr_with_reviewers(self):
+        clone = self.other_clone()
+        run_cli("routine", "start", "--branch", "docs/brain", cwd=clone)
+        decision = self.put("decision", "Single approver", f"area: technical\n{SRC}", root=clone)
+        code, data, err = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "pb(routine): sync",
+                                  cwd=clone)
+        self.assertEqual(code, 0, err)
+        self.assertNotIn(decision, self.remote_files("docs/brain"))
+        self.assertEqual(data["review"]["pr"], PR["html_url"])
+        self.assertIn(decision, self.remote_files(data["review"]["branch"]))
+        log = self.gh_log.read_text()
+        self.assertIn("base=docs/brain", log)
+        self.assertIn("team_reviewers[]=backend", log)
+        self.assertEqual(data["problems"], [])
+
+    def test_routine_reports_a_review_pr_that_could_not_be_opened(self):
+        self.set_fixture("repos/o/r/pulls", None)
+        os.environ["FAKE_GH_FAIL"] = "repos/o/r/pulls"
+        self.addCleanup(os.environ.pop, "FAKE_GH_FAIL", None)
+        clone = self.other_clone()
+        run_cli("routine", "start", "--branch", "docs/brain", cwd=clone)
+        self.put("decision", "Single approver", f"area: technical\n{SRC}", root=clone)
+        code, data, err = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "pb(routine): sync",
+                                  cwd=clone)
+        self.assertEqual(code, 0, err)
+        self.assertIsNone(data["review"]["pr"])
+        self.assertTrue(data["review"]["problems"])
 
 
 if __name__ == "__main__":

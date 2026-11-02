@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from . import frontmatter, links, policy
+from .brain import _as_list
 from .changes import changed_pages
 from .errors import FrontmatterError
 from .scaffold import ROUTINE_SYNC_SKILL
@@ -298,9 +299,3 @@ def brain_rel(brain, raw):
         rel = Path(raw).as_posix()
         # brain/<path> typed from the user's checkout, where the brain is the managed copy.
         return rel[len("brain/"):] if rel.startswith("brain/") else rel
-
-
-def _as_list(value):
-    if value is None:
-        return []
-    return value if isinstance(value, list) else [value]

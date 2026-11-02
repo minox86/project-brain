@@ -42,7 +42,7 @@ class ScaffoldTest(unittest.TestCase):
         self.assertTrue(settings["enabledPlugins"]["pb@project-brain"])
         claude = (self.repo / "CLAUDE.md").read_text()
         self.assertIn("<!-- pb:start -->\nFor product and domain context read brain/AGENTS.md.\n<!-- pb:end -->", claude)
-        self.assertIn("brain/.pb/cache/", (self.repo / ".gitignore").read_text())
+        self.assertFalse((self.repo / ".gitignore").exists() and "brain/.pb/cache/" in (self.repo / ".gitignore").read_text())
         self.assertIn("brain/AGENTS.md", data["created"])
 
     def test_upgrade_rewrites_workflows_of_an_existing_brain(self):

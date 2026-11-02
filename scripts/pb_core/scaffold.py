@@ -117,11 +117,6 @@ def scaffold(repo_root, product, preset="software-product"):
         created.append("CLAUDE.md")
     if enable_plugin(repo):
         created.append(".claude/settings.json")
-    gitignore = repo / ".gitignore"
-    existing = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
-    if "brain/.pb/cache/" not in existing.splitlines():
-        sep = "" if not existing or existing.endswith("\n") else "\n"
-        gitignore.write_text(existing + sep + "brain/.pb/cache/\n", encoding="utf-8")
     return {"brain": str(brain), "created": created, "skipped": skipped, "default_branch": default}
 
 
@@ -185,6 +180,6 @@ def _set_product(path, product):
 
 
 def _default_branch(repo):
-    from .gitops import default_branch
+    from .workspace import default_branch
     inside = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=str(repo), capture_output=True, text=True)
     return default_branch(repo) if inside.returncode == 0 else "main"

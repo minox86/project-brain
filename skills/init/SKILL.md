@@ -88,7 +88,7 @@ Show the final schema in one block in the chat: types table (area, folder, field
 ## 5. Scaffold and apply the schema
 
 1. Temporary worktree from the default branch, so the user's checkout is never touched: `git fetch -q origin`, then `git worktree add -q --detach <tmp> origin/<default>`. Run every following command and edit every file there.
-2. `PB scaffold --repo <tmp> --product "<name>"` (creates `brain/`, the `pb-validate` and `pb-brain-branch` workflows, the CLAUDE.md pointer, the shared `.claude/settings.json` that enables the plugin for every clone, `.gitignore` entry, vendored toolkit). Report `skipped` workflows if any already existed, and check them against the templates.
+2. `PB scaffold --repo <tmp> --product "<name>"` (creates `brain/`, the `pb-validate` and `pb-brain-branch` workflows, the CLAUDE.md pointer, the shared `.claude/settings.json` that enables the plugin for every clone, vendored toolkit). Report `skipped` workflows if any already existed, and check them against the templates.
 3. Apply the interview results by editing `<tmp>/brain/schema/brain.md`, `review.md` and `types/*.md`. In `review.md` set `watch`, `direct_min_confidence`, `noise_to_review` and `reviewers`; check each handle with `gh api users/<login>` or `gh api orgs/<org>/teams/<slug>`, and keep the prose in sync with the rules. For the types: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; add new type files in the same format.
 4. `PB --brain <tmp>/brain validate` must pass on the empty brain.
 
@@ -104,7 +104,7 @@ Ask with `AskUserQuestion` (`multiSelect`, one option per group of pages: module
 
 ## 7. Close
 
-1. Commit in the temporary worktree: `PB --brain <tmp>/brain commit -m "pb(init): create brain for <product>" --allow-default --include CLAUDE.md .gitignore .claude/settings.json .github/workflows/pb-validate.yml .github/workflows/pb-brain-branch.yml` (leave out workflows reported as `skipped`). Then the generated files: `PB --brain <tmp>/brain generate`, `git -C <tmp> add brain`, `git -C <tmp> commit -qm "pb(generate): refresh generated files"` (init is the only place that runs `PB generate` by hand: there is no save yet).
+1. Commit in the temporary worktree: `PB --brain <tmp>/brain commit -m "pb(init): create brain for <product>" --allow-default --include CLAUDE.md .claude/settings.json .github/workflows/pb-validate.yml .github/workflows/pb-brain-branch.yml` (leave out workflows reported as `skipped`). Then the generated files: `PB --brain <tmp>/brain generate`, `git -C <tmp> add brain`, `git -C <tmp> commit -qm "pb(generate): refresh generated files"` (init is the only place that runs `PB generate` by hand: there is no save yet).
 2. Create `docs/brain` with it: `git -C <tmp> push -q origin HEAD:refs/heads/docs/brain`.
 3. Open the brain PR: `gh pr create --head docs/brain --base <default> --title "Brain updates" --body <what this first PR brings: the brain, the pb workflows, the CLAUDE.md pointer and the plugin settings; merging it turns on the workflows on the default branch; afterwards the PR is reopened by pb with each new save>`. The product pipeline edits of section G are code: put them in a separate branch and PR towards the default branch, never on `docs/brain`.
 4. `git worktree remove --force <tmp>`, then `PB workspace sync` in the user's clone: it must return the brain.

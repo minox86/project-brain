@@ -28,6 +28,9 @@ DUPLICATE_RATIO = 0.85
 def validate(brain, paths=None, base="HEAD"):
     errors, warnings = [], []
     scope = _scope(brain, paths)
+    for rel in sorted(scope or ()):
+        if not (brain.root / rel).exists():
+            errors.append({"path": rel, "code": "unknown-path", "message": f"{rel} is not in the brain at {brain.root}"})
 
     def report(bucket, rel, code, message):
         if scope is None or rel in scope:
@@ -292,7 +295,9 @@ def brain_rel(brain, raw):
     try:
         return path.resolve().relative_to(brain.root).as_posix()
     except ValueError:
-        return raw
+        rel = Path(raw).as_posix()
+        # brain/<path> typed from the user's checkout, where the brain is the managed copy.
+        return rel[len("brain/"):] if rel.startswith("brain/") else rel
 
 
 def _as_list(value):

@@ -14,7 +14,8 @@ REVIEW_PREFIX = "pb/review/"
 
 
 def _git(cwd, *args, check=True):
-    proc = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True)
+    proc = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
+                          errors="replace")
     if check and proc.returncode != 0:
         raise GitError(f"git {' '.join(args)} failed: {proc.stderr.strip() or proc.stdout.strip()}")
     return proc
@@ -56,6 +57,8 @@ def commit(brain, message, allow_default=False, include=(), exclude=()):
                        {"error": f"current branch '{branch}' is the default branch: switch to a working branch "
                                  "or pass --allow-default", "code": "on-default-branch", "branch": branch})
     prefix = _brain_prefix(brain, repo)
+    include = [p for p in include if (repo / p).exists()
+               or _git(repo, "ls-files", "--error-unmatch", "--", p, check=False).returncode == 0]
     specs = ([prefix] + [f":(exclude){prefix}/{g.rstrip('/')}" for g in GENERATED]
              + [f":(exclude){prefix}/{rel}" for rel in exclude] + list(include))
     _git(repo, "add", "-A", "--", *specs)
@@ -71,11 +74,12 @@ def _remote_has(repo, branch):
     return _git(repo, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}", check=False).returncode == 0
 
 
-def routine_start(brain, branch, worktree=None):
-    repo = _repo_root(brain)
+def routine_start(repo, branch, worktree=None):
+    """Needs only the clone: the brain lives on the branch, not necessarily in the current checkout."""
+    repo = Path(repo)
     _git(repo, "fetch", "-q", "origin")
     if worktree is not None:
-        return _start_in_worktree(brain, repo, branch, Path(worktree))
+        return _start_in_worktree(repo, branch, Path(worktree))
     if _remote_has(repo, branch):
         _git(repo, "checkout", "-q", "-B", branch, f"origin/{branch}")
         return {"branch": branch, "created": False}
@@ -85,18 +89,18 @@ def routine_start(brain, branch, worktree=None):
     return {"branch": branch, "created": True}
 
 
-def _start_in_worktree(brain, repo, branch, worktree):
+def _start_in_worktree(repo, branch, worktree):
     """Manual runs: a detached worktree on the target branch, so the user's checkout is never touched."""
     created = not _remote_has(repo, branch)
     start = f"origin/{default_branch(repo) if created else branch}"
     _git(repo, "worktree", "add", "-q", "--detach", str(worktree), start)
     worktree = worktree.resolve()
     return {"branch": branch, "created": created, "worktree": str(worktree),
-            "brain": str(worktree / _brain_prefix(brain, repo))}
+            "brain": str(worktree / "brain")}
 
 
-def routine_cleanup(brain, worktree):
-    repo = _repo_root(brain)
+def routine_cleanup(repo, worktree):
+    repo = Path(repo)
     _git(repo, "worktree", "remove", "--force", str(worktree))
     _git(repo, "worktree", "prune")
     return {"removed": str(worktree)}
@@ -122,9 +126,12 @@ def routine_finish(brain, branch, message, confidence=()):
         rebase = _git(repo, "rebase", "-q", f"origin/{branch}", check=False)
         if rebase.returncode != 0:
             _git(repo, "rebase", "--abort", check=False)
-            return {"committed": done["committed"], "pushed": False, "conflict": True, "review": None}
+            return {"committed": done["committed"], "pushed": False, "conflict": True, "review": None,
+                    "promotion": None, "problems": []}
     regenerate(brain.root, repo)
-    _git(repo, "push", "-q", "origin", f"HEAD:refs/heads/{branch}")
+    if _git(repo, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", check=False).returncode:
+        return {"committed": done["committed"], "pushed": False, "conflict": True, "review": None,
+                "promotion": None, "problems": [f"the push to {branch} was refused (someone pushed meanwhile?)"]}
     result = {"committed": done["committed"], "pushed": True, "conflict": False, "review": None,
               "promotion": None, "problems": []}
     if held_commit:

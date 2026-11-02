@@ -28,8 +28,8 @@ PROMOTION_BODY = (
 
 
 def _git(cwd, *args, check=True, env=None):
-    proc = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True,
-                          env=dict(os.environ, **(env or {})))
+    proc = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", env=dict(os.environ, **(env or {})))
     if check and proc.returncode != 0:
         raise GitError(f"git {' '.join(args)} failed: {proc.stderr.strip() or proc.stdout.strip()}")
     return proc
@@ -54,9 +54,12 @@ def worktree_path(repo):
 
 
 def _alive(pid):
+    if os.name == "nt":
+        # os.kill(pid, 0) would terminate the process on Windows: rely on the lock's age there.
+        return bool(str(pid).strip())
     try:
         os.kill(int(pid), 0)
-    except (ValueError, ProcessLookupError):
+    except (ValueError, ProcessLookupError, OverflowError):
         return False
     except PermissionError:
         return True
@@ -220,21 +223,56 @@ def _result(**extra):
 
 
 def _check(brain, wt, files):
-    """Validation errors on the pages touched by this save (other pages' problems never block it)."""
+    """Errors this save would bring to docs/brain: invalid touched pages, a secret in any touched file, links
+    left pointing at a deleted page. Problems of other pages never block it."""
+    from . import frontmatter
+    from .secrets import scan
     from .validate import validate
+    errors = []
+    for f in files:
+        path = wt / f
+        if path.is_file():
+            text = path.read_bytes().decode("utf-8", errors="replace")
+            for hit in scan(text):
+                errors.append({"path": f, "code": "secret", "message": f"line {hit['line']} looks like a "
+                               f"{hit['kind']}: remove it (never work around the check)"})
     pages = [str(wt / f) for f in files if f.startswith("brain/") and f.endswith(".md") and (wt / f).is_file()]
-    if not pages:
-        return []
-    return validate(brain, pages, "HEAD")["errors"]
+    if pages:
+        errors += [e for e in validate(brain, pages, "HEAD")["errors"] if e["code"] != "secret"]
+    gone = []
+    for f in files:
+        if f.endswith(".md") and not (wt / f).exists():
+            old = _git(wt, "show", f"HEAD:{f}", check=False)
+            if old.returncode == 0:
+                try:
+                    meta, _ = frontmatter.parse(old.stdout)
+                except Exception:
+                    meta = None
+                if meta and meta.get("title"):
+                    gone.append(str(meta["title"]))
+    if gone:
+        for e in validate(brain)["errors"]:
+            if e["code"] == "broken-link" and any(f"[[{t}]]" in e["message"] for t in gone):
+                errors.append(dict(e, message=e["message"] + " (the page was deleted by this save: fix the link "
+                                                             "or keep the page)"))
+    return errors
 
 
 def _head(wt):
     return _git(wt, "rev-parse", "HEAD").stdout.strip()
 
 
+HELD_TRAILER = "Pb-Held: yes"
+
+
+def _held_message(message):
+    first, _, rest = message.partition("\n")
+    return f"{first} (review)" + (f"\n{rest.rstrip()}" if rest.strip() else "") + f"\n\n{HELD_TRAILER}"
+
+
 def _held_on_top(wt, pending):
-    subject = _git(wt, "log", "-1", "--format=%s", check=False).stdout.strip()
-    return bool(pending.get("held")) and subject == f"{pending['message']} (review)"
+    body = _git(wt, "log", "-1", "--format=%B", check=False).stdout
+    return bool(pending.get("held")) and HELD_TRAILER in body.splitlines()
 
 
 def _as_worktree_path(wt, raw):
@@ -263,13 +301,20 @@ def _parked(repo):
     return pb_dir(repo) / "parked"
 
 
-def _park(repo, wt):
+def _park(repo, wt, keep=()):
     leftovers, _, _ = _state(wt)
+    leftovers = [f for f in leftovers if f not in set(keep)]
     if not leftovers:
         return
     folder = _parked(repo)
-    manifest = {"files": [], "deleted": []}
+    manifest_path = folder / "manifest.json"
+    # Drafts already parked (a save stopped on a conflict) are kept: only new ones are added.
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.is_file() else \
+        {"files": [], "deleted": []}
+    known = set(manifest["files"]) | set(manifest["deleted"])
     for rel in leftovers:
+        if rel in known:
+            continue
         source = wt / rel
         if source.is_file():
             target = folder / rel
@@ -344,12 +389,23 @@ def _save(repo, message, paths, confidence, force_review):
     leftovers, _, _ = _state(wt)
     scope = leftovers
     if paths:
-        wanted = {_as_worktree_path(wt, p) for p in paths} | restored
+        wanted = {_as_worktree_path(wt, p) for p in paths}
+        unknown = sorted(w for w in wanted if w not in leftovers and not (wt / w).exists()
+                         and _git(wt, "cat-file", "-e", f"HEAD:{w}", check=False).returncode)
+        if unknown:
+            return _result(errors=[{"path": w, "code": "not-in-brain",
+                                    "message": f"{w} is not in the brain copy at {wt}: write pages there"}
+                                   for w in unknown])
+        wanted |= restored
         scope = [f for f in leftovers if f in wanted]
     committed = False
     if scope:
+        # Validate against what docs/brain will hold: other drafts are parked first.
+        _park(repo, wt, keep=scope)
+        brain = _fresh(wt)
         errors = _check(brain, wt, scope)
         if errors:
+            _unpark(repo, wt)
             return _result(errors=errors)
         in_scope = {f[len("brain/"):] for f in scope}
         routed = review(brain, "HEAD", confidence, noise_holds=False)
@@ -363,7 +419,7 @@ def _save(repo, message, paths, confidence, force_review):
         if direct:
             committed = _commit_paths(wt, message, [f"brain/{rel}" for rel in direct])
         if held:
-            if _commit_paths(wt, f"{message} (review)", [f"brain/{rel}" for rel in sorted(held)]):
+            if _commit_paths(wt, _held_message(message), [f"brain/{rel}" for rel in sorted(held)]):
                 _write_pending(repo, {"message": message, "pages": sorted(held), "markdown": markdown,
                                       "reviewers": routed.get("reviewers") or {"users": [], "teams": []},
                                       "force": force_review, "held": True})
@@ -379,6 +435,14 @@ def save_continue(repo):
         if not rebasing:
             raise UsageError("there is no conflict to continue: run `PB save -m MESSAGE`")
         conflicted = _conflict(wt)["files"]
+        marked = [f for f in conflicted if (wt / f).is_file() and any(
+            line.startswith(("<<<<<<< ", ">>>>>>> ")) or line in ("<<<<<<<", ">>>>>>>")
+            for line in (wt / f).read_text(encoding="utf-8", errors="replace").splitlines())]
+        if marked:
+            return _result(committed=True, conflict=_conflict(wt), errors=[
+                {"path": f, "code": "conflict-markers",
+                 "message": "conflict markers are still in the file: merge the two versions and remove them"}
+                for f in marked])
         if conflicted:
             _git(wt, "add", "-A", "--", *conflicted)
         step = _git(wt, "rebase", "--continue", check=False, env={"GIT_EDITOR": "true"})
@@ -418,7 +482,15 @@ def _publish_parked(repo, wt, committed, rebased):
                                          "next save"])
             step = _git(wt, "rebase", "-q", f"origin/{BRAIN_BRANCH}", check=False, env={"GIT_EDITOR": "true"})
             if step.returncode:
-                return _result(committed=committed, conflict=_conflict(wt))
+                conflict = _conflict(wt)
+                if conflict["files"]:
+                    return _result(committed=committed, conflict=conflict)
+                _git(wt, "rebase", "--abort", check=False)
+                _, _, unpushed = _state(wt)
+                return _result(committed=committed, unpushed=unpushed, errors=[{
+                    "path": None, "code": "save-failed",
+                    "message": "the save could not be brought up to date with the brain: "
+                               + (step.stderr.strip() or step.stdout.strip())[:300]}])
         if pending and not _held_on_top(wt, pending):
             # The rebase dropped the held commit: its content is already on docs/brain.
             _clear_pending(repo)

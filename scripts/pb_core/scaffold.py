@@ -17,7 +17,7 @@ WORKFLOWS = ("pb-validate.yml", "pb-brain-branch.yml")
 RETIRED_WORKFLOWS = ("pb-generate.yml",)  # generated files are now refreshed by every save
 MARKETPLACE = {"project-brain": {"source": {"source": "github", "repo": "minox86/project-brain"}}}
 PLUGIN_ID = "pb@project-brain"
-NEEDS_QUOTES =re.compile(r"""^[\[\]{}#&*!|>'"%@`-]|[:#]\s|,\s""")
+NEEDS_QUOTES = re.compile(r"""^[\[\]{}#&*!|>'"%@`-]|[:#]\s|\s#|,\s""")
 
 
 def upgrade(repo_root):
@@ -178,7 +178,8 @@ def enable_plugin(repo):
 
 
 def _set_product(path, product):
-    value = f'"{product}"' if NEEDS_QUOTES.search(product) else product
+    escaped = product.replace("\\", "\\\\").replace('"', '\\"')
+    value = f'"{escaped}"' if NEEDS_QUOTES.search(product) or '"' in product else product
     text = path.read_text(encoding="utf-8")
     path.write_text(re.sub(r"(?m)^product:.*$", lambda _: f"product: {value}", text, count=1), encoding="utf-8")
 

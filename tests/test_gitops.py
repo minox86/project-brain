@@ -127,7 +127,8 @@ class GitopsTest(GitRepoCase):
         self.write("brain/functional/features/Approval.md", "---\ntype: feature\ntitle: Approval\n---\nOurs.\n")
         code, data, _ = run_cli("routine", "finish", "--branch", "main", "-m", "ours", cwd=self.repo)
         self.assertEqual(code, 1)
-        self.assertEqual(data, {"committed": True, "pushed": False, "conflict": True, "review": None})
+        self.assertEqual(data, {"committed": True, "pushed": False, "conflict": True, "review": None,
+                                "promotion": None, "problems": []})
         self.assertEqual(git(self.remote, "log", "--format=%s", "-1", "main"), "theirs")
         self.assertFalse((self.repo / ".git" / "rebase-merge").exists())
 

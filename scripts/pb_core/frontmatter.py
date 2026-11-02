@@ -98,9 +98,14 @@ def _value(text, lineno):
 
 def _strip_comment(line):
     quote = None
+    escaped = False
     for i, ch in enumerate(line):
         if quote:
+            if escaped:
+                escaped = False
+                continue
             if ch == "\\" and quote == '"':
+                escaped = True
                 continue
             if ch == quote:
                 quote = None

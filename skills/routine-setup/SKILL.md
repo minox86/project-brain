@@ -84,7 +84,7 @@ Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule
 
 Cloud routines do not load plugins: the routine follows the copy of the toolkit and of its instructions (sync, put, meeting skills and the references) vendored in `brain/.pb/toolkit/`. Refresh it from this plugin with `PB toolkit-sync`, so the routine runs the same version as the plugin.
 
-Validate, then the closing flow (`PB save -m "pb(routine-setup): configure nightly routine"`, which includes the refreshed `brain/.pb/toolkit/`). The routine reads configuration and instructions from `docs/brain`, where the save puts them. After every plugin upgrade, `PB --brain <brain> toolkit-sync` and save again, or the routine keeps following the old instructions.
+Validate, then the closing flow (`PB save -m "pb(routine-setup): configure nightly routine"`, which includes the refreshed `brain/.pb/toolkit/`). Changes under `schema/` and `.pb/toolkit/` always go to a review PR: the routine reads configuration and instructions from `docs/brain`, so it uses them once that PR is merged. Give the user the link and say so. After every plugin upgrade, `PB --brain <brain> toolkit-sync` and save again, or the routine keeps following the old instructions.
 
 ## 8. Create the routine
 

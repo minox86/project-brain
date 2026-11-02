@@ -103,7 +103,7 @@ class GitopsTest(GitRepoCase):
         self.assertEqual(data, {"committed": True, "pushed": True, "conflict": False, "review": None,
                                 "promotion": None, "problems": []})
         log = git(self.remote, "log", "--format=%s", "brain/inbox")
-        self.assertEqual(log.splitlines()[0], "pb(routine): sync")
+        self.assertEqual(log.splitlines()[:2], ["pb(generate): refresh generated files", "pb(routine): sync"])
         code, data, _ = run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
         self.assertFalse(data["created"])
 

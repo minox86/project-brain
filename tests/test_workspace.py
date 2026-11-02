@@ -9,7 +9,7 @@ from test_gitops import GitRepoCase, git
 
 SRC = "sources: [jira:FIN-1]"
 PR = {"number": 7, "html_url": "https://github.com/o/r/pull/7"}
-OPEN_PROMOTION = [{"url": "https://github.com/o/r/pull/3"}]
+OPEN_PROMOTION = [{"html_url": "https://github.com/o/r/pull/3"}]
 
 # A fake `gh` answering from a fixtures dict: api calls by path, other commands by their non-flag words.
 FAKE_GH = """#!/usr/bin/env python3
@@ -72,7 +72,8 @@ class WorkspaceCase(FakeGhMixin, GitRepoCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "-qm", "policy")
         git(self.repo, "push", "-q", "origin", "main", "main:refs/heads/docs/brain")
-        self.fake_gh({"pr list": [], "repos/o/r/pulls": PR, "repos/o/r/pulls/7/requested_reviewers": {}})
+        self.fake_gh({"repos/o/r/pulls?head=o:docs/brain&base=main&state=open": [], "repos/o/r/pulls": PR,
+                      "repos/o/r/pulls/7/requested_reviewers": {}})
         code, data, err = run_cli("workspace", "sync", cwd=self.repo)
         self.assertEqual(code, 0, err)
         self.wt = Path(data["worktree"])
@@ -152,11 +153,11 @@ class SaveTest(WorkspaceCase):
         self.assertEqual(data["problems"], [])
 
     def test_open_promotion_pr_is_reused(self):
-        self.set_fixture("pr list", OPEN_PROMOTION)
+        self.set_fixture("repos/o/r/pulls?head=o:docs/brain&base=main&state=open", OPEN_PROMOTION)
         self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}")
         code, data, err = self.save()
         self.assertEqual(code, 0, err)
-        self.assertEqual(data["promotion"], OPEN_PROMOTION[0]["url"])
+        self.assertEqual(data["promotion"], OPEN_PROMOTION[0]["html_url"])
         self.assertNotIn("pulls -X POST", self.gh_log.read_text())
 
     def test_without_gh_the_save_still_lands(self):
@@ -179,8 +180,9 @@ class SaveTest(WorkspaceCase):
         self.assertIn(decision, self.remote_files(review["branch"]))
         self.assertIn(concept, self.remote_files("docs/brain"))
         self.assertNotIn(decision, self.remote_files("docs/brain"))
+        # Based on this save's pages; docs/brain adds only the regenerated index on top.
         self.assertEqual(git(self.remote, "rev-parse", f"{review['branch']}~1"),
-                         git(self.remote, "rev-parse", "docs/brain"))
+                         git(self.remote, "rev-parse", "docs/brain~1"))
         calls = self.gh_log.read_text()
         self.assertIn(f"head={review['branch']} -f base=docs/brain", calls)
         self.assertIn("team_reviewers[]=backend", calls)
@@ -195,11 +197,11 @@ class SaveTest(WorkspaceCase):
         self.assertIn(rel, self.remote_files("docs/brain"))
 
     def test_force_review_holds_everything(self):
-        self.write("brain/schema/brain.md", (self.wt / "brain/schema/brain.md").read_text() + "\n", self.wt)
+        rel = self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}")
         code, data, err = self.save("--force-review")
         self.assertEqual(code, 0, err)
         self.assertFalse(data["pushed"])
-        self.assertEqual(data["review"]["pages"], ["schema/brain.md"])
+        self.assertEqual(data["review"]["pages"], [rel[len("brain/"):]])
         self.assertIn("Configuration or toolkit change", self.gh_log.read_text())
 
     def test_errors_on_touched_pages_block_the_save(self):
@@ -275,6 +277,83 @@ class SaveTest(WorkspaceCase):
         self.assertIn(concept, self.remote_files("docs/brain"))
         self.assertNotIn(decision, self.remote_files("docs/brain"))
         self.assertIn(decision, self.remote_files(data["review"]["branch"]))
+
+
+class ReviewFindingsTest(WorkspaceCase):
+    def go_offline(self):
+        hidden = self.remote.with_name("away.git")
+        self.remote.rename(hidden)
+        return lambda: hidden.rename(self.remote)
+
+    def test_save_regenerates_the_index_in_the_users_commit(self):
+        rel = self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}")
+        code, data, err = self.save()
+        self.assertEqual(code, 0, err)
+        self.assertIn("Invoice", git(self.remote, "show", "docs/brain:brain/index.md"))
+        self.assertIn("Invoice", git(self.remote, "show", "docs/brain:brain/glossary.md"))
+        self.assertEqual(git(self.remote, "log", "-2", "--format=%s", "docs/brain").splitlines(),
+                         ["pb(generate): refresh generated files", "pb(put): test"])
+
+    def test_schema_changes_are_always_held(self):
+        self.write("brain/schema/brain.md", (self.wt / "brain/schema/brain.md").read_text() + "\n", self.wt)
+        code, data, err = self.save()
+        self.assertEqual(code, 0, err)
+        self.assertEqual(data["review"]["pages"], ["schema/brain.md"])
+
+    def test_force_review_survives_an_offline_save(self):
+        online = self.go_offline()
+        rel = "brain/functional/concepts/Note.md"
+        self.write(rel, page("concept", "Note", f"term_en: Note\n{SRC}")[1], self.wt)
+        self.save("--force-review")
+        online()
+        self.put("concept", "Other", f"term_en: Other\n{SRC}")
+        code, data, err = self.save()
+        self.assertEqual(code, 0, err)
+        self.assertNotIn(rel, self.remote_files("docs/brain"))
+        self.assertIn(rel, self.remote_files(data["review"]["branch"]))
+
+    def test_dropped_held_commit_does_not_take_the_direct_one_to_review(self):
+        online = self.go_offline()
+        decision = self.put("decision", "Single approver", f"area: technical\n{SRC}")
+        concept = self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}")
+        self.save()
+        online()
+        self.push_from_other(decision, (self.wt / decision).read_text() if (self.wt / decision).exists()
+                             else git(self.wt, "show", f"HEAD:{decision}") + "\n")
+        code, data, err = self.save()
+        self.assertEqual(code, 0, err)
+        self.assertIn(concept, self.remote_files("docs/brain"))
+        self.assertIsNone(data["review"])
+
+    def test_promotion_pr_is_found_through_the_api(self):
+        self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}")
+        self.save()
+        self.assertNotIn("pr list", self.gh_log.read_text())
+        self.assertIn("repos/o/r/pulls?head=o:docs/brain", self.gh_log.read_text())
+
+    def test_review_pr_failure_keeps_the_pages_for_the_next_save(self):
+        self.set_fixture("repos/o/r/pulls", None)
+        data = json.loads(self.gh_fixtures.read_text())
+        del data["repos/o/r/pulls"]
+        self.gh_fixtures.write_text(json.dumps(data))
+        decision = self.put("decision", "Single approver", f"area: technical\n{SRC}")
+        code, data, err = self.save()
+        self.assertEqual(code, 0, err)
+        self.assertIsNone(data["review"]["pr"])
+        self.assertEqual(git(self.remote, "branch", "--list", "pb/review/*"), "")
+        self.assertTrue((self.wt / decision).is_file())
+        self.set_fixture("repos/o/r/pulls", PR)
+        code, data, err = self.save()
+        self.assertEqual(data["review"]["pr"], PR["html_url"])
+
+    def test_save_with_paths_leaves_other_drafts_alone(self):
+        mine = self.put("concept", "Mine", f"term_en: Mine\n{SRC}")
+        draft = self.put("concept", "Draft", f"term_en: Draft\n{SRC}")
+        code, data, err = run_cli("save", "-m", "pb(put): mine", str(self.wt / mine), cwd=self.repo)
+        self.assertEqual(code, 0, err)
+        self.assertIn(mine, self.remote_files("docs/brain"))
+        self.assertNotIn(draft, self.remote_files("docs/brain"))
+        self.assertTrue((self.wt / draft).is_file())
 
 
 class RoutineTest(WorkspaceCase):

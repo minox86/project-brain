@@ -90,7 +90,7 @@ Once per product.
 
 1. Open the monorepo and run **`/pb:init`**. Your checkout is not touched: init works in a temporary copy.
 2. Claude looks at the repo, then asks a few rounds of questions to shape the wiki around your product, including which parts of it need a human review and who reviews technical, functional and design changes. The recommended answer is always the first option.
-3. Confirm. Claude creates the branch `docs/brain` with `brain/`, three GitHub workflows and the first pages, and opens the PR from `docs/brain` to your default branch.
+3. Confirm. Claude creates the branch `docs/brain` with `brain/`, two GitHub workflows and the first pages, and opens the PR from `docs/brain` to your default branch.
 4. Merge that PR: it turns on the workflows.
 
 **How it works from then on.** The brain lives on `docs/brain`. Every save goes straight there, so everyone sees it at once; only pages on watched points wait for a reviewer in a PR. pb keeps one PR open from `docs/brain` to the default branch: merge it when you want the code branches to carry the brain, with any merge method. Your default branch keeps its protection; `docs/brain` must stay open to pushes from the team.
@@ -134,7 +134,7 @@ Once the brain and the routine are set up, these happen without anyone running a
 - ✅ **The brain checks itself.** Every save is validated before it leaves your computer, and CI checks it again: broken links, malformed pages and anything that looks like a password or token. The PR towards the default branch fails if `docs/brain` carries anything other than the brain.
 - 🔇 **Noise is caught as it is written.** New pages that look like an existing one, pages nobody links, claims without a source, dated "update" sections, status talk ("this sprint", "TODO") and long verbatim quotes are flagged before the save.
 - 👀 **Sensitive changes wait for the right reviewer.** `brain/schema/review.md`, written by `/pb:init` and changed with `/pb:schema`, lists the points that need a human (decisions, interfaces, feature status…) and who reviews technical, functional and design changes. Saves and the routine push what passes and open a PR, with those reviewers, for the rest.
-- 📚 **Indexes stay fresh.** CI rebuilds the index, the bilingual glossary and a context pack for every feature and active epic after every save.
+- 📚 **Indexes stay fresh.** Every save rebuilds the index, the bilingual glossary and a context pack for every feature and active epic.
 - 🧹 **Old items step aside.** Superseded decisions, answered questions and closed epics leave the index after a while. Git keeps the history.
 - 💬 **No commands to remember.** Ask in plain words: *"what did we decide about approvals?"*, *"save this decision in the brain"*, *"give me the context for FIN-412"*.
 

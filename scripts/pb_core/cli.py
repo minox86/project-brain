@@ -158,7 +158,7 @@ def _cmd_save(args):
     else:
         if not args.message:
             raise UsageError("pb save needs -m MESSAGE")
-        result = workspace.save(repo, args.message, force_review=args.force_review)
+        result = workspace.save(repo, args.message, args.paths, force_review=args.force_review)
     return result, 1 if (result["conflict"] or result["errors"]) else 0
 
 
@@ -257,6 +257,7 @@ def build_parser():
     p.add_argument("action", choices=["sync"])
     p.set_defaults(handler=_cmd_workspace)
     p = sub.add_parser("save")
+    p.add_argument("paths", nargs="*", help="the pages this save is about (default: every unsaved brain file)")
     p.add_argument("-m", "--message")
     p.add_argument("--continue", dest="cont", action="store_true", help="resume after resolving a conflict")
     p.add_argument("--force-review", action="store_true", help="configuration or toolkit changes: review PR only")

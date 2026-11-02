@@ -26,12 +26,12 @@ Every `pb` skill reads this file before acting. Skills that write to the brain a
 | `PB state suppress <source> "<claim>"` | Claim corrected by `/pb:fix` that sync must not re-ingest |
 | `PB correction --page P --wrong W --right R --evidence E` | Append to `brain/.pb/corrections.md` |
 | `PB workspace sync` | Prepare the managed copy of the brain (`docs/brain`) and bring it up to date: `brain` is the path to pass as `--brain`; also reports `leftovers` (pages written but not saved), `rebase_in_progress`, `unpushed` saves |
-| `PB save -m MSG [--force-review]` / `PB save --continue` | Save the pages written in the managed copy: validate, commit, push to `docs/brain`; held pages go to a `pb/review/<timestamp>` PR; keeps the PR from `docs/brain` to the default branch open. `--continue` after resolving a conflict |
+| `PB save -m MSG [PATH…] [--force-review]` / `PB save --continue` | Save the pages written in the managed copy: only the `PATH`s given (the pages this work created, changed or deleted; without paths, every unsaved file), so another session's drafts are never swept in. Validates, commits, regenerates index and context packs, pushes to `docs/brain`; pages on watched points, and every change under `schema/` or `.pb/toolkit/`, go to a `pb/review/<timestamp>` PR instead; keeps the PR from `docs/brain` to the default branch open. `--continue` after resolving a conflict |
 | `PB commit -m MSG [--allow-default] [--include PATH…]` | Init only: commit `brain/` changes (generated files excluded), plus any `--include` paths, on the current branch |
 | `PB routine start --branch B [--worktree DIR]` / `PB routine finish --branch B -m MSG [--confidence PATH=LEVEL…]` / `PB routine discard` / `PB routine cleanup --worktree DIR` | Routine runs: checkout target branch (or, for manual local runs, a detached worktree that leaves the user's checkout alone); commit, rebase, push; pages the review policy holds go to a `pb/review/<timestamp>` branch with a PR and reviewers; drop the run's brain changes except digests; remove the worktree |
 | `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap |
-| `PB scaffold --product NAME [--repo DIR]` | Create `brain/`, CI workflows, CLAUDE.md pointer, vendored toolkit |
-| `PB generate` | CI only: index, glossary, context packs, backlinks, digest retention |
+| `PB scaffold --product NAME [--repo DIR]` / `PB scaffold --upgrade [--repo DIR]` | Create `brain/`, CI workflows, CLAUDE.md pointer, plugin settings, vendored toolkit / move an older brain to `docs/brain` (current workflows, plugin settings, toolkit, `AGENTS.md` writing rule) |
+| `PB generate` | Index, glossary, context packs, backlinks, digest retention. `PB save` and `PB routine finish` run it: never by hand |
 | `PB toolkit-sync` | Refresh `brain/.pb/toolkit` (scripts, plus the sync/put/meeting skills and these references the cloud routine follows, since routines load no plugins) after a plugin upgrade |
 
 ## Modes

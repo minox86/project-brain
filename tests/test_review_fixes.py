@@ -96,13 +96,6 @@ class SecretsReviewTest(unittest.TestCase):
 
 
 class TemplatesTest(unittest.TestCase):
-    def test_generate_runs_on_docs_brain(self):
-        text = (ROOT / "templates/github/pb-generate.yml").read_text()
-        self.assertIn('branches: ["docs/brain"]', text)
-        self.assertIn("workflow_dispatch:", text)
-        self.assertIn("concurrency:", text)
-        self.assertIn("git push origin HEAD:docs/brain", text)
-
     def test_validate_uses_base_toolkit_and_never_automerges_toolkit(self):
         text = (ROOT / "templates/github/pb-validate.yml").read_text()
         self.assertIn("ref: ${{ github.event.pull_request.base.sha }}", text)

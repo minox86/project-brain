@@ -1,24 +1,12 @@
 """Git operations: dev commits on the current branch, routine runs on a target branch."""
 import datetime
-import json
-import re
-import subprocess
 from pathlib import Path
 
 from .brain import GENERATED
 from .errors import GitError
 from .review import review
-from .workspace import BRAIN_BRANCH, ensure_promotion, regenerate
-
-REVIEW_PREFIX = "pb/review/"
-
-
-def _git(cwd, *args, check=True):
-    proc = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
-                          errors="replace")
-    if check and proc.returncode != 0:
-        raise GitError(f"git {' '.join(args)} failed: {proc.stderr.strip() or proc.stdout.strip()}")
-    return proc
+from .workspace import (BRAIN_BRANCH, REVIEW_PREFIX, _git, _remote_has, default_branch, ensure_promotion,
+                        open_review_pr, origin_repo, regenerate)
 
 
 def _repo_root(brain):
@@ -31,16 +19,6 @@ def _brain_prefix(brain, repo):
 
 def current_branch(repo):
     return _git(repo, "branch", "--show-current").stdout.strip()
-
-
-def default_branch(repo):
-    proc = _git(repo, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD", check=False)
-    if proc.returncode == 0 and proc.stdout.strip():
-        return proc.stdout.strip().rsplit("refs/remotes/origin/", 1)[-1]
-    for name in ("main", "master"):
-        if _git(repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{name}", check=False).returncode == 0:
-            return name
-    return "main"
 
 
 def _staged(repo, specs):
@@ -68,10 +46,6 @@ def commit(brain, message, allow_default=False, include=(), exclude=()):
     _git(repo, "commit", "-q", "-m", message, "--", *specs)
     sha = _git(repo, "rev-parse", "HEAD").stdout.strip()
     return {"committed": True, "sha": sha, "branch": branch, "files": files}
-
-
-def _remote_has(repo, branch):
-    return _git(repo, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}", check=False).returncode == 0
 
 
 def routine_start(repo, branch, worktree=None):
@@ -137,8 +111,7 @@ def routine_finish(brain, branch, message, confidence=()):
     if held_commit:
         result["review"] = _open_review(brain, repo, branch, message, routed, held_commit)
     if branch == BRAIN_BRANCH and done["committed"]:
-        owner = (brain.sources.get("github") or {}).get("repo") or _origin_repo(repo)
-        result["promotion"], problem = ensure_promotion(repo, owner)
+        result["promotion"], problem = ensure_promotion(repo, _owner(brain, repo))
         if problem:
             result["problems"].append(problem)
     return result
@@ -159,46 +132,17 @@ def _open_review(brain, repo, branch, message, routed, held_commit):
         _git(repo, "push", "-q", "origin", f"HEAD:refs/heads/{head}")
     finally:
         _git(repo, "checkout", "-q", back)
-    gh_repo = (brain.sources.get("github") or {}).get("repo") or _origin_repo(repo)
-    if not gh_repo:
-        out["problems"].append(f"no GitHub repo (github.repo in sources.md): open a PR from {head} to {branch} by hand")
-        return out
     body = routed["markdown"] + "\nOpened by the pb routine. Merge to accept, edit the pages here to correct them, " \
                                 "close to drop them.\n"
-    try:
-        pr = _gh_json(["api", f"repos/{gh_repo}/pulls", "-X", "POST", "-f", f"title={message} (review)",
-                       "-f", f"head={head}", "-f", f"base={branch}", "-f", f"body={body}"])
-    except GitError as exc:
-        out["problems"].append(f"PR not opened, open it by hand from {head} to {branch}: {exc}")
-        return out
-    out["pr"] = pr.get("html_url")
-    people = routed["reviewers"]
-    if people["users"] or people["teams"]:
-        args = ["api", f"repos/{gh_repo}/pulls/{pr.get('number')}/requested_reviewers", "-X", "POST"]
-        args += [x for u in people["users"] for x in ("-f", f"reviewers[]={u}")]
-        args += [x for t in people["teams"] for x in ("-f", f"team_reviewers[]={t}")]
-        try:
-            _gh_json(args)
-        except GitError as exc:
-            out["problems"].append(f"reviewers not requested: {exc}")
-    out["reviewers"] = people
+    out["pr"], problems = open_review_pr(_owner(brain, repo), head, f"{message} (review)", body, routed["reviewers"],
+                                         base=branch)
+    out["problems"] += problems
+    out["reviewers"] = routed["reviewers"]
     return out
 
 
-def _gh_json(args):
-    try:
-        proc = subprocess.run(["gh", *args], capture_output=True, text=True)
-    except FileNotFoundError:
-        raise GitError("the GitHub CLI (gh) is not installed")
-    if proc.returncode != 0:
-        raise GitError(proc.stderr.strip() or proc.stdout.strip() or "gh failed")
-    return json.loads(proc.stdout or "null") or {}
-
-
-def _origin_repo(repo):
-    url = _git(repo, "remote", "get-url", "origin", check=False).stdout.strip()
-    found = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?/?$", url)
-    return found.group(1) if found else None
+def _owner(brain, repo):
+    return (brain.sources.get("github") or {}).get("repo") or origin_repo(repo)
 
 
 def routine_discard(brain):

@@ -51,6 +51,32 @@ class ContextTest(unittest.TestCase):
         self.assertLess(md.index("## Features"), md.index("## Modules"))
         self.assertIn("### Billing\n", md)
 
+    def test_context_follows_roles_integrations_and_domain_types(self):
+        repo = billing_brain(self.tmp.name, [
+            page("role", "Accountant"),
+            page("integration", "SDI", 'kind: api\nused_by: ["[[Billing]]"]'),
+            page("feature", "Approval", 'capability: Invoicing\nroles: ["[[Accountant]]"]\nmodules: ["[[Billing]]"]'),
+        ])
+        rule = repo / "brain/schema/types/rule.md"
+        rule.write_text("---\nname: rule\narea: functional\nfolder: functional/rules\nmax_words: 300\n"
+                        "fields:\n  status: {kind: enum, values: [active, retired], default: active}\n"
+                        "  applies_to: {kind: list, of: link}\nrequired: []\n---\n# Rule\n")
+        for title, status in (("Rounding", "active"), ("Old rounding", "retired")):
+            path = repo / f"brain/functional/rules/{title}.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f'---\ntype: rule\ntitle: "{title}"\nstatus: {status}\n'
+                            f'applies_to: ["[[Approval]]"]\n---\nRule body.\n')
+        _, data, _ = run_cli("context", "--feature", "Approval", cwd=repo)
+        got = titles(data)
+        for title in ("Accountant", "SDI", "Rounding", "Billing"):
+            self.assertIn(title, got)
+        self.assertNotIn("Old rounding", got)
+        md = data["markdown"]
+        self.assertIn("## Roles", md)
+        self.assertIn("## Integrations", md)
+        self.assertIn("## Rules\n\n### Rounding", md)
+        self.assertLess(md.index("## Rules"), md.index("## Modules"))
+
     def test_superseded_decision_and_resolved_question_excluded(self):
         repo = billing_brain(self.tmp.name)
         _, data, _ = run_cli("context", "--feature", "Invoice Approval", cwd=repo)

@@ -39,6 +39,8 @@ FOLDERS = {
     "module": "technical/modules",
     "interface": "technical/interfaces",
     "environment": "technical/environments",
+    "integration": "technical/integrations",
+    "role": "functional/roles",
     "decision": "decisions",
     "epic": "epics",
     "open-question": "open-questions",

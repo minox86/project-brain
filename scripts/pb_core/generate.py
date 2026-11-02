@@ -1,4 +1,4 @@
-"""Generated files: index, glossary, context packs, backlinks; digest retention."""
+"""Generated files: index, glossary, feature catalogue, context packs, backlinks; digest retention."""
 import datetime
 import json
 import re
@@ -25,6 +25,7 @@ def generate(brain, today):
     pages = [p for p in brain.pages() if p.type in brain.types]
     write("index.md", _index(brain, pages, today))
     write("glossary.md", _glossary(brain, pages))
+    write("features.md", _features(brain, pages))
     write(".pb/backlinks.json", json.dumps(_backlinks(brain, pages), indent=2, sort_keys=True, ensure_ascii=False) + "\n")
 
     packs = {f"{p.title}.md": p for p in pages if p.type == "feature"
@@ -75,7 +76,8 @@ def _heading(folder):
 
 def _index(brain, pages, today):
     product = brain.config.get("product") or "Product"
-    out = [HEADER, f"# {product} brain index", ""]
+    out = [HEADER, f"# {product} brain index", "",
+           "Also: [glossary](glossary.md) · [feature catalogue by capability](features.md)", ""]
     archived = 0
     order = [("functional", "Functional"), ("technical", "Technical")]
     types_by_area = {}
@@ -129,6 +131,40 @@ def _glossary(brain, pages):
         cells.append(_cell(_first_sentence(summary_of(p), 200)))
         out.append("| " + " | ".join(cells) + " |")
     return "\n".join(out) + "\n"
+
+
+STATUS_ORDER = ["released", "in-progress", "planned", "idea", "deprecated"]
+UNCATEGORISED = "Uncategorised"
+
+
+def _features(brain, pages):
+    """Feature catalogue: features grouped by capability, then by status."""
+    product = brain.config.get("product") or "Product"
+    out = [HEADER, f"# {product} features", ""]
+    groups = {}
+    for p in (p for p in pages if p.type == "feature"):
+        groups.setdefault(str(p.get("capability") or "").strip() or UNCATEGORISED, []).append(p)
+    if not groups:
+        return "\n".join(out + ["_none yet_"]) + "\n"
+    rank = {s: i for i, s in enumerate(STATUS_ORDER)}
+
+    def roles(p):
+        return ", ".join(f"[[{t}]]" for t in links.extract(" ".join(str(r) for r in _as_list(p.get("roles")))))
+
+    names = sorted((g for g in groups if g != UNCATEGORISED), key=str.lower)
+    for name in names + ([UNCATEGORISED] if UNCATEGORISED in groups else []):
+        out += [f"## {name}", "", "| Feature | Status | Roles | Summary |", "|---|---|---|---|"]
+        for p in sorted(groups[name], key=lambda p: (rank.get(p.get("status") or "idea", 99), p.title.lower())):
+            out.append(f"| [[{p.title}]] | {p.get('status') or 'idea'} | {_cell(roles(p)) or '—'} | "
+                       f"{_cell(_first_sentence(summary_of(p), 160))} |")
+        out.append("")
+    return "\n".join(out).rstrip() + "\n"
+
+
+def _as_list(value):
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
 
 
 def _backlinks(brain, pages):

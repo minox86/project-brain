@@ -5,7 +5,7 @@
 **Your product team's shared memory, inside the repo, for people and AI agents.**
 
 A Claude plugin that turns Teams threads, Confluence analyses, Jira epics and developer sessions<br>
-into a linked wiki of features, epics, concepts, modules and decisions, right next to your code.
+into a linked wiki of features, glossary, roles, decisions and the technical knowledge the code cannot tell, right next to your code.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](#-install)
@@ -45,6 +45,19 @@ flowchart LR
     B --> A[AI agents in the repo]
     B --> W[Cowork: /pb:ask · /pb:context]
 ```
+
+## 🗂 What's in the brain
+
+`/pb:init` tailors the schema to your product, starting from this default:
+
+| Part | Pages | Holds |
+|---|---|---|
+| **Functional** | `concept` → `glossary.md` | The product's vocabulary, in the languages you choose, with the lifecycle of each entity |
+| | `feature` → `features.md` | The feature catalogue, grouped by capability, with status and roles |
+| | `role` | Who uses the product, their goals, what they may do and why |
+| | domain types | Chosen at init after a few questions on your domain: business `rule`s, `regulation`s, end-to-end `process`es, `edition`s, `metric`s, or types designed for it |
+| **Technical** | `module`, `interface`, `integration`, `environment` | **All and only** what the code cannot tell: boundaries and non-goals, invariants, pitfalls, direction, contract semantics, how external systems really behave |
+| **Across** | `epic`, `decision`, `open-question` | Work in progress, choices with their reasons, unanswered questions and contradictions |
 
 ## 📦 Install
 
@@ -141,7 +154,7 @@ Once the brain and the routine are set up, these happen without anyone running a
 - ✅ **The brain checks itself.** Every save is checked before it leaves your computer: malformed pages, broken links (also to pages being deleted), anything that looks like a password or token. CI checks the changed pages again, and fails the brain PR if `docs/brain` carries code.
 - 🔇 **Noise is caught as it is written.** New pages that look like an existing one, pages nobody links, claims without a source, dated "update" sections, status talk ("this sprint", "TODO") and long verbatim quotes are flagged before the save.
 - 👀 **Sensitive changes wait for the right reviewer.** `brain/schema/review.md`, written by `/pb:init` and changed with `/pb:schema`, lists the points that need a human and who reviews technical, functional and design changes.
-- 📚 **Indexes stay fresh.** Every save rebuilds the index, the glossary (in the languages you chose) and a context pack for every feature and active epic.
+- 📚 **Indexes stay fresh.** Every save rebuilds the index, the glossary (in the languages you chose), the feature catalogue and a context pack for every feature and active epic.
 - 🧹 **Old items step aside.** Superseded decisions, answered questions and closed epics leave the index after a while. Git keeps the history.
 - 💬 **No commands to remember.** Ask in plain words: *"what did we decide about approvals?"*, *"save this decision in the brain"*, *"give me the context for FIN-412"*.
 
@@ -178,6 +191,7 @@ Once the brain and the routine are set up, these happen without anyone running a
 ## ⬆️ Upgrading
 
 - **The plugin:** `/plugin marketplace update project-brain`, then reinstall or update `pb`. Then ask Claude to run `pb toolkit-sync` and save it: CI and the cloud routine use the copy in `brain/.pb/toolkit/`, and the change goes to a review PR. They use the new version once it is merged.
+- **The default schema** (0.4: roles, integrations, capabilities, a technical part limited to what the code cannot tell, domain types): an existing brain keeps its own schema in `brain/schema/`. To adopt any of it, ask `/pb:schema` (e.g. *"add the role and integration types"*, *"add business rules"*).
 - **From a version with the brain on the default branch** (0.1): everyone updates the plugin; a maintainer runs `/pb:init`, which moves the brain to `docs/brain` and opens the brain PR (merge it), then `/pb:routine-setup`, so the routine writes to `docs/brain` (merge its review PR). Pages written in code branches before the move reach the default branch with their PRs, and `docs/brain` at the next brain PR merge.
 
 ## 🩺 Troubleshooting

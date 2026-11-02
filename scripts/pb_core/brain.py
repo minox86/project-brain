@@ -15,7 +15,7 @@ DEFAULTS = {
     "raw_max_words": 3000,
 }
 
-GENERATED = ["index.md", "glossary.md", "context/", ".pb/backlinks.json"]
+GENERATED = ["index.md", "glossary.md", "features.md", "context/", ".pb/backlinks.json"]
 MARKER = Path("schema") / "VERSION"
 
 

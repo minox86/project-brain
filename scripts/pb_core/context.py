@@ -6,13 +6,16 @@ from . import links
 SECTIONS = [
     ("epic", "Epics"),
     ("feature", "Features"),
+    ("role", "Roles"),
     ("concept", "Concepts"),
     ("module", "Modules"),
     ("interface", "Interfaces"),
+    ("integration", "Integrations"),
     ("decision", "Decisions"),
     ("open-question", "Open questions"),
 ]
 _ORDER = {t: i for i, (t, _) in enumerate(SECTIONS)}
+CLOSED = {"superseded", "deprecated", "retired", "repealed", "dropped", "resolved", "done", "cancelled"}
 _GLOB = set("*?[")
 
 
@@ -67,11 +70,13 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
         add(_targets(brain, p, "features") + _targets(brain, p, "modules"))
     for p in list(collected.values()):
         if p.type == "feature":
-            add(_targets(brain, p, "modules") + _targets(brain, p, "concepts"))
+            add(_targets(brain, p, "modules") + _targets(brain, p, "concepts") + _targets(brain, p, "roles"))
     for m in [p for p in collected.values() if p.type == "module"]:
-        add(_targets(brain, m, "interfaces"))
+        add(_targets(brain, m, "interfaces"))  # field of brains created before 0.4
         for other in brain.pages():
             if other.type == "interface" and m.title in _link_titles(brain, other, ("provided_by", "consumed_by")):
+                add([other])
+            if other.type == "integration" and m.title in _link_titles(brain, other, ("used_by",)):
                 add([other])
             if other.type == "feature" and m.title in _link_titles(brain, other, ("modules",)):
                 add([other] + _targets(brain, other, "concepts"))
@@ -82,6 +87,8 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
             add([other])
     hit = {p.title for p in collected.values()}
     for other in brain.pages():
+        if set(_link_titles(brain, other, ("applies_to",))) & hit and other.get("status") not in CLOSED:
+            add([other])  # domain types (rules, processes, regulations…) point at what they govern
         affects = set(_link_titles(brain, other, ("affects",)))
         if not affects & hit:
             continue
@@ -90,7 +97,7 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
         if other.type == "open-question" and other.get("status", "open") == "open":
             add([other])
 
-    pages = sorted(collected.values(), key=lambda p: (_ORDER.get(p.type, 99), p.title.lower()))
+    pages = sorted(collected.values(), key=lambda p: (_ORDER.get(p.type, 99), p.type, p.title.lower()))
     limit = max_words or brain.config.get("context_pack_max_words") or 4000
     mode = {p.rel: "full" for p in pages}
     markdown = _render(seeds, pages, mode)
@@ -123,7 +130,9 @@ def _render(seeds, pages, mode):
     if not pages:
         return ""
     out = [f"# Context: {', '.join(p.title for p in seeds)}", ""]
-    for type_, heading in SECTIONS:
+    known = {t for t, _ in SECTIONS}
+    others = sorted({p.type for p in pages if p.type not in known})
+    for type_, heading in SECTIONS[:3] + [(t, _plural(t)) for t in others] + SECTIONS[3:]:
         group = [p for p in pages if p.type == type_]
         if not group:
             continue
@@ -135,6 +144,11 @@ def _render(seeds, pages, mode):
             else:
                 out += [f"{summary_of(p)} (see brain/{p.rel})", ""]
     return "\n".join(out).rstrip() + "\n"
+
+
+def _plural(type_):
+    words = type_.replace("-", " ")
+    return words[:1].upper() + words[1:] + ("" if words.endswith("s") else "s")
 
 
 def _targets(brain, page, field):

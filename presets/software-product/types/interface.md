@@ -6,7 +6,7 @@ max_words: 400
 fields:
   kind: {kind: enum, values: [rest, event, grpc, lib, ui-contract]}
   provided_by: {kind: link, to: module}
-  consumed_by: {kind: list, of: link, to: module}
+  external_consumers: {kind: list, of: string}
   spec_path: {kind: string}
 required: []
 ---
@@ -14,13 +14,15 @@ required: []
 
 A contract between modules or with the outside world: a REST API, an event, a gRPC service, a library API, a UI contract.
 
-**Create** a page when a contract is consumed by more than one module or by an external party, or when its semantics are not obvious from its spec.
+**Only what the spec and the code do not say.** Paths, payloads, types and the list of internal callers are in the spec and the code: never copy them.
 
-**Fields:** `spec_path` points to the machine-readable spec in the repo (OpenAPI, AsyncAPI, proto) when it exists; do not copy the spec.
+**Create** a page when a contract is consumed by more than one module or by an external party, and its semantics are not obvious from its spec.
+
+**Fields:** `spec_path` points to the machine-readable spec in the repo (OpenAPI, AsyncAPI, proto) when it exists. `external_consumers` names consumers outside the monorepo (partner, mobile app, another product): internal consumers are found in the code.
 
 **Body structure:**
-- `## Purpose` — what the contract is for.
-- `## Semantics` — meaning, ordering, idempotency, error handling, versioning rules: what the spec does not say.
-- `## Consumers` — how and why consumers use it, when it matters.
+- `## Purpose` — what the contract is for, in 1–2 lines.
+- `## Semantics` — meaning, ordering, idempotency, error handling, versioning and compatibility promises: what the spec does not say.
+- `## Consumers` — only promises made to specific consumers, or why a consumer uses it in an unusual way.
 
 Keep it under 400 words.

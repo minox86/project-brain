@@ -18,6 +18,7 @@ Table of types from `brain/schema/types/*.md`: name, area, folder, fields (with 
 
 1. Collect signals: open lines in `proposals.md`; `PB validate` warnings (`unknown-field` recurring on a type, `link-type`); `PB stats` (types with many pages over budget, empty types); `PB lint` (`duplicate-candidate` clusters suggesting a missing type).
 2. Propose numbered changes, each with the reason, the pages affected and the migration needed. Append accepted-for-later ones to `proposals.md`.
+3. A domain need the schema lacks (rules restated in several features, norms, cross-feature processes, editions, KPIs): propose the matching type from `BASE/../../presets/domain-types/` (its README lists the signals), adapted to the product.
 
 ## Review policy
 

@@ -31,7 +31,7 @@ Resolve the path once (no `..`, no quotes unless it contains spaces), so permiss
 | `PB routine start --branch B [--worktree DIR]` / `PB routine finish --branch B -m MSG [--confidence PATH=LEVEL…]` / `PB routine discard` / `PB routine cleanup --worktree DIR` | Routine runs: checkout target branch (or, for manual local runs, a detached worktree that leaves the user's checkout alone); commit, rebase, push; pages the review policy holds go to a `pb/review/<timestamp>` branch with a PR and reviewers; drop the run's brain changes except digests; remove the worktree |
 | `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap, including the documentation inventory (`docs`, `docs_words`) |
 | `PB scaffold --product NAME [--repo DIR]` / `PB scaffold --upgrade [--repo DIR]` | Create `brain/`, CI workflows, CLAUDE.md pointer, plugin settings, vendored toolkit / move an older brain to `docs/brain` (current workflows, plugin settings, toolkit, `AGENTS.md` writing rule) |
-| `PB generate` | Index, glossary, context packs, backlinks, digest retention. `PB save` and `PB routine finish` run it: never by hand |
+| `PB generate` | Index, glossary, feature catalogue (`features.md`), context packs, backlinks, digest retention. `PB save` and `PB routine finish` run it: never by hand |
 | `PB toolkit-sync` | Refresh `brain/.pb/toolkit` (scripts, plus the sync/put/meeting skills and these references the cloud routine follows, since routines load no plugins) after a plugin upgrade |
 
 ## Modes
@@ -45,7 +45,7 @@ Run `PB workspace sync` first (the brain is not in the user's checkout, so `PB v
   - `leftovers` → pages written earlier and never saved: see **Before writing** in `writing.md`.
   - not a clone, or `git`/`python3` missing → `/pb:setup` prepares the computer.
 - **Routine run** — the scheduled routine (`templates/routine/prompt.md`) and `/pb:routine-run --local`: `PB routine start` gives the brain (the checkout of `docs/brain`, or the `brain` of its worktree). Do not run `PB workspace sync` or `PB save`: `PB routine finish` commits and pushes. Never ask the user anything: what needs a human gets confidence `low`, so the review policy holds it.
-- **Read mode** — Python or a clone are not available, but a GitHub connector or tool can read the monorepo: only `/pb:ask` and `/pb:context`. Read files from the branch `docs/brain`: `brain/index.md` first, then `brain/glossary.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
+- **Read mode** — Python or a clone are not available, but a GitHub connector or tool can read the monorepo: only `/pb:ask` and `/pb:context`. Read files from the branch `docs/brain`: `brain/index.md` first, then `brain/glossary.md`, `brain/features.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
 - **Neither** — the brain is not reachable. Guide the user as **Connectors** below says for the GitHub connector (Cowork), or suggest `/pb:setup` in Claude Code.
 
 In read mode, write skills (`put`, `meeting`, `capture`, `fix`, `sync`, `lint`, `schema`, `init`, `routine-setup`, `routine-run`) do not run. Reply: "The brain is read-only here. In Claude Code (`/pb:setup` prepares it once) anyone can write it; the nightly routine also brings in the Teams channels and Confluence spaces it reads."

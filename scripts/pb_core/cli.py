@@ -130,17 +130,20 @@ def _cmd_commit(args):
 
 
 def _cmd_routine(args):
+    if args.action in ("start", "cleanup"):
+        repo = workspace.repo_root(Path.cwd())
+        if args.action == "cleanup":
+            if not args.worktree:
+                raise UsageError("pb routine cleanup needs --worktree")
+            return gitops.routine_cleanup(repo, args.worktree), 0
+        if not args.branch:
+            raise UsageError("pb routine start needs --branch")
+        return gitops.routine_start(repo, args.branch, args.worktree), 0
     brain = _brain(args)
     if args.action == "discard":
         return gitops.routine_discard(brain), 0
-    if args.action == "cleanup":
-        if not args.worktree:
-            raise UsageError("pb routine cleanup needs --worktree")
-        return gitops.routine_cleanup(brain, args.worktree), 0
     if not args.branch:
         raise UsageError(f"pb routine {args.action} needs --branch")
-    if args.action == "start":
-        return gitops.routine_start(brain, args.branch, args.worktree), 0
     if not args.message:
         raise UsageError("pb routine finish needs -m MESSAGE")
     result = gitops.routine_finish(brain, args.branch, args.message, args.confidence or ())

@@ -4,7 +4,10 @@ import re
 
 
 def _norm(text):
-    return re.sub(r"[^a-z0-9]+", " ", str(text).lower()).strip()
+    """Lower case, accents dropped, any non-word run as one space: works for every script, not only ASCII."""
+    import unicodedata
+    plain = "".join(c for c in unicodedata.normalize("NFKD", str(text)) if not unicodedata.combining(c))
+    return re.sub(r"[\W_]+", " ", plain.casefold()).strip()
 
 
 def resolve(brain, name, type_=None, limit=5):

@@ -8,7 +8,8 @@ from .errors import FrontmatterError
 
 def _git(cwd, *args):
     try:
-        proc = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True)
+        proc = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
+                              errors="replace")
     except FileNotFoundError:
         return None
     return proc.stdout if proc.returncode == 0 else None

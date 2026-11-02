@@ -43,7 +43,7 @@ Run `PB workspace sync` first (the brain is not in the user's checkout, so `PB v
   - `code: busy` → another session is saving: retry in a moment.
   - `leftovers` → pages written earlier and never saved: see **Before writing** in `writing.md`.
   - not a clone, or `git`/`python3` missing → `/pb:setup` prepares the computer.
-- **Read mode** — Python or a clone are not available, but a GitHub connector or tool can read the monorepo: only `/pb:ask`, `/pb:context` and `/pb:brief`. Read files from the branch `docs/brain`: `brain/index.md` first, then `brain/glossary.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
+- **Read mode** — Python or a clone are not available, but a GitHub connector or tool can read the monorepo: only `/pb:ask` and `/pb:context`. Read files from the branch `docs/brain`: `brain/index.md` first, then `brain/glossary.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
 - **Neither** — the brain is not reachable. Guide the user as **Connectors** below says for the GitHub connector (Cowork), or suggest `/pb:setup` in Claude Code.
 
 In read mode, write skills (`put`, `meeting`, `capture`, `fix`, `sync`, `lint`, `schema`, `init`, `routine-setup`, `routine-run`) do not run. Reply: "The brain is read-only here. In Claude Code (`/pb:setup` prepares it once) anyone can write it; the nightly routine also brings in the Teams channels and Confluence spaces it reads."

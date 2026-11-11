@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Prepares a person's computer to read and write the project brain from Claude Code without knowing git — checks and installs git, Python and the GitHub CLI, signs in to GitHub, sets the git identity, clones the product monorepo, quiets permission prompts and proves the chain with a first read. Use when someone joins the team, when a pb skill says the environment is not ready (no clone, no gh, not logged in), or when the user asks to set up, install or configure pb on their machine.
+description: Prepares a developer's computer to read and write the project brain from Claude Code — checks and installs git, Python and the GitHub CLI, signs in to GitHub, sets the git identity, clones the product monorepo, quiets permission prompts and proves the chain with a first read. Use when someone joins the team, when a pb skill says the environment is not ready (no clone, no gh, not logged in), or when the user asks to set up, install or configure pb on their machine.
 argument-hint: "[owner/repo]"
 ---
 
@@ -8,7 +8,7 @@ argument-hint: "[owner/repo]"
 
 Arguments: `$ARGUMENTS`
 
-Read `BASE/../../references/conventions.md`. For people who may never have used a terminal: plain words, one step at a time, and never a git term they have to act on. Idempotent: every step checks first and only fixes what is missing; rerunning it is safe.
+Read `BASE/../../references/conventions.md`. Plain words, one step at a time. Idempotent: every step checks first and only fixes what is missing; rerunning it is safe.
 
 Ask every choice with the **`AskUserQuestion` tool** (recommended option first, labelled "(Recommended)"); in text only if the tool is not available. Run what you can run yourself. When something needs the user (a password, a browser page, an admin), say exactly what to do and give commands to type as `! <command>` lines (the `!` runs them in this session).
 
@@ -37,11 +37,11 @@ Check again after installing. Do not go on until all three answer.
 
 ## 5. Permissions on the repo
 
-`gh api repos/<owner/repo> --jq .permissions`. `push: true` is required: saves are pushed to the branch `docs/brain`. If it is false, stop and give the exact request for a repo admin: "Please give <login> write access to <owner/repo>". Write access does not let anyone change protected branches: code still needs approved PRs. Fork-based contributions are not supported.
+`gh api repos/<owner/repo> --jq .permissions`. `push: true` is required: brain pages travel in the user's branches and PRs, and `/pb:sync`, `/pb:routine-run --local` and `/pb:merge` push the branch `docs/brain`. If it is false, stop and give the exact request for a repo admin: "Please give <login> write access to <owner/repo>". Write access does not let anyone change protected branches: code still needs approved PRs. Fork-based contributions are not supported.
 
 ## 6. Quiet operation
 
-So that people who are not developers are not asked to approve every internal step, propose (show the rules, then ask) adding to the clone's **local** Claude Code settings, `.claude/settings.local.json` (never committed), merged with what is there:
+So that the user is not asked to approve every internal step, propose (show the rules, then ask) adding to the clone's **local** Claude Code settings, `.claude/settings.local.json` (never committed), merged with what is there:
 
 ```json
 {"permissions": {"allow": [
@@ -60,11 +60,10 @@ Also check that the `pb` plugin is enabled for this clone: the monorepo's `.clau
 
 ## 7. First read
 
-`PB workspace sync`. It prepares the managed copy of the brain (branch `docs/brain`) inside the clone's git folder, outside the user's files.
-- `no-brain`: the team has no brain yet, or it still lives on the default branch from an earlier pb version; a maintainer runs `/pb:init`.
-- `busy`: retry in a moment.
-- Otherwise read `brain/index.md` from the returned `brain` and show the product name and how many pages it has.
+`PB version`.
+- `brain: null`: as **Modes** in the conventions says (a branch cut before the brain arrived, or no brain yet: a maintainer runs `/pb:init`).
+- Otherwise read `brain/index.md` and show the product name and how many pages it has.
 
 ## 8. Done
 
-One short message: what was installed or changed, where the clone is, and what to try now: "ask the brain something" (`/pb:ask`), "give me the context of FIN-123" (`/pb:context`), "save this decision in the brain" (`/pb:put`). Saving never needs git: everyone sees a save at once, and pages on sensitive points wait for a reviewer.
+One short message: what was installed or changed, where the clone is, and what to try now: "ask the brain something" (`/pb:ask`), "give me the context of FIN-123" (`/pb:context`), "save this decision in the brain" (`/pb:put`). Pages they write stay in their working branch and reach the default branch with their code PR.

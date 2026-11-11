@@ -4,6 +4,7 @@ from pathlib import Path
 
 from . import frontmatter
 from .errors import FrontmatterError, NotInBrain
+from .repo import BRAIN_PR_TITLE
 
 DEFAULTS = {
     "product": None,
@@ -13,6 +14,10 @@ DEFAULTS = {
     "digest_retention_days": 30,
     "context_pack_max_words": 4000,
     "raw_max_words": 3000,
+    "commit_format": "pb({skill}): {summary}",
+    "pr_title_brain": BRAIN_PR_TITLE,
+    "pr_title_init": "Create the project brain",
+    "commit_rules": None,
 }
 
 GENERATED = ["index.md", "glossary.md", "features.md", "context/", ".pb/backlinks.json"]
@@ -29,35 +34,12 @@ def find_brain(start, explicit=None):
                     return option
             return None
     current = Path(start).resolve()
-    managed = _managed_copy(current)
-    if managed is not None:
-        return managed
     for folder in [current] + list(current.parents):
         if (folder / MARKER).is_file() and folder.name == "brain":
             return folder
         if (folder / "brain" / MARKER).is_file():
             return folder / "brain"
     return None
-
-
-def _managed_copy(start):
-    """From a clone's main checkout, the brain is the managed copy on docs/brain (`PB workspace sync`), never the
-    checkout's own brain/, which lags behind. Linked worktrees (the managed copy, routine runs) use their own."""
-    import subprocess
-    proc = subprocess.run(["git", "rev-parse", "--absolute-git-dir", "--git-common-dir"], cwd=str(start),
-                          capture_output=True, text=True)
-    if proc.returncode != 0:
-        return None
-    lines = proc.stdout.strip().splitlines()
-    if len(lines) != 2:
-        return None
-    git_dir, common = Path(lines[0]), Path(lines[1])
-    if not common.is_absolute():
-        common = (Path(start) / common).resolve()
-    if git_dir.resolve() != common.resolve():
-        return None
-    candidate = common / "pb" / "brain-worktree" / "brain"
-    return candidate if (candidate / MARKER).is_file() else None
 
 
 class TypeDef:

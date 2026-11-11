@@ -4,11 +4,6 @@ Read by every skill that writes to the brain, after `conventions.md`.
 
 ## Before writing
 
-Routine runs skip this paragraph (see **Modes** in the conventions). Otherwise `PB workspace sync`: write every file under its `brain` (BRAIN), never in the user's checkout. If it reports:
-- `leftovers`: pages written earlier and never saved, maybe by another session. Show them in one line and ask: save them with this work, or discard them (`git -C <worktree> reset -q -- brain`, `git -C <worktree> checkout -- brain`, `git -C <worktree> clean -fdq brain`). Never drop them silently.
-- `rebase_in_progress`: a save stopped on a conflict; finish it first (**Conflicts** below).
-- `unpushed`: saves that did not reach GitHub (offline); the next `PB save` sends them, nothing to do.
-
 Read `brain/schema/brain.md`, the `brain/schema/types/<type>.md` files of every type you will write, and `brain/AGENTS.md`. The prose of each type is binding: when to create, when not to, body structure, word budget.
 
 ## Significance gate
@@ -73,20 +68,23 @@ When a source contradicts the brain, never overwrite silently: create or update 
 
 ## Closing flow
 
-Every writing operation ends like this:
+Every writing operation in repo mode ends like this:
 
 1. `PB validate <created or changed pages>`. Fix errors and repeat, at most twice. If errors remain, stop and report them; do not save broken pages.
 2. Condense every page with an `over-budget` warning and fix every noise warning (below), then validate again.
-3. `PB save -m "pb(<skill>): <one-line summary>" <every file this work created, changed or deleted>`: pages, and also `raw/` extracts, `.pb/state/*.json` (cursors, suppressions), `.pb/corrections.md`, `schema/proposals.md`; plus leftovers the user chose to save. Every skill's closing flow means this list, even when it shows only the message. It commits, regenerates index and context packs, pushes straight to `docs/brain` and returns at once; never wait for CI. Pages the review policy holds, and changes to `schema/` or the toolkit, go to a review PR (`review.pr`).
-4. Tell the user the outcome in plain words, without git terms: "Saved: everyone sees it now." When `review` is set: "These pages wait for a review by <reviewers>: <link>." When `pushed` is false with `unpushed` > 0: "Saved on this computer; it goes out with the next save (no connection now)." Then the `problems`, if any, in one line each.
-5. Exit 1 with `errors`: fix those pages and save again. Exit 1 with `conflict`: **Conflicts** below.
+3. `PB save <every file this work created, changed or deleted>`: pages, and also `raw/` extracts, `.pb/state/*.json` (suppressions only; cursors never change in a working branch), `.pb/corrections.md`, `schema/` files. Every skill's closing flow means this list. It checks those files, regenerates index, glossary, feature catalogue, context packs and backlinks, and reports the watched points; it never commits or pushes. With `errors`: fix those files and save again. `code: no-brain`: see **Modes** in the conventions.
+4. Tell the user, in one message:
+   - the brain files changed (`files`), uncommitted in the branch `<branch>`: they commit them with their code, and the pages reach the default branch with that PR;
+   - when `watched` is not empty: the points touched, with their reasons, and that the reviewers (`reviewers`) will be asked on the PR;
+   - when `on_default` is true: the pages need a branch and a PR like any other change.
+5. Commit only if the user asks: `PB commit --skill <skill> -m "<one-line summary>"` (`--allow-default` only if they asked to commit on the default branch). It commits the brain's pages and generated files together, with the message `commit_format` of `brain/schema/brain.md` makes of the summary. Never push. With `rejected`, the commit was refused: read `output`. About the message: rewrite the whole message so it satisfies the rule (and `commit_rules`), run the same command again with `--raw -m "<message>"`, every other argument unchanged, then offer to update `commit_format`/`commit_rules` with `/pb:schema`. About the files or the environment (a linter on the pages, a missing git identity): fix the files and run the same command again, or report it; do not rewrite the message. Never bypass a hook. When the developer asks you to commit the pages together with code in one commit of their own, follow the repo's commit rules and `commit_rules`: that commit is theirs.
 6. Summarise: pages created/updated (as `[[links]]`), open questions raised, anything dropped by the significance gate worth mentioning.
 
-Routine runs use their own closing flow (`templates/routine/prompt.md`, `/pb:routine-run`).
+Routine runs use their own closing flow (`templates/routine/prompt.md`, `/pb:sync`, `/pb:routine-run`).
 
 ## Conflicts
 
-Someone saved the same page in the meantime. `conflict.paths` lists the files, with `<<<<<<<`, `=======`, `>>>>>>>` markers. Resolve them yourself, never ask the user to use git: merge both versions into one coherent page (keep every fact, drop duplicates, the newer source wins on a contradiction; a real disagreement becomes an `open-question`), remove the markers, then `PB save --continue`. Mention it in one line: "Someone had changed <page> meanwhile: I merged both versions." If the merge needs a judgement only the user can make, ask before continuing.
+A conflict on generated files (`index.md`, `glossary.md`, `features.md`, `context/`, `.pb/backlinks.json`) is never merged by hand: take either side, run `PB generate`, and stage the result. Conflicts on pages in a working branch are the developer's, like any conflict in their branch; when they ask for help, combine both versions into one coherent page (keep every fact, drop duplicates, the newer source wins on a contradiction; a real disagreement becomes an `open-question`). Conflicts between `docs/brain` and the default branch are settled by `/pb:merge`.
 
 ## Noise warnings
 
@@ -101,17 +99,17 @@ Someone saved the same page in the meantime. `conflict.paths` lists the files, w
 | `ephemeral` | Status words (today, this sprint, TODO…): state the lasting fact or drop it |
 | `verbatim` | A long quote: summarise and link the source |
 
-Fix them before saving. A warning that is a false positive can stay: in interactive saves the user's confirmation lets it through; in routine runs, with `noise_to_review: true` in `brain/schema/review.md`, the page waits for a reviewer.
+Fix them before saving. A warning that is a false positive can stay: in interactive saves the user's confirmation lets it through; in routine runs, with `noise_to_review: true` in `brain/schema/review.md`, the PR flags the page for a reviewer.
 
 ## Confidence and review
 
-`brain/schema/review.md` decides which changes reach the branch directly and which wait in a PR, by the points of the schema they touch (`watch`) and by how sure the writer is. Rate every page you create or update:
+`brain/schema/review.md` decides which changes a reviewer must look at, by the points of the schema they touch (`watch`) and by how sure the writer is. Nothing is held back: watched changes are named on the PR that carries them, and the area reviewers are asked there. Rate every page you create or update:
 - **high**: stated explicitly and settled in the source;
 - **medium**: inferred, or from one voice in a discussion that did not visibly conclude;
 - **low**: an interpretation, an ambiguous name resolution, a contradiction, a type chosen with doubt.
 
-Only the routine passes ratings to the toolkit (`--confidence PATH=LEVEL`, high is the default). In interactive skills the user is there: show what you rated medium or low in the plan or preview and let them decide; once they confirm, the page counts as high. Pages on points watched by the policy go to a review PR whatever the confidence.
+Only routine runs pass ratings to the toolkit (`--confidence PATH=LEVEL`, high is the default). In interactive skills the user is there: show what you rated medium or low in the plan or preview and let them decide; once they confirm, the page counts as high. Pages on watched points are flagged whatever the confidence.
 
 ## Schema signals
 
-When the schema does not fit (the same structure repeated in a generic type, a missing field, recurring `unknown-field` warnings), append a line to `brain/schema/proposals.md`: `- [ ] P<n> · <proposal>` with `n` = highest existing + 1. `/pb:schema` applies proposals. `proposals.md` is under `schema/`: saving it opens a review PR, which is how proposals reach the maintainers.
+When the schema does not fit (the same structure repeated in a generic type, a missing field, recurring `unknown-field` warnings), append a line to `brain/schema/proposals.md`: `- [ ] P<n> · <proposal>` with `n` = highest existing + 1. `/pb:schema` applies proposals. `proposals.md` is under `schema/`, so the PR that carries it asks the reviewers: that is how proposals reach the maintainers.

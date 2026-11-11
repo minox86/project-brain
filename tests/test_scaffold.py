@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import subprocess
 import sys
@@ -34,10 +35,12 @@ class ScaffoldTest(unittest.TestCase):
         self.assertTrue((brain / ".pb/toolkit/VERSION").read_text().strip())
         self.assertTrue((self.repo / ".github/workflows/pb-validate.yml").is_file())
         self.assertFalse((self.repo / ".github/workflows/pb-generate.yml").exists())
-        merge_back = (self.repo / ".github/workflows/pb-brain-branch.yml").read_text()
-        self.assertIn('branches: ["main"]', merge_back)
-        self.assertIn("origin/main", merge_back)
-        self.assertNotIn("{{default_branch}}", merge_back)
+        self.assertFalse((self.repo / ".github/workflows/pb-brain-branch.yml").exists())
+        self.assertNotIn("{{default_branch}}", (self.repo / ".github/workflows/pb-validate.yml").read_text())
+        attrs = (brain / ".gitattributes").read_text()
+        for line in ("index.md linguist-generated", "glossary.md linguist-generated", "features.md linguist-generated",
+                     "context/** linguist-generated", ".pb/backlinks.json linguist-generated"):
+            self.assertIn(line, attrs)
         settings = json.loads((self.repo / ".claude/settings.json").read_text())
         self.assertTrue(settings["enabledPlugins"]["pb@project-brain"])
         claude = (self.repo / "CLAUDE.md").read_text()
@@ -48,16 +51,58 @@ class ScaffoldTest(unittest.TestCase):
     def test_upgrade_rewrites_workflows_of_an_existing_brain(self):
         self.scaffold()
         (self.repo / ".github/workflows/pb-generate.yml").write_text("old\n")
-        (self.repo / ".github/workflows/pb-brain-branch.yml").unlink()
+        (self.repo / ".github/workflows/pb-brain-branch.yml").write_text("old\n")
+        (self.repo / "brain/.gitattributes").unlink()
         agents = self.repo / "brain/AGENTS.md"
         agents.write_text(agents.read_text().replace(
-            agents.read_text()[agents.read_text().index("The brain lives"):agents.read_text().index("never edit generated files")],
-            "Write through the `pb` plugin skills (`/pb:put`) or, by hand, following the types. Never edit generated files"))
+            agents.read_text()[agents.read_text().index("The brain in this checkout"):agents.read_text().index("Never edit generated files")],
+            "Write through the `pb` plugin skills (`/pb:put`) or, by hand, following the types. "))
         code, data, err = run_cli("scaffold", "--repo", self.repo, "--upgrade")
         self.assertEqual(code, 0, err)
         self.assertFalse((self.repo / ".github/workflows/pb-generate.yml").exists())
-        self.assertTrue((self.repo / ".github/workflows/pb-brain-branch.yml").is_file())
-        self.assertIn("Write only through the `pb` plugin skills", agents.read_text())
+        self.assertFalse((self.repo / ".github/workflows/pb-brain-branch.yml").exists())
+        self.assertIn(".github/workflows/pb-brain-branch.yml", data["deleted"])
+        self.assertIn(".github/workflows/pb-generate.yml", data["deleted"])
+        self.assertIn("index.md linguist-generated", (self.repo / "brain/.gitattributes").read_text())
+        self.assertIn("The brain in this checkout is the brain of your branch. Write pages here with the `pb` skills "
+                      "and commit them with your code.", agents.read_text())
+        self.assertNotIn("Write through the `pb` plugin skills", agents.read_text())
+
+    def test_upgrade_refreshes_the_writing_rule_of_a_0_4_agents_md(self):
+        self.scaffold()
+        agents = self.repo / "brain/AGENTS.md"
+        text = agents.read_text()
+        start, end = text.index("The brain in this checkout"), text.index("Content enters only if it is:")
+        old = ("The brain lives on the branch `docs/brain`; `brain/` in a code branch is a copy that can be a few days "
+               "behind (it arrives through a PR from `docs/brain`). The latest version: the `pb` skills, or "
+               "`git show origin/docs/brain:brain/<path>`.\n\n"
+               "Write only through the `pb` plugin skills (`/pb:put`, `/pb:capture`, `/pb:fix`): they save to "
+               "`docs/brain`. Never edit `brain/` in a code branch (it would conflict with the brain coming from "
+               "`docs/brain`), and never edit generated files: `index.md`, `glossary.md`, `features.md`, `context/`, "
+               "`.pb/backlinks.json`.\n\n")
+        agents.write_text(text[:start] + old + text[end:])
+        code, _, err = run_cli("scaffold", "--repo", self.repo, "--upgrade")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(agents.read_text(), text)
+        for gone in ("Never edit `brain/` in a code branch", "The brain lives on the branch", "Write only through"):
+            self.assertNotIn(gone, agents.read_text())
+
+    def test_validate_workflow_shape(self):
+        text = (ROOT / "templates/github/pb-validate.yml").read_text()
+        self.assertNotIn("push:", text)
+        self.assertIn("Generated files are stale: run `PB generate` and commit", text)
+        self.assertIn("review:", text)
+        self.assertIn("pull-requests: write", text)
+        self.assertIn("brain-only:", text)
+        self.assertFalse((ROOT / "templates/github/pb-brain-branch.yml").exists())
+
+    def test_freshness_uses_the_pr_toolkit_when_the_pr_changes_the_toolkit(self):
+        text = (ROOT / "templates/github/pb-validate.yml").read_text()
+        step = text[text.index("name: Generated files are fresh"):text.index("  review:")]
+        self.assertIn('git diff --quiet "$BASE"...HEAD -- brain/.pb/toolkit', step)
+        self.assertIn(".pb-base/brain/.pb/toolkit/pb.py", step)
+        self.assertLess(step.index("-- brain/.pb/toolkit"), step.rindex("toolkit=brain/.pb/toolkit/pb.py"))
+        self.assertLess(step.rindex("toolkit=brain/.pb/toolkit/pb.py"), step.index("generate\n"))
 
     def test_scaffold_refuses_existing_brain(self):
         self.scaffold()
@@ -106,6 +151,22 @@ class ScaffoldTest(unittest.TestCase):
         text = (base / "SKILL.md").read_text()
         for rel in sorted(set(re.findall(r"BASE/([\w./-]+\.md)", text))):
             self.assertTrue((base / rel).resolve().is_file(), rel)
+
+    def test_vendored_toolkit_writes_no_bytecode_under_brain(self):
+        self.scaffold()
+        env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPYCACHEPREFIX", "PYTHONDONTWRITEBYTECODE")}
+        # As stock CPython does: Apple's python3 redirects the cache, so put the defaults back first.
+        script = str(self.repo / "brain/.pb/toolkit/pb.py")
+        boot = ("import runpy, sys; sys.pycache_prefix = None; sys.dont_write_bytecode = False; "
+                f"sys.argv = [{script!r}, 'version']; runpy.run_path({script!r}, run_name='__main__')")
+        out = subprocess.run([sys.executable, "-c", boot], cwd=str(self.repo), capture_output=True, text=True, env=env)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(list((self.repo / "brain").rglob("__pycache__")), [])
+
+    def test_validate_workflow_runs_the_toolkit_without_bytecode(self):
+        text = (ROOT / "templates/github/pb-validate.yml").read_text()
+        self.assertNotRegex(text, r"python3 (?!-B )")
+        self.assertEqual(text.count('python3 -B "$toolkit"'), 3)
 
     def test_toolkit_sync_from_vendored_copy_refuses_and_keeps_toolkit(self):
         self.scaffold()

@@ -13,7 +13,7 @@ def epic_brain(tmp, extra=()):
         page("concept", "Invoice", "term_en: Invoice"),
         page("epic", "Multi-level approval", 'jira: FIN-100\nstatus: active\nfeatures: ["[[Invoice Approval]]"]',
              "## Goal\nApproval chains.\n"),
-        page("epic", "Legacy export", 'jira: FIN-50\nstatus: done\nupdated: 2026-01-01\nfeatures: ["[[Invoice Approval]]"]'),
+        page("epic", "Legacy export", 'jira: FIN-50\nstatus: done\nupdated: 2026-01-01\narchived: true\nfeatures: ["[[Invoice Approval]]"]'),
         page("epic", "Web revamp", 'jira: FIN-200\nmodules: ["[[Web]]"]'),
         page("decision", "Max three levels", 'area: functional\naffects: ["[[Multi-level approval]]"]'),
         page("open-question", "Who approves level 3", 'area: functional\naffects: ["[[Multi-level approval]]"]'),
@@ -70,7 +70,7 @@ class EpicTest(unittest.TestCase):
 
     def test_generate_packs_for_active_epics_and_archives_done(self):
         repo = epic_brain(self.tmp.name)
-        code, _, err = run_cli("generate", "--today", "2026-10-31", cwd=repo)
+        code, _, err = run_cli("generate", cwd=repo)
         self.assertEqual(code, 0, err)
         brain = repo / "brain"
         packs = sorted(p.name for p in (brain / "context").iterdir())

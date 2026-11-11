@@ -44,7 +44,7 @@ class CommitFixesTest(test_gitops.GitRepoCase):
         self.assertIn("?? apps/", git(self.repo, "status", "--porcelain"))
 
     def test_routine_discard_keeps_only_digest(self):
-        run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
+        run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
         self.add_page("Invalid")
         self.write("brain/schema/brain.md", "changed\n")
         self.write("brain/digests/2026-10-31.md", "# Digest\n")
@@ -69,7 +69,7 @@ class ScaffoldBranchTest(unittest.TestCase):
                 code, data, _ = run_cli("scaffold", "--repo", repo, "--product", "P")
                 self.assertEqual(code, 0)
                 self.assertEqual(data["default_branch"], "main")
-                self.assertIn('branches: ["main"]', (repo / ".github/workflows/pb-brain-branch.yml").read_text())
+                self.assertNotIn("{{default_branch}}", (repo / ".github/workflows/pb-validate.yml").read_text())
         finally:
             for k, v in saved.items():
                 if v is None:

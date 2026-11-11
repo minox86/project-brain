@@ -1,4 +1,4 @@
-"""Routes brain changes straight to the branch or to a reviewed PR, by the policy in schema/review.md."""
+"""Flags the brain changes that are watched, and their area reviewers, by the policy in schema/review.md."""
 from pathlib import Path
 
 from . import policy
@@ -8,8 +8,9 @@ from .validate import brain_rel, noise, page_targets
 
 
 def review(brain, base="HEAD", confidence=(), noise_holds=True):
-    """Which changed pages need a PR, why, and who reviews them. `confidence` holds "PATH=LEVEL" items.
-    `noise_holds=False` (interactive saves, where the user confirmed the pages): noise warnings never hold."""
+    """Which changed pages are watched (flagged for their area reviewers), why, and who reviews them. `confidence`
+    holds "PATH=LEVEL" items. `noise_holds=False` (interactive saves, where the user confirmed the pages): noise
+    warnings never flag a page. The keys `route`/`direct`/`review` are kept: `review` lists the flagged pages."""
     rules = policy.load(brain)
     changed = changed_pages(brain, base)
     if changed is None:
@@ -36,7 +37,7 @@ def review(brain, base="HEAD", confidence=(), noise_holds=True):
         for p, code, _ in noise(brain, changed):
             flag(p.rel, f"noise: {code}")
 
-    # A page going straight to the branch must not link a page that only exists in the PR.
+    # A page that links a new flagged page is flagged too: its reviewers see both.
     created = {rel for rel, info in changed.items() if info["change"] == "create"}
     moved = True
     while moved:
@@ -64,6 +65,8 @@ def review(brain, base="HEAD", confidence=(), noise_holds=True):
         "direct": sorted(rel for rel in changed if rel not in flagged),
         "review": items,
         "reviewers": reviewers_for(rules, items),
+        # Per area, whatever is flagged: CI asks the technical ones when brain/schema or the toolkit changes.
+        "area_reviewers": {area: reviewers_for(rules, [{"area": area}]) for area in policy.AREAS},
         "ignored_confidence": ignored,
         "markdown": _markdown(items),
     }

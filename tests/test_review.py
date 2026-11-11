@@ -45,7 +45,7 @@ class BrainRepoCase(GitRepoCase):
         self.assertEqual(code, 0, err)
         return data
 
-    def held(self, data):
+    def flagged(self, data):
         return {item["path"]: item["reasons"] for item in data["review"]}
 
 
@@ -131,17 +131,26 @@ class ReviewTest(BrainRepoCase):
         self.put("feature", "Approval", f"status: planned\n{SRC}", "Approves an [[Invoice]] once.\n")
         data = self.review()
         self.assertEqual(data["route"], "pr")
-        self.assertEqual(self.held(data), {rel: ["watch: decisions"]})
+        self.assertEqual(self.flagged(data), {rel: ["watch: decisions"]})
         self.assertEqual(data["direct"], ["functional/features/Approval.md"])
         self.assertEqual(data["reviewers"], {"areas": ["technical"], "handles": ["dev-lead", "acme/backend"],
                                              "users": ["dev-lead"], "teams": ["backend"]})
         self.assertIn(f"`{rel}`", data["markdown"])
 
+    def test_area_reviewers_are_listed_even_with_nothing_flagged(self):
+        self.policy('reviewers: {technical: ["@dev-lead", "acme/backend"], functional: [pm]}')
+        data = self.review()
+        self.assertEqual(data["review"], [])
+        self.assertEqual(data["area_reviewers"]["technical"],
+                         {"areas": ["technical"], "handles": ["dev-lead", "acme/backend"], "users": ["dev-lead"],
+                          "teams": ["backend"]})
+        self.assertEqual(data["area_reviewers"]["ux"]["handles"], [])
+
     def test_confidence_threshold(self):
         self.policy("direct_min_confidence: high")
         rel = self.put("feature", "Approval", f"status: planned\n{SRC}", "Approves an [[Invoice]] once.\n")
         data = self.review("--confidence", f"{rel}=medium", "brain/other/Nope.md=low")
-        self.assertEqual(self.held(data), {rel: ["confidence: medium"]})
+        self.assertEqual(self.flagged(data), {rel: ["confidence: medium"]})
         self.assertEqual(data["ignored_confidence"], ["brain/other/Nope.md"])
         self.policy("direct_min_confidence: medium")
         self.assertEqual(self.review("--confidence", f"{rel}=medium")["route"], "direct")
@@ -153,7 +162,7 @@ class ReviewTest(BrainRepoCase):
         rel = self.put("feature", "Approval", f"status: planned\n{SRC}", "Approves an [[Invoice]] once.\n")
         self.assertEqual(self.review()["route"], "direct")
         self.put("feature", "Approval", f"status: released\n{SRC}", "Approves an [[Invoice]].\n")
-        self.assertEqual(self.held(self.review()), {rel: ["watch: feature · fields status"]})
+        self.assertEqual(self.flagged(self.review()), {rel: ["watch: feature · fields status"]})
 
     def test_delete_rule_and_cross_area_asks_everyone(self):
         self.policy("reviewers: {technical: [t], functional: [f], ux: [u]}\n"
@@ -169,19 +178,19 @@ class ReviewTest(BrainRepoCase):
         self.put("open-question", "Who approves", SRC)
         self.assertEqual(self.review()["reviewers"]["users"], ["t", "f", "u"])
 
-    def test_page_linking_a_held_new_page_is_held_too(self):
+    def test_page_linking_a_flagged_new_page_is_flagged_too(self):
         self.policy("watch: [{type: decision}]")
         decision = self.put("decision", "Single approver", f"area: functional\n{SRC}")
         feature = self.put("feature", "Approval", f"status: planned\n{SRC}",
                            "Approves an [[Invoice]], see [[Single approver]].\n")
-        held = self.held(self.review())
-        self.assertEqual(held[feature], ["links [[Single approver]], new and under review"])
-        self.assertIn(decision, held)
+        flagged = self.flagged(self.review())
+        self.assertEqual(flagged[feature], ["links [[Single approver]], new and under review"])
+        self.assertIn(decision, flagged)
 
-    def test_noise_holds_pages(self):
+    def test_noise_flags_pages(self):
         self.policy("noise_to_review: true")
         rel = self.put("feature", "Approval", "status: planned", "Approves an [[Invoice]].\n")
-        self.assertEqual(self.held(self.review()), {rel: ["noise: missing-source"]})
+        self.assertEqual(self.flagged(self.review()), {rel: ["noise: missing-source"]})
         self.policy("noise_to_review: false")
         self.assertEqual(self.review()["route"], "direct")
 
@@ -193,7 +202,7 @@ class ReviewTest(BrainRepoCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "-qm", "decision")
         self.assertEqual(self.review()["route"], "direct")
-        self.assertEqual(list(self.held(self.review("--base", base))), [rel])
+        self.assertEqual(list(self.flagged(self.review("--base", base))), [rel])
 
 
 class RoutineSplitTest(BrainRepoCase):
@@ -214,6 +223,7 @@ class RoutineSplitTest(BrainRepoCase):
         self.log.write_text("")
         fixtures = base / "fixtures.json"
         fixtures.write_text(json.dumps({
+            "repos/o/r/pulls?head=o:docs/brain&base=main&state=open": [],
             "repos/o/r/pulls": {"number": 7, "html_url": "https://github.com/o/r/pull/7"},
             "repos/o/r/pulls/7/requested_reviewers": {},
         }))
@@ -224,58 +234,13 @@ class RoutineSplitTest(BrainRepoCase):
         self.addCleanup(lambda: [os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
                                  for k, v in saved.items()])
 
-    def remote_files(self, ref):
-        return git(self.remote, "ls-tree", "-r", "--name-only", ref, "brain/").splitlines()
-
-    def test_held_pages_go_to_a_review_pr(self):
-        run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
-        decision = self.put("decision", "Single approver", f"area: technical\n{SRC}")
-        feature = self.put("feature", "Approval", f"status: planned\n{SRC}",
-                           "Approves an [[Invoice]] once, see [[Single approver]].\n")
-        concept = self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}", "Billed by [[Billing]] monthly.\n")
-        self.write("brain/digests/2026-11-01.md", "# Digest\n")
-        code, data, err = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "pb(routine): sync",
-                                  "--confidence", f"brain/{concept}=high", cwd=self.repo)
-        self.assertEqual(code, 0, err)
-        self.assertTrue(data["pushed"])
-        review = data["review"]
-        self.assertEqual(review["pr"], "https://github.com/o/r/pull/7")
-        self.assertEqual(sorted(review["pages"]), sorted([decision, feature]))
-        self.assertEqual(review["problems"], [])
-        direct = self.remote_files("brain/inbox")
-        self.assertIn(f"brain/{concept}", direct)
-        self.assertIn("brain/digests/2026-11-01.md", direct)
-        self.assertNotIn(f"brain/{decision}", direct)
-        held = self.remote_files(review["branch"])
-        self.assertIn(f"brain/{decision}", held)
-        self.assertIn("Approves an [[Invoice]] once", git(self.remote, "show", f"{review['branch']}:brain/{feature}"))
-        self.assertEqual(git(self.remote, "rev-parse", f"{review['branch']}~1"),
-                         git(self.remote, "rev-parse", "brain/inbox"))
-        calls = self.log.read_text()
-        self.assertIn("head=pb/review/", calls)
-        self.assertIn("base=brain/inbox", calls)
-        self.assertIn("team_reviewers[]=backend", calls)
-        self.assertIn("reviewers[]=pm", calls)
-        self.assertEqual(git(self.repo, "branch", "--show-current"), "brain/inbox")
-        self.assertEqual(git(self.repo, "status", "--porcelain", "brain"), "")
-
-    def test_without_held_pages_nothing_is_opened(self):
-        run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
+    def test_without_watched_pages_no_reviewer_is_requested(self):
+        run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
         self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}", "Billed by [[Billing]] monthly.\n")
-        code, data, _ = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "m", cwd=self.repo)
-        self.assertEqual((code, data["review"]), (0, None))
-        self.assertEqual(self.log.read_text(), "")
-
-    def test_pr_failure_keeps_the_branch_and_reports(self):
-        os.environ["FAKE_GH_FIXTURES"] = str(Path(self.tmp.name) / "none.json")
-        Path(os.environ["FAKE_GH_FIXTURES"]).write_text("{}")
-        run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
-        decision = self.put("decision", "Single approver", f"area: technical\n{SRC}")
-        code, data, _ = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "m", cwd=self.repo)
-        self.assertEqual(code, 0)
-        self.assertIsNone(data["review"]["pr"])
-        self.assertIn("open it by hand", data["review"]["problems"][0])
-        self.assertIn(f"brain/{decision}", self.remote_files(data["review"]["branch"]))
+        code, data, _ = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "m", cwd=self.repo)
+        self.assertEqual((code, data["watched"], data["pr"]), (0, [], "https://github.com/o/r/pull/7"))
+        self.assertNotIn("review", data)
+        self.assertNotIn("requested_reviewers", self.log.read_text())
 
 
 class TemplatesTest(unittest.TestCase):
@@ -286,21 +251,16 @@ class TemplatesTest(unittest.TestCase):
         self.assertNotIn("paths:", text)
         self.assertIn("github.head_ref == 'docs/brain'", text)
         self.assertIn("head.repo.full_name == github.repository", text)
-        self.assertIn("grep -v -E '^(brain/|", text)
+        self.assertIn("grep -v -E '^brain/' ", text)
         self.assertNotIn("gh pr merge", text)
         self.assertNotIn("--approve", text)
+        self.assertIn("AUTHOR: ${{ github.event.pull_request.user.login }}", text)
+        self.assertIn('[ "${user,,}" = "${AUTHOR,,}" ] && continue', text)
+        # Schema or toolkit touched: the technical area reviewers (spec section 7).
+        self.assertIn(".area_reviewers.technical.users[]?", text)
+        self.assertIn(".area_reviewers.technical.teams[]?", text)
+        self.assertIn("no reviewer could be derived", text)
         self.assertIn("contents: read", text)
-
-    def test_brain_branch_workflow_merges_default_into_docs_brain(self):
-        from helpers import ROOT
-        text = (ROOT / "templates/github/pb-brain-branch.yml").read_text()
-        self.assertIn("types: [closed]", text)
-        self.assertIn("github.event.pull_request.merged", text)
-        self.assertIn("github.head_ref == 'docs/brain'", text)
-        self.assertIn("git merge --no-edit -X ours", text)
-        self.assertNotIn("[skip ci]", text)
-        self.assertFalse((ROOT / "templates/github/pb-generate.yml").exists())
-        self.assertIn("git push origin HEAD:docs/brain", text)
 
     def test_scaffold_ships_the_review_policy(self):
         with tempfile.TemporaryDirectory() as tmp:

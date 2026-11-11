@@ -11,15 +11,19 @@ from . import FORMAT_VERSION, __version__
 from .brain import Brain, find_brain
 from .context import build_context
 from .generate import generate
+from .retention import apply_retention
 from .lint import lint
+from .messages import commit_message, compose, pr_title
 from .stats import stats
-from . import gitops, state, workspace
+from . import gitops, merge, state
+from .repo import repo_root
 from .scaffold import scaffold, sync_toolkit, upgrade
 from .scan import scan
 from .errors import PbError, UsageError
 from .prs import merged_prs
 from .resolve import resolve
 from .review import review
+from .save import save
 from .validate import validate
 
 
@@ -95,7 +99,11 @@ def _today(args):
 
 
 def _cmd_generate(args):
-    return generate(_brain(args), _today(args)), 0
+    return generate(_brain(args)), 0
+
+
+def _cmd_retention(args):
+    return apply_retention(_brain(args), _today(args)), 0
 
 
 def _cmd_lint(args):
@@ -126,12 +134,22 @@ def _cmd_correction(args):
 
 
 def _cmd_commit(args):
-    return gitops.commit(_brain(args), args.message, args.allow_default, args.include or ()), 0
+    brain = _brain(args)
+    result = gitops.commit(brain, compose(brain, args.skill, args.message, args.raw), args.allow_default,
+                           args.include or ())
+    return result, 1 if result["rejected"] else 0
+
+
+def _cmd_message(args):
+    brain = _brain(args)
+    return {"message": commit_message(brain, args.skill, args.message), "pr_title_brain": pr_title(brain, "brain"),
+            "pr_title_init": pr_title(brain, "init"), "commit_format": brain.config.get("commit_format"),
+            "commit_rules": brain.config.get("commit_rules")}, 0
 
 
 def _cmd_routine(args):
     if args.action in ("start", "cleanup"):
-        repo = workspace.repo_root(Path.cwd())
+        repo = repo_root(Path.cwd())
         if args.action == "cleanup":
             if not args.worktree:
                 raise UsageError("pb routine cleanup needs --worktree")
@@ -145,24 +163,31 @@ def _cmd_routine(args):
     if not args.branch:
         raise UsageError(f"pb routine {args.action} needs --branch")
     if not args.message:
-        raise UsageError("pb routine finish needs -m MESSAGE")
-    result = gitops.routine_finish(brain, args.branch, args.message, args.confidence or ())
-    return result, 1 if result["conflict"] else 0
+        raise UsageError("pb routine finish needs -m SUMMARY")
+    message = compose(brain, args.skill or "routine", args.message, args.raw)
+    result = gitops.routine_finish(brain, args.branch, message, args.confidence or ())
+    return result, 1 if result["conflict"] or result["rejected"] else 0
 
 
-def _cmd_workspace(args):
-    return workspace.sync(workspace.repo_root(Path.cwd())), 0
+def _cmd_merge(args):
+    repo = repo_root(Path.cwd())
+    if args.action == "land":
+        result = merge.merge_land(repo, args.wait)
+        return result, 0 if result["merged"] else 1
+    if not args.worktree:
+        raise UsageError(f"pb merge {args.action} needs --worktree")
+    if args.action == "start":
+        result = merge.merge_start(repo, args.worktree)
+        return result, 1 if result["alert"] else 0
+    if not args.message:
+        raise UsageError("pb merge finish needs -m SUMMARY")
+    result = merge.merge_finish(repo, args.worktree, args.message, args.raw)
+    return result, 1 if result["errors"] or result["unresolved"] or not result["pushed"] else 0
 
 
 def _cmd_save(args):
-    repo = workspace.repo_root(Path.cwd())
-    if args.cont:
-        result = workspace.save_continue(repo)
-    else:
-        if not args.message:
-            raise UsageError("pb save needs -m MESSAGE")
-        result = workspace.save(repo, args.message, args.paths, force_review=args.force_review)
-    return result, 1 if (result["conflict"] or result["errors"]) else 0
+    result = save(repo_root(Path.cwd()), args.paths)
+    return result, 1 if result["errors"] else 0
 
 
 def _repo_arg(args):
@@ -193,6 +218,9 @@ def _cmd_stats(args):
     return stats(_brain(args)), 0
 
 
+SUMMARY_HELP = "the summary the commit_format of schema/brain.md wraps (with --raw: the whole message)"
+
+
 def build_parser():
     parser = _Parser(prog="pb", description="project-brain toolkit")
     parser.add_argument("--brain", help="path of the brain/ directory")
@@ -213,9 +241,10 @@ def build_parser():
     p.add_argument("--since", required=True, help="ISO datetime cursor, e.g. 2026-10-30T02:00:00Z")
     p.add_argument("--repo", help="owner/name; default: github.repo in sources.md")
     p.set_defaults(handler=_cmd_prs)
-    p = sub.add_parser("generate")
+    sub.add_parser("generate").set_defaults(handler=_cmd_generate)
+    p = sub.add_parser("retention")
     p.add_argument("--today")
-    p.set_defaults(handler=_cmd_generate)
+    p.set_defaults(handler=_cmd_retention)
     sub.add_parser("stats").set_defaults(handler=_cmd_stats)
     p = sub.add_parser("state")
     p.add_argument("action", choices=["get", "set", "suppress"])
@@ -229,23 +258,38 @@ def build_parser():
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_correction)
     p = sub.add_parser("commit")
-    p.add_argument("-m", "--message", required=True)
+    p.add_argument("-m", "--message", required=True, metavar="SUMMARY", help=SUMMARY_HELP)
+    p.add_argument("--skill", default="brain", help="the {skill} of commit_format (default: brain)")
+    p.add_argument("--raw", action="store_true", help="-m is the whole message, used verbatim")
     p.add_argument("--allow-default", action="store_true")
     p.add_argument("--include", nargs="+", help="extra repo paths to commit (e.g. CI workflows from init)")
     p.set_defaults(handler=_cmd_commit)
+    p = sub.add_parser("message", help="the commit message and PR titles in the repo's format; commits nothing")
+    p.add_argument("-m", "--message", required=True, metavar="SUMMARY")
+    p.add_argument("--skill", default="brain")
+    p.set_defaults(handler=_cmd_message)
     p = sub.add_parser("routine")
     p.add_argument("action", choices=["start", "finish", "discard", "cleanup"])
     p.add_argument("--branch")
     p.add_argument("--worktree", help="manual runs: work in a detached worktree at this path")
-    p.add_argument("-m", "--message")
+    p.add_argument("-m", "--message", metavar="SUMMARY", help=SUMMARY_HELP)
+    p.add_argument("--skill", help="finish: the {skill} of commit_format (default: routine)")
+    p.add_argument("--raw", action="store_true", help="finish: -m is the whole message, used verbatim")
     p.add_argument("--confidence", nargs="+", action="extend", metavar="PATH=LEVEL",
                    help="finish: pages written with less than high confidence (low, medium)")
     p.set_defaults(handler=_cmd_routine)
+    p = sub.add_parser("merge")
+    p.add_argument("action", choices=["start", "finish", "land"])
+    p.add_argument("--worktree", help="start, finish: the temporary worktree on docs/brain")
+    p.add_argument("-m", "--message", metavar="SUMMARY", help=SUMMARY_HELP)
+    p.add_argument("--raw", action="store_true", help="finish: -m is the whole message, used verbatim")
+    p.add_argument("--wait", type=int, default=600, help="land: seconds to wait for the PR's checks")
+    p.set_defaults(handler=_cmd_merge)
     p = sub.add_parser("review")
     p.add_argument("--base", default="HEAD", help="git commit to compare with (default: HEAD, uncommitted changes)")
     p.add_argument("--confidence", nargs="+", action="extend", metavar="PATH=LEVEL",
                    help="pages written with less than high confidence (low, medium)")
-    p.add_argument("--no-noise", action="store_true", help="noise warnings never hold a page")
+    p.add_argument("--no-noise", action="store_true", help="noise warnings are never listed as watched")
     p.set_defaults(handler=_cmd_review)
     p = sub.add_parser("scan")
     p.add_argument("--repo")
@@ -256,14 +300,8 @@ def build_parser():
     p.add_argument("--upgrade", action="store_true", help="existing brain: current workflows, plugin settings, toolkit")
     p.add_argument("--preset", default="software-product")
     p.set_defaults(handler=_cmd_scaffold)
-    p = sub.add_parser("workspace")
-    p.add_argument("action", choices=["sync"])
-    p.set_defaults(handler=_cmd_workspace)
     p = sub.add_parser("save")
-    p.add_argument("paths", nargs="*", help="the pages this save is about (default: every unsaved brain file)")
-    p.add_argument("-m", "--message")
-    p.add_argument("--continue", dest="cont", action="store_true", help="resume after resolving a conflict")
-    p.add_argument("--force-review", action="store_true", help="configuration or toolkit changes: review PR only")
+    p.add_argument("paths", nargs="*", help="the pages this save is about (default: every changed brain file)")
     p.set_defaults(handler=_cmd_save)
     sub.add_parser("toolkit-sync").set_defaults(handler=_cmd_toolkit_sync)
     p = sub.add_parser("lint")

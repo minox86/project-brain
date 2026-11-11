@@ -1,12 +1,14 @@
-"""Git operations: dev commits on the current branch, routine runs on a target branch."""
+"""Git operations: dev commits on the current branch, routine runs on docs/brain with one PR."""
 import datetime
 from pathlib import Path
 
-from .brain import GENERATED
-from .errors import GitError
+from .errors import GitError, UsageError
+from .generate import generate
+from .messages import pr_title
+from .repo import (BRAIN_BRANCH, brain_pr_body, default_branch, ensure_brain_pr, gh_repo,
+                   git as _git, request_reviewers)
+from .retention import apply_retention
 from .review import review
-from .workspace import (BRAIN_BRANCH, REVIEW_PREFIX, _git, _remote_has, default_branch, ensure_promotion,
-                        open_review_pr, origin_repo, regenerate)
 
 
 def _repo_root(brain):
@@ -15,6 +17,11 @@ def _repo_root(brain):
 
 def _brain_prefix(brain, repo):
     return brain.root.resolve().relative_to(repo.resolve()).as_posix()
+
+
+def _remote_has(repo, branch):
+    return _git(repo, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}",
+                check=False).returncode == 0
 
 
 def current_branch(repo):
@@ -27,7 +34,17 @@ def _staged(repo, specs):
     return [f for f in out.split("\0") if f]
 
 
-def commit(brain, message, allow_default=False, include=(), exclude=()):
+def try_commit(cwd, message, *specs):
+    """git commit with the repo's hooks; a refusal (commit-msg, pre-commit) is returned, not raised, and leaves the
+    changes as git left them. None when committed."""
+    done = _git(cwd, "commit", "-q", "-m", message, *(("--", *specs) if specs else ()), check=False)
+    if done.returncode == 0:
+        return None
+    return {"message": message, "output": "\n".join(x.strip() for x in (done.stderr, done.stdout) if x.strip())}
+
+
+def commit(brain, message, allow_default=False, include=()):
+    """Commit the brain (and `include`) with `message`, composed by messages.compose."""
     repo = _repo_root(brain)
     branch = current_branch(repo)
     if not allow_default and branch == default_branch(repo):
@@ -37,40 +54,80 @@ def commit(brain, message, allow_default=False, include=(), exclude=()):
     prefix = _brain_prefix(brain, repo)
     include = [p for p in include if (repo / p).exists()
                or _git(repo, "ls-files", "--error-unmatch", "--", p, check=False).returncode == 0]
-    specs = ([prefix] + [f":(exclude){prefix}/{g.rstrip('/')}" for g in GENERATED]
-             + [f":(exclude){prefix}/{rel}" for rel in exclude] + list(include))
+    # The generated files travel with the pages: the working branch carries both.
+    specs = [prefix] + list(include)
     _git(repo, "add", "-A", "--", *specs)
     files = _staged(repo, specs)
     if not files:
-        return {"committed": False, "sha": None, "branch": branch, "files": []}
-    _git(repo, "commit", "-q", "-m", message, "--", *specs)
+        return {"committed": False, "sha": None, "branch": branch, "files": [], "rejected": None}
+    rejected = try_commit(repo, message, *specs)
+    if rejected:
+        return {"committed": False, "sha": None, "branch": branch, "files": files, "rejected": rejected}
     sha = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    return {"committed": True, "sha": sha, "branch": branch, "files": files}
+    return {"committed": True, "sha": sha, "branch": branch, "files": files, "rejected": None}
+
+
+def adds_nothing(repo, branch, base):
+    """True when merging origin/<branch> into origin/<base> would leave <base>'s tree unchanged: everything the
+    branch holds is already on <base> (its PR was merged, by any method, squash included). False when the
+    merge conflicts or git cannot tell (a missing ref, unrelated histories, git older than 2.38)."""
+    merged = _git(repo, "merge-tree", "--write-tree", f"origin/{base}", f"origin/{branch}", check=False)
+    tree = _git(repo, "rev-parse", "--verify", "--quiet", f"origin/{base}^{{tree}}", check=False)
+    if merged.returncode != 0 or tree.returncode != 0:
+        return False
+    lines = merged.stdout.split()
+    return bool(lines) and lines[0] == tree.stdout.strip()
+
+
+def _behind(repo, branch, base):
+    """How many commits of origin/<base> origin/<branch> lacks (0 when either is missing)."""
+    proc = _git(repo, "rev-list", "--count", f"origin/{branch}..origin/{base}", check=False)
+    return int(proc.stdout.strip()) if proc.returncode == 0 and proc.stdout.strip().isdigit() else 0
+
+
+def _start_point(repo, branch):
+    """Where the run starts: (ref, created, restarted, behind). The branch is restarted from the default branch,
+    never merged with it, when it holds nothing the default branch lacks."""
+    base = default_branch(repo)
+    if not _remote_has(repo, branch):
+        return (f"origin/{base}" if _remote_has(repo, base) else "HEAD"), True, False, 0
+    if branch != base and adds_nothing(repo, branch, base):
+        same = _git(repo, "rev-parse", f"origin/{branch}").stdout == _git(repo, "rev-parse", f"origin/{base}").stdout
+        return f"origin/{base}", False, not same, 0
+    return f"origin/{branch}", False, False, _behind(repo, branch, base)
+
+
+def _routine_branch(repo, branch):
+    """pb pushes only to docs/brain."""
+    if branch == default_branch(repo):
+        raise UsageError(f"the routine never pushes to the default branch '{branch}': use --branch {BRAIN_BRANCH}")
+    if branch != BRAIN_BRANCH:
+        raise UsageError(f"the routine writes only on {BRAIN_BRANCH}, not on '{branch}': use --branch {BRAIN_BRANCH}")
+
+
+def _in_routine_checkout(repo, action):
+    """A routine run works on a detached worktree or a checkout of docs/brain, never on a developer's branch."""
+    branch = current_branch(repo)
+    if branch and branch != BRAIN_BRANCH:
+        raise UsageError(f"pb routine {action} runs only in a routine run (a detached worktree or a checkout of "
+                         f"{BRAIN_BRANCH}), not on '{branch}': nothing was changed. In a worktree, pass "
+                         "--brain <brain of the run>")
 
 
 def routine_start(repo, branch, worktree=None):
     """Needs only the clone: the brain lives on the branch, not necessarily in the current checkout."""
     repo = Path(repo)
-    _git(repo, "fetch", "-q", "origin")
+    _routine_branch(repo, branch)
+    _git(repo, "fetch", "-q", "--prune", "origin")
+    start, created, restarted, behind = _start_point(repo, branch)
+    out = {"branch": branch, "created": created, "restarted": restarted, "behind": behind}
     if worktree is not None:
-        return _start_in_worktree(repo, branch, Path(worktree))
-    if _remote_has(repo, branch):
-        _git(repo, "checkout", "-q", "-B", branch, f"origin/{branch}")
-        return {"branch": branch, "created": False}
-    base = default_branch(repo)
-    start = f"origin/{base}" if _remote_has(repo, base) else "HEAD"
+        # Manual runs: a detached worktree, so the user's checkout is never touched.
+        _git(repo, "worktree", "add", "-q", "--detach", str(worktree), start)
+        worktree = Path(worktree).resolve()
+        return dict(out, worktree=str(worktree), brain=str(worktree / "brain"))
     _git(repo, "checkout", "-q", "-B", branch, start)
-    return {"branch": branch, "created": True}
-
-
-def _start_in_worktree(repo, branch, worktree):
-    """Manual runs: a detached worktree on the target branch, so the user's checkout is never touched."""
-    created = not _remote_has(repo, branch)
-    start = f"origin/{default_branch(repo) if created else branch}"
-    _git(repo, "worktree", "add", "-q", "--detach", str(worktree), start)
-    worktree = worktree.resolve()
-    return {"branch": branch, "created": created, "worktree": str(worktree),
-            "brain": str(worktree / "brain")}
+    return out
 
 
 def routine_cleanup(repo, worktree):
@@ -81,73 +138,75 @@ def routine_cleanup(repo, worktree):
 
 
 def routine_finish(brain, branch, message, confidence=()):
-    """Push the run to `branch`; changes the review policy holds back go to a PR on top of it instead."""
+    """Apply retention, regenerate, commit the run and push it to `branch`; on docs/brain, keep the one PR towards
+    the default branch open, with the watched changes in its description and the area reviewers requested.
+    Never merges: a branch that moved on origin is pushed over only when it holds nothing the default branch lacks."""
     repo = _repo_root(brain)
-    routed = review(brain, "HEAD", confidence)
-    held = [item["path"] for item in routed["review"]]
-    done = commit(brain, message, allow_default=True, exclude=held)
-    direct_tip = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    held_commit = None
-    if held:
-        prefix = _brain_prefix(brain, repo)
-        specs = [f"{prefix}/{rel}" for rel in held]
-        _git(repo, "add", "-A", "--", *specs)
-        _git(repo, "commit", "-q", "-m", f"{message} (review)", "--", *specs)
-        held_commit = _git(repo, "rev-parse", "HEAD").stdout.strip()
-        _git(repo, "reset", "-q", "--keep", direct_tip)
-    _git(repo, "fetch", "-q", "origin")
+    base = default_branch(repo)
+    _routine_branch(repo, branch)
+    _in_routine_checkout(repo, "finish")
+    retention = apply_retention(brain, datetime.date.today())
+    before = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    generate(brain)  # one commit carries the pages and the generated files
+    done = commit(brain, message, allow_default=True)
+    _git(repo, "fetch", "-q", "--prune", "origin")
+    # Everything the PR holds, not only this run: the changes since the fork from the default branch.
+    # Confidence levels are known for this run's pages only.
+    fork = _git(repo, "merge-base", f"origin/{base}", "HEAD", check=False)
+    routed = review(brain, fork.stdout.strip() if fork.returncode == 0 else before, confidence)
+    out = {"committed": done["committed"], "pushed": False, "conflict": False, "pr": None,
+           "watched": routed["review"], "reviewers": routed["reviewers"], "behind": 0,
+           "retention": retention, "problems": [], "rejected": done["rejected"]}
+    if done["rejected"]:  # nothing pushed, no PR: the run's changes stay in the checkout
+        out["problems"].append("the commit was rejected by the repo's commit rules")
+        return out
+    push = ["push", "-q"]
     if _remote_has(repo, branch):
-        rebase = _git(repo, "rebase", "-q", f"origin/{branch}", check=False)
-        if rebase.returncode != 0:
-            _git(repo, "rebase", "--abort", check=False)
-            return {"committed": done["committed"], "pushed": False, "conflict": True, "review": None,
-                    "promotion": None, "problems": []}
-    regenerate(brain.root, repo)
-    if _git(repo, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", check=False).returncode:
-        return {"committed": done["committed"], "pushed": False, "conflict": True, "review": None,
-                "promotion": None, "problems": [f"the push to {branch} was refused (someone pushed meanwhile?)"]}
-    result = {"committed": done["committed"], "pushed": True, "conflict": False, "review": None,
-              "promotion": None, "problems": []}
-    if held_commit:
-        result["review"] = _open_review(brain, repo, branch, message, routed, held_commit)
-    if branch == BRAIN_BRANCH and done["committed"]:
-        result["promotion"], problem = ensure_promotion(repo, _owner(brain, repo))
-        if problem:
-            result["problems"].append(problem)
-    return result
-
-
-def _open_review(brain, repo, branch, message, routed, held_commit):
-    """Put the held changes on a pb/review/ branch off the pushed tip and open a PR with the area reviewers."""
-    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
-    head = f"{REVIEW_PREFIX}{stamp}"
-    out = {"branch": head, "pages": [item["path"] for item in routed["review"]], "pr": None, "problems": []}
-    back = current_branch(repo) or _git(repo, "rev-parse", "HEAD").stdout.strip()
-    _git(repo, "checkout", "-q", "--detach")
-    try:
-        if _git(repo, "cherry-pick", held_commit, check=False).returncode != 0:
-            _git(repo, "cherry-pick", "--abort", check=False)
-            out["problems"].append(f"the held changes no longer apply on {branch}: they are dropped for this run")
-            return out
-        _git(repo, "push", "-q", "origin", f"HEAD:refs/heads/{head}")
-    finally:
-        _git(repo, "checkout", "-q", back)
-    body = routed["markdown"] + "\nOpened by the pb routine. Merge to accept, edit the pages here to correct them, " \
-                                "close to drop them.\n"
-    out["pr"], problems = open_review_pr(_owner(brain, repo), head, f"{message} (review)", body, routed["reviewers"],
-                                         base=branch)
-    out["problems"] += problems
-    out["reviewers"] = routed["reviewers"]
+        tip = _git(repo, "rev-parse", f"origin/{branch}").stdout.strip()
+        if _git(repo, "merge-base", "--is-ancestor", tip, "HEAD", check=False).returncode != 0:
+            if not adds_nothing(repo, branch, base):
+                out["conflict"] = True
+                out["behind"] = _behind(repo, branch, base)
+                return out
+            push.append(f"--force-with-lease=refs/heads/{branch}:{tip}")  # a restart from the default branch
+    if _git(repo, *push, "origin", f"HEAD:refs/heads/{branch}", check=False).returncode:
+        out["conflict"] = True
+        out["problems"].append(f"the push to {branch} was refused")
+        out["behind"] = _behind(repo, branch, base)
+        return out
+    out["pushed"] = True
+    out["behind"] = _behind(repo, branch, base)
+    if branch == BRAIN_BRANCH and _ahead(repo, base):
+        _brain_pr(brain, base, routed, out)
     return out
 
 
-def _owner(brain, repo):
-    return (brain.sources.get("github") or {}).get("repo") or origin_repo(repo)
+def _ahead(repo, base):
+    """HEAD holds commits origin/<base> lacks (with none, GitHub refuses the PR)."""
+    proc = _git(repo, "rev-list", "--count", f"origin/{base}..HEAD", check=False)
+    return proc.returncode != 0 or proc.stdout.strip() != "0"
+
+
+def _brain_pr(brain, base, routed, out):
+    owner = gh_repo(brain)
+    if not owner:
+        out["problems"].append(f"no GitHub repo (github.repo in sources.md): the brain PR from "
+                               f"{BRAIN_BRANCH} to {base} was not opened")
+        return
+    url, number, problem, author = ensure_brain_pr(owner, base,
+                                                   brain_pr_body(routed["markdown"], out["behind"], base),
+                                                   pr_title(brain, "brain"))
+    out["pr"] = url
+    if problem:
+        out["problems"].append(problem)
+    if number is not None:
+        out["problems"] += request_reviewers(owner, number, routed["reviewers"], exclude=[author])
 
 
 def routine_discard(brain):
     """Throw away every brain/ change of this run except the digests."""
     repo = _repo_root(brain)
+    _in_routine_checkout(repo, "discard")
     prefix = _brain_prefix(brain, repo)
     specs = [prefix, f":(exclude){prefix}/digests"]
     _git(repo, "reset", "-q", "--", *specs)

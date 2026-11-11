@@ -9,14 +9,14 @@ Every `pb` skill reads this file before acting. Skills that write to the brain a
 Resolve the path once (no `..`, no quotes unless it contains spaces), so permission rules like `Bash(python3 */scripts/pb.py *)` match. `${CLAUDE_PLUGIN_ROOT}/scripts/pb.py` is the same file.
 
 - Every command prints one JSON object. Exit `0` ok; `1` findings described in the JSON; `2` usage or environment error (read `error`).
-- Run from anywhere inside the monorepo. From the user's checkout, once `PB workspace sync` has run, every command uses the managed copy by itself; `--brain <dir>` (or `PB_BRAIN`) picks another brain, as routine runs do.
-- Never do by hand what the toolkit does: validation, name resolution, context packs, stats, lint, sync cursors, commits.
+- Run from anywhere inside the monorepo: the brain is `brain/` of the current checkout. `--brain <dir>` (or `PB_BRAIN`) picks another brain, as routine runs in a worktree do; it goes before the command: `PB --brain <dir> resolve "<name>"`.
+- Never do by hand what the toolkit does: validation, name resolution, context packs, generated files, stats, lint, sync cursors.
 
 | Command | Use |
 |---|---|
 | `PB version` | `brain` is the brain path, or `null` outside a brain |
 | `PB validate [paths…] [--base REF]` | Check pages against the schema, secrets, budgets and the review policy; noise warnings on pages created or updated since `REF` (default `HEAD`). Warnings never fail |
-| `PB review [--base REF] [--confidence PATH=LEVEL…]` | Apply `brain/schema/review.md` to the pages changed since `REF`: which go straight to the branch, which are held for a PR, why, and the reviewers per area |
+| `PB review [--base REF] [--confidence PATH=LEVEL…]` | Apply `brain/schema/review.md` to the pages changed since `REF`: which touch a watched point (or are rated too low, or carry noise), why, and the reviewers per area |
 | `PB resolve "<name>" [--type T]` | Candidate pages for a name (`title`, `alias`, `partial`, `fuzzy`) |
 | `PB context (--jira KEY \| --feature T \| --paths P…) [--max-words N]` | Context pack: pages + markdown (`--jira` matches epics and features; `--feature` takes any feature or epic title) |
 | `PB prs --since ISO [--repo owner/name]` | Merged PRs since the cursor that touch a module (via `gh`): only those reach you, with modules, matched files, diff size and description; plus the new `cursor` |
@@ -25,32 +25,34 @@ Resolve the path once (no `..`, no quotes unless it contains spaces), so permiss
 | `PB state get <source> [key]` / `PB state set <source> <key> <json>` | Sync cursors (`teams`, `confluence`, `github`, `jira`, `meetings`) |
 | `PB state suppress <source> "<claim>"` | Claim corrected by `/pb:fix` that sync must not re-ingest |
 | `PB correction --page P --wrong W --right R --evidence E` | Append to `brain/.pb/corrections.md` |
-| `PB workspace sync` | Prepare the managed copy of the brain (`docs/brain`) and bring it up to date: `brain` is the path to pass as `--brain`; also reports `leftovers` (pages written but not saved), `rebase_in_progress`, `unpushed` saves |
-| `PB save -m MSG [PATH…] [--force-review]` / `PB save --continue` | Save the pages written in the managed copy: only the `PATH`s given (the pages this work created, changed or deleted; without paths, every unsaved file), so another session's drafts are never swept in. Validates, commits, regenerates index and context packs, pushes to `docs/brain`; pages on watched points, and every change under `schema/` or `.pb/toolkit/`, go to a `pb/review/<timestamp>` PR instead; keeps the PR from `docs/brain` to the default branch open. `--continue` after resolving a conflict |
-| `PB commit -m MSG [--allow-default] [--include PATH…]` | Init only: commit `brain/` changes (generated files excluded), plus any `--include` paths, on the current branch |
-| `PB routine start --branch B [--worktree DIR]` / `PB routine finish --branch B -m MSG [--confidence PATH=LEVEL…]` / `PB routine discard` / `PB routine cleanup --worktree DIR` | Routine runs: checkout target branch (or, for manual local runs, a detached worktree that leaves the user's checkout alone); commit, rebase, push; pages the review policy holds go to a `pb/review/<timestamp>` branch with a PR and reviewers; drop the run's brain changes except digests; remove the worktree |
-| `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap, including the documentation inventory (`docs`, `docs_words`) |
-| `PB scaffold --product NAME [--repo DIR]` / `PB scaffold --upgrade [--repo DIR]` | Create `brain/`, CI workflows, CLAUDE.md pointer, plugin settings, vendored toolkit / move an older brain to `docs/brain` (current workflows, plugin settings, toolkit, `AGENTS.md` writing rule) |
-| `PB generate` | Index, glossary, feature catalogue (`features.md`), context packs, backlinks, digest retention. `PB save` and `PB routine finish` run it: never by hand |
+| `PB save [PATH…]` | Close a write in the working tree: check the `PATH`s given (the files this work created, changed or deleted; without paths, every changed brain file), regenerate the generated files, report `watched` points and `reviewers`. Never commits or pushes. Returns `saved`, `errors`, `files` (every changed brain file), `watched`, `reviewers`, `markdown`, `branch`, `on_default` |
+| `PB generate` | Index, glossary, feature catalogue (`features.md`), context packs, backlinks. Safe by hand at any time; it is what resolves a conflict on generated files |
+| `PB commit -m SUMMARY [--skill S] [--raw] [--allow-default] [--include PATH…]` | Commit `brain/` changes (pages and generated files), plus any `--include` paths, on the current branch, with the message `commit_format` (`brain/schema/brain.md`) makes of `SUMMARY` and `S` (default `brain`); `--raw`: `-m` is the whole message. Only when the user asks, and in `/pb:init`. A commit the repo's hooks refuse returns `rejected` (`message`, `output`; `null` on success), exit 1, the changes left in place |
+| `PB message -m SUMMARY [--skill S]` | The commit `message`, `pr_title_brain`, `pr_title_init`, `commit_format` and `commit_rules`; commits nothing |
+| `PB routine start --branch B [--worktree DIR]` | Check out `B` (created or restarted from the default branch when needed), or with `--worktree` a temporary worktree (`worktree`, `brain`). Also `created`, `restarted`, `behind` |
+| `PB routine finish --branch B -m SUMMARY [--skill S] [--raw] [--confidence PATH=LEVEL…]` | Retention, regenerate, commit (`S` default `routine`), push `B`, keep the brain PR (`pr_title_brain`) open with reviewers. Never merges. Returns `committed`, `pushed`, `conflict`, `pr`, `watched`, `reviewers`, `behind`, `retention`, `problems`, `rejected` (a refused commit: nothing pushed, exit 1) |
+| `PB routine discard` / `PB routine cleanup --worktree DIR` | Drop the run's brain changes except digests / remove the run's worktree |
+| `PB retention [--today D]` | Flag old closed pages `archived`, delete old digests. `PB routine finish` runs it: never by hand |
+| `PB merge start --worktree DIR` / `PB merge finish --worktree DIR -m SUMMARY [--raw]` / `PB merge land [--wait S]` | `/pb:merge` only: bring the default branch into `docs/brain`, push it, merge the "Brain updates" PR |
+| `PB scan [--repo DIR]` | Facts about the monorepo for bootstrap, including the documentation inventory (`docs`, `docs_words`) and where the repo states its commit rules (`commit_rules`: `commitlint`, `hooks`, `pr_checks`, `recent_subjects`) |
+| `PB scaffold --product NAME [--repo DIR]` / `PB scaffold --upgrade [--repo DIR]` | Create `brain/`, the CI workflow, CLAUDE.md pointer, plugin settings, vendored toolkit / bring an older brain up to date (workflow, plugin settings, toolkit, `AGENTS.md` writing rule) |
 | `PB toolkit-sync` | Refresh `brain/.pb/toolkit` (scripts, plus the sync/put/meeting skills and these references the cloud routine follows, since routines load no plugins) after a plugin upgrade |
 
 ## Modes
 
-Run `PB workspace sync` first (the brain is not in the user's checkout, so `PB version` alone cannot find it):
+Run `PB version` first:
 
-- **Repo mode** — it answers with a `brain`: you are in a clone of the monorepo, with Python and git (Claude Code), and all skills are available. **BRAIN** is that path: every `brain/…` path in the skills and references means `BRAIN/…`, for reading and for writing; never read or write the `brain/` folder of the user's checkout, which lags behind. The brain always lives on the branch `docs/brain`; the managed copy sits inside the clone's git folder, so the user's checkout, branch and uncommitted code are never touched and nobody needs to know git. Results of `sync`:
-  - `code: no-brain` → no brain yet (or one from an earlier pb version on the default branch): `/pb:init` creates or moves it.
-  - `code: busy` → another session is saving: retry in a moment.
-  - `code: offline` → GitHub cannot be reached: ask the user to check the connection.
-  - `leftovers` → pages written earlier and never saved: see **Before writing** in `writing.md`.
+- **Repo mode** — it answers with a `brain`: you are in a clone of the monorepo, with Python and git (Claude Code), and all skills are available. The brain is `brain/` in the working tree of this checkout, on whatever branch the developer is on: you read the brain as of that branch and write pages there, as ordinary changes of it. pb never commits, pushes, rebases or switches branch here: the developer commits the pages with the code and they reach the default branch with the code PR, where CI checks them and asks the area reviewers. With `brain: null`:
+  - `git cat-file -e origin/<default>:brain/schema/VERSION` succeeds → this branch was cut before the brain arrived: say to bring the default branch into it; never do it yourself.
+  - no brain on the default branch either → `/pb:init` creates it.
   - not a clone, or `git`/`python3` missing → `/pb:setup` prepares the computer.
-- **Routine run** — the scheduled routine (`templates/routine/prompt.md`) and `/pb:routine-run --local`: `PB routine start` gives the brain (the checkout of `docs/brain`, or the `brain` of its worktree). Do not run `PB workspace sync` or `PB save`: `PB routine finish` commits and pushes. Never ask the user anything: what needs a human gets confidence `low`, so the review policy holds it.
-- **Read mode** — Python or a clone are not available, but a GitHub connector or tool can read the monorepo: only `/pb:ask` and `/pb:context`. Read files from the branch `docs/brain`: `brain/index.md` first, then `brain/glossary.md`, `brain/features.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
+- **Routine run** — the scheduled routine (`templates/routine/prompt.md`), `/pb:sync` and `/pb:routine-run --local`: always on the branch `docs/brain`, never in the user's checkout. In the cloud the routine checks it out (`PB routine start --branch docs/brain`); in Claude Code, `PB routine start --branch docs/brain --worktree <tmp dir outside the repo>` gives a temporary worktree: run every `PB` command as `PB --brain <brain from the result> …`; every `brain/…` path in the skills and references means `<brain>/…`, for reading and writing; always end with `PB routine cleanup --worktree <tmp dir>`. No `PB save`: `PB routine finish` commits and pushes `docs/brain` and keeps one PR, "Brain updates", to the default branch; nothing is ever merged by the run. Sync cursors change only here; suppressions from `/pb:fix` may also come from a working branch, and `/pb:merge` keeps both sides' suppressions. The scheduled routine never asks anything: what needs a human gets confidence `low`, so the PR flags it for the reviewers.
+- **Read mode** — Python or a clone are not available, but a GitHub connector or tool can read the monorepo: only `/pb:ask` and `/pb:context`. Read `brain/` on the default branch (no branch to select): `brain/index.md` first, then `brain/glossary.md`, `brain/features.md`, `brain/context/<feature or active epic>.md`, and the pages they link. Never try to write.
 - **Neither** — the brain is not reachable. Guide the user as **Connectors** below says for the GitHub connector (Cowork), or suggest `/pb:setup` in Claude Code.
 
-In read mode, write skills (`put`, `meeting`, `capture`, `fix`, `sync`, `lint`, `schema`, `init`, `routine-setup`, `routine-run`) do not run. Reply: "The brain is read-only here. In Claude Code (`/pb:setup` prepares it once) anyone can write it; the nightly routine also brings in the Teams channels and Confluence spaces it reads."
+In read mode, write skills (`put`, `meeting`, `capture`, `fix`, `sync`, `lint`, `schema`, `init`, `routine-setup`, `routine-run`, `merge`) do not run. Reply: "The brain is read-only here. To add knowledge, write it on Confluence or in the team's Teams channel (mention the Jira epic key): the nightly routine brings it in."
 
-The brain on `docs/brain` is always the latest. It reaches the code branches through one PR from `docs/brain` to the default branch that pb keeps open and the team merges when it wants: the `brain/` folder in a code checkout can be a few days behind, the managed copy never is.
+The default branch holds the brain everyone reads. A working branch adds its own pages until its PR is merged; what the routine writes waits on `docs/brain` in "Brain updates" until `/pb:merge` brings it to the default branch.
 
 ## Connectors
 

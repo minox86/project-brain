@@ -60,7 +60,7 @@ class LintTest(unittest.TestCase):
 
     def test_archivable(self):
         _, data, _ = self.lint(files_of(*self.linked_module(),
-                                        page("decision", "D", 'area: ux\nstatus: superseded\nupdated: 2026-01-01\naffects: ["[[F]]"]')),
+                                        page("decision", "D", 'area: ux\nstatus: superseded\nupdated: 2026-01-01\narchived: true\naffects: ["[[F]]"]')),
                                ["services/billing/a.py"])
         self.assertEqual(self.codes(data), ["archivable"])
 

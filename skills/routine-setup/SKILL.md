@@ -48,7 +48,7 @@ With the Atlassian connector: `getVisibleJiraProjects`. Let the user pick the pr
 
 ## 5. Target branch
 
-The routine writes where everyone writes: the branch `docs/brain` (`routine.branch: docs/brain`). It pushes directly what the review policy (`brain/schema/review.md`) lets through; what it holds goes to a `pb/review/…` PR towards `docs/brain`, with the area reviewers; and it keeps the PR from `docs/brain` to the default branch open, like every save. The routine's account must be able to push to `docs/brain`, create `pb/review/*` branches and open PRs. Nothing to choose: say it in one line.
+The routine is the only writer on the fixed branch `docs/brain` (`routine.branch: docs/brain`) and keeps one PR from it to the default branch, "Brain updates", with the area reviewers on the watched changes it carries. Nothing merges by itself: the maintainer brings its changes to the default branch with `/pb:merge`. Check with `gh`, never ask what it can tell (`gh api repos/<repo>/rules/branches/docs/brain`, empty when nothing covers it): `docs/brain` must accept pushes from the routine owner and from whoever runs `/pb:merge`. If a ruleset or a protection pattern (e.g. `docs/*`, `*`) covers it, propose excluding `docs/brain` from it; only a repo admin can change it: apply it with `gh api` if the user is one (`gh api repos/<repo> --jq .permissions.admin`), otherwise give the user the line for an admin. The routine's account must be able to push to `docs/brain` and open PRs.
 
 ## 6. Schedule
 
@@ -100,4 +100,4 @@ Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo
 
 ## 9. Save
 
-Validate, then the closing flow: `PB save -m "pb(routine-setup): configure the routine" brain/schema/sources.md brain/AGENTS.md brain/.pb/toolkit`. Changes under `schema/` and `.pb/toolkit/` always wait for a review, so the whole configuration goes to one review PR (the `AGENTS.md` section goes out directly). The routine reads configuration and instructions from `docs/brain`: it works once that PR is merged. Give the user the link and say: "Merge this PR (or ask <reviewers>), then run `/pb:routine-run` for a first run." After every plugin upgrade, `PB toolkit-sync` and save again, or the routine keeps following the old instructions.
+Validate, then the closing flow: `PB save brain/schema/sources.md brain/AGENTS.md <every changed file under brain/.pb/toolkit/>`. Changes under `schema/` and `.pb/toolkit/` are always watched, so the PR that carries them asks the reviewers. The routine reads configuration and instructions from `docs/brain`, which starts from the default branch: it works once that PR is merged (if `docs/brain` is behind, after `/pb:merge`). Say: "Commit these files and merge their PR (or ask <reviewers>), then run `/pb:routine-run` for a first run." After every plugin upgrade, `PB toolkit-sync` and save again, or the routine keeps following the old instructions.

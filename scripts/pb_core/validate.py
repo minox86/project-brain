@@ -8,10 +8,11 @@ from . import frontmatter, links, policy
 from .brain import _as_list
 from .changes import changed_pages
 from .errors import FrontmatterError
+from .messages import format_problem
 from .scaffold import ROUTINE_SYNC_SKILL
 from .secrets import scan
 
-IMPLICIT = {"type", "title", "aliases", "summary", "created", "updated", "sources"}
+IMPLICIT = {"type", "title", "aliases", "summary", "created", "updated", "sources", "archived"}
 BAD_TITLE = re.compile(r'[\\/:*?"<>|#^\[\]]')
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}$")
 
@@ -95,6 +96,10 @@ def validate(brain, paths=None, base="HEAD"):
                "the cloud routine reads its instructions from brain/.pb/toolkit, which has none: "
                "run `PB toolkit-sync` from the plugin and commit it to the routine's branch")
 
+    problem = format_problem(brain.config.get("commit_format"))
+    if problem:
+        report(errors, "schema/brain.md", "bad-commit-format", problem)
+
     for problem in policy.problems(brain):
         report(errors, "schema/review.md", "bad-review-policy", problem)
 
@@ -142,6 +147,8 @@ def _check_page(brain, p, error, warn):
         if name in IMPLICIT:
             if name in ("created", "updated") and value is not None and not DATE.match(str(value)):
                 error("bad-date", f"'{name}' must be YYYY-MM-DD")
+            if name == "archived" and value is not None and not isinstance(value, bool):
+                error("bad-kind", "'archived' must be true or false")
             if name in ("aliases", "sources") and value is not None and not isinstance(value, list):
                 error("bad-kind", f"'{name}' must be a list")
             continue
@@ -297,5 +304,5 @@ def brain_rel(brain, raw):
         return path.resolve().relative_to(brain.root).as_posix()
     except ValueError:
         rel = Path(raw).as_posix()
-        # brain/<path> typed from the user's checkout, where the brain is the managed copy.
+        # brain/<path> typed from the repo root while --brain points at another brain (a routine worktree).
         return rel[len("brain/"):] if rel.startswith("brain/") else rel

@@ -30,6 +30,20 @@ class BrainTest(unittest.TestCase):
         finally:
             del os.environ["PB_BRAIN"]
 
+    def test_find_brain_ignores_a_leftover_managed_copy(self):
+        import shutil
+        from test_gitops import GIT_ENV, git
+        repo = make_brain(Path(self.tmp.name) / "repo")
+        env = {k: os.environ.get(k) for k in GIT_ENV}
+        os.environ.update(GIT_ENV)
+        self.addCleanup(lambda: [os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+                                 for k, v in env.items()])
+        git(repo, "init", "-q", "-b", "main")
+        leftover = repo / ".git" / "pb" / "brain-worktree" / "brain"
+        shutil.copytree(str(repo / "brain"), str(leftover))
+        self.assertEqual(find_brain(repo, None), (repo / "brain").resolve())
+        self.assertEqual(find_brain(repo / "brain", None), (repo / "brain").resolve())
+
     def test_version_reports_brain(self):
         repo = make_brain(self.tmp.name)
         code, data, _ = run_cli("version", cwd=repo)

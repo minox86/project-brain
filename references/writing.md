@@ -77,7 +77,7 @@ Every writing operation in repo mode ends like this:
    - the brain files changed (`files`), uncommitted in the branch `<branch>`: they commit them with their code, and the pages reach the default branch with that PR;
    - when `watched` is not empty: the points touched, with their reasons, and that the reviewers (`reviewers`) will be asked on the PR;
    - when `on_default` is true: the pages need a branch and a PR like any other change.
-5. Commit only if the user asks: `PB commit -m "pb(<skill>): <one-line summary>"` (`--allow-default` only if they asked to commit on the default branch), then the generated files it leaves out: `git add brain` and `git commit -qm "pb(generate): refresh generated files"`. Never push.
+5. Commit only if the user asks: `PB commit -m "pb(<skill>): <one-line summary>"` (`--allow-default` only if they asked to commit on the default branch). It commits the brain's pages and generated files together. Never push.
 6. Summarise: pages created/updated (as `[[links]]`), open questions raised, anything dropped by the significance gate worth mentioning.
 
 Routine runs use their own closing flow (`templates/routine/prompt.md`, `/pb:sync`, `/pb:routine-run`).

@@ -2,7 +2,6 @@
 import datetime
 from pathlib import Path
 
-from .brain import GENERATED, Brain
 from .errors import GitError, UsageError
 from .generate import generate
 from .repo import (BRAIN_BRANCH, BRAIN_PR_TITLE, brain_pr_body, default_branch, ensure_brain_pr, gh_repo,
@@ -44,8 +43,8 @@ def commit(brain, message, allow_default=False, include=(), exclude=()):
     prefix = _brain_prefix(brain, repo)
     include = [p for p in include if (repo / p).exists()
                or _git(repo, "ls-files", "--error-unmatch", "--", p, check=False).returncode == 0]
-    specs = ([prefix] + [f":(exclude){prefix}/{g.rstrip('/')}" for g in GENERATED]
-             + [f":(exclude){prefix}/{rel}" for rel in exclude] + list(include))
+    # The generated files travel with the pages: the working branch carries both.
+    specs = [prefix] + [f":(exclude){prefix}/{rel}" for rel in exclude] + list(include)
     _git(repo, "add", "-A", "--", *specs)
     files = _staged(repo, specs)
     if not files:
@@ -108,7 +107,7 @@ def routine_cleanup(repo, worktree):
 
 
 def routine_finish(brain, branch, message, confidence=()):
-    """Apply retention, commit the run, regenerate and push it to `branch`; on docs/brain, keep the one PR towards
+    """Apply retention, regenerate, commit the run and push it to `branch`; on docs/brain, keep the one PR towards
     the default branch open, with the watched changes in its description and the area reviewers requested.
     Never merges: a branch that moved on origin is pushed over only when it holds nothing the default branch lacks."""
     repo = _repo_root(brain)
@@ -117,8 +116,8 @@ def routine_finish(brain, branch, message, confidence=()):
         raise UsageError(f"the routine never pushes to the default branch '{base}': use --branch {BRAIN_BRANCH}")
     retention = apply_retention(brain, datetime.date.today())
     before = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    generate(brain)  # one commit carries the pages and the generated files
     done = commit(brain, message, allow_default=True)
-    regenerate(brain.root, repo)
     _git(repo, "fetch", "-q", "origin")
     # Everything the PR holds, not only this run: the changes since the fork from the default branch.
     # Confidence levels are known for this run's pages only.
@@ -166,23 +165,6 @@ def _brain_pr(brain, base, routed, out):
         out["problems"].append(problem)
     if number is not None:
         out["problems"] += request_reviewers(owner, number, routed["reviewers"])
-
-
-def regenerate(brain_root, repo):
-    """Refresh index, glossary, context packs and backlinks from the committed pages; commit them if they changed.
-    Runs after the rebase on the latest branch, so generated files never conflict."""
-    done = generate(Brain(brain_root))
-    prefix = Path(brain_root).resolve().relative_to(Path(repo).resolve()).as_posix()
-    specs = [f"{prefix}/{g.rstrip('/')}" for g in GENERATED] + [f"{prefix}/{d}" for d in done["deleted"]]
-    specs = [spec for spec in specs if (Path(repo) / spec).exists()
-             or _git(repo, "cat-file", "-e", f"HEAD:{spec}", check=False).returncode == 0]
-    if not specs:
-        return False
-    _git(repo, "add", "-A", "--", *specs)
-    if _git(repo, "diff", "--cached", "--quiet", "--", *specs, check=False).returncode == 0:
-        return False
-    _git(repo, "commit", "-q", "-m", "pb(generate): refresh generated files", "--", *specs)
-    return True
 
 
 def routine_discard(brain):

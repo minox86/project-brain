@@ -60,7 +60,7 @@ class GitRepoCase(unittest.TestCase):
 
 
 class GitopsTest(GitRepoCase):
-    def test_commit_only_brain_and_excludes_generated(self):
+    def test_commit_only_brain_and_carries_generated_files(self):
         git(self.repo, "checkout", "-qb", "feat/x")
         self.add_page("Approval")
         self.write("brain/index.md", "generated\n")
@@ -70,10 +70,11 @@ class GitopsTest(GitRepoCase):
         self.assertEqual(code, 0, err)
         self.assertTrue(data["committed"])
         self.assertEqual(data["branch"], "feat/x")
-        self.assertEqual(data["files"], ["brain/functional/features/Approval.md"])
+        expected = ["brain/functional/features/Approval.md", "brain/index.md"]
+        self.assertEqual(sorted(data["files"]), expected)
         shown = git(self.repo, "show", "--name-only", "--format=%s", "HEAD").splitlines()
         self.assertEqual(shown[0], "pb(put): add approval")
-        self.assertEqual([l for l in shown[1:] if l], ["brain/functional/features/Approval.md"])
+        self.assertEqual(sorted(l for l in shown[1:] if l), expected)
         self.assertIn("A  apps/web/a.ts", git(self.repo, "status", "--porcelain"))
 
     def test_commit_refuses_default_branch(self):
@@ -107,7 +108,11 @@ class GitopsTest(GitRepoCase):
                                 "reviewers": NO_REVIEWERS, "behind": 0,
                                 "retention": {"archived": [], "deleted": []}, "problems": []})
         log = git(self.remote, "log", "--format=%s", "brain/inbox")
-        self.assertEqual(log.splitlines()[:2], ["pb(generate): refresh generated files", "pb(routine): sync"])
+        self.assertEqual(log.splitlines()[:2], ["pb(routine): sync", "init"])
+        shown = git(self.remote, "show", "--name-only", "--format=", "brain/inbox").splitlines()
+        self.assertIn("brain/functional/features/Approval.md", shown)
+        self.assertIn("brain/index.md", shown)  # one commit carries pages and generated files
+        self.assertEqual(git(self.repo, "status", "--porcelain", "--", "brain"), "")
         code, data, _ = run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
         self.assertFalse(data["created"])
 
@@ -308,7 +313,7 @@ class RoutineFinishTest(BrainBranchCase):
         self.assertTrue(out["pushed"])
         self.assertFalse(out["conflict"])
         self.assertEqual(git(self.remote, "rev-parse", "docs/brain"), git(self.repo, "rev-parse", "HEAD"))
-        self.assertEqual(git(self.repo, "rev-parse", "HEAD~2"), git(self.repo, "rev-parse", "origin/main"))
+        self.assertEqual(git(self.repo, "rev-parse", "HEAD~1"), git(self.repo, "rev-parse", "origin/main"))
         self.assertNotEqual(subprocess.run(["git", "merge-base", "--is-ancestor", old, "HEAD"],
                                            cwd=str(self.repo)).returncode, 0)
 

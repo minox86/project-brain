@@ -11,6 +11,7 @@ from . import FORMAT_VERSION, __version__
 from .brain import Brain, find_brain
 from .context import build_context
 from .generate import generate
+from .retention import apply_retention
 from .lint import lint
 from .stats import stats
 from . import gitops, state, workspace
@@ -95,7 +96,11 @@ def _today(args):
 
 
 def _cmd_generate(args):
-    return generate(_brain(args), _today(args)), 0
+    return generate(_brain(args)), 0
+
+
+def _cmd_retention(args):
+    return apply_retention(_brain(args), _today(args)), 0
 
 
 def _cmd_lint(args):
@@ -213,9 +218,10 @@ def build_parser():
     p.add_argument("--since", required=True, help="ISO datetime cursor, e.g. 2026-10-30T02:00:00Z")
     p.add_argument("--repo", help="owner/name; default: github.repo in sources.md")
     p.set_defaults(handler=_cmd_prs)
-    p = sub.add_parser("generate")
+    sub.add_parser("generate").set_defaults(handler=_cmd_generate)
+    p = sub.add_parser("retention")
     p.add_argument("--today")
-    p.set_defaults(handler=_cmd_generate)
+    p.set_defaults(handler=_cmd_retention)
     sub.add_parser("stats").set_defaults(handler=_cmd_stats)
     p = sub.add_parser("state")
     p.add_argument("action", choices=["get", "set", "suppress"])

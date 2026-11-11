@@ -11,7 +11,7 @@ from .errors import FrontmatterError
 from .scaffold import ROUTINE_SYNC_SKILL
 from .secrets import scan
 
-IMPLICIT = {"type", "title", "aliases", "summary", "created", "updated", "sources"}
+IMPLICIT = {"type", "title", "aliases", "summary", "created", "updated", "sources", "archived"}
 BAD_TITLE = re.compile(r'[\\/:*?"<>|#^\[\]]')
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}$")
 
@@ -142,6 +142,8 @@ def _check_page(brain, p, error, warn):
         if name in IMPLICIT:
             if name in ("created", "updated") and value is not None and not DATE.match(str(value)):
                 error("bad-date", f"'{name}' must be YYYY-MM-DD")
+            if name == "archived" and value is not None and not isinstance(value, bool):
+                error("bad-kind", "'archived' must be true or false")
             if name in ("aliases", "sources") and value is not None and not isinstance(value, list):
                 error("bad-kind", f"'{name}' must be a list")
             continue

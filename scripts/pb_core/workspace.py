@@ -367,10 +367,9 @@ def _unpark(repo, wt):
 def regenerate(brain_root, wt):
     """Refresh index, glossary, context packs and backlinks from the committed pages; commit them if they changed.
     Runs after the rebase on the latest brain, so generated files never conflict."""
-    import datetime as _dt
     from .brain import Brain, GENERATED
     from .generate import generate
-    done = generate(Brain(brain_root), _dt.date.today())
+    done = generate(Brain(brain_root))
     prefix = Path(brain_root).resolve().relative_to(Path(wt).resolve()).as_posix()
     specs = [f"{prefix}/{g.rstrip('/')}" for g in GENERATED] + [f"{prefix}/{d}" for d in done["deleted"]]
     specs = [spec for spec in specs if (Path(wt) / spec).exists()

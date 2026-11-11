@@ -50,6 +50,11 @@ jobs:
           fi
           toolkit=.pb-base/brain/.pb/toolkit/pb.py
           [ -f "$toolkit" ] || toolkit=brain/.pb/toolkit/pb.py
+          # A PR that changes the vendored toolkit (an upgrade) commits files made by the new generator:
+          # judge them with it, or the upgrade PR itself would fail.
+          if ! git diff --quiet "$BASE"...HEAD -- brain/.pb/toolkit; then
+            toolkit=brain/.pb/toolkit/pb.py
+          fi
           python3 "$toolkit" --brain brain generate
           if [ -n "$(git status --porcelain -- brain)" ]; then
             git status --short -- brain

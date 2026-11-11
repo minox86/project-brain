@@ -74,6 +74,14 @@ class ScaffoldTest(unittest.TestCase):
         self.assertIn("brain-only:", text)
         self.assertFalse((ROOT / "templates/github/pb-brain-branch.yml").exists())
 
+    def test_freshness_uses_the_pr_toolkit_when_the_pr_changes_the_toolkit(self):
+        text = (ROOT / "templates/github/pb-validate.yml").read_text()
+        step = text[text.index("name: Generated files are fresh"):text.index("  review:")]
+        self.assertIn('git diff --quiet "$BASE"...HEAD -- brain/.pb/toolkit', step)
+        self.assertIn(".pb-base/brain/.pb/toolkit/pb.py", step)
+        self.assertLess(step.index("-- brain/.pb/toolkit"), step.rindex("toolkit=brain/.pb/toolkit/pb.py"))
+        self.assertLess(step.rindex("toolkit=brain/.pb/toolkit/pb.py"), step.index("generate\n"))
+
     def test_scaffold_refuses_existing_brain(self):
         self.scaffold()
         code, data, _ = self.scaffold()

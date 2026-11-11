@@ -89,7 +89,7 @@ def scaffold(repo_root, product, preset="software-product"):
     repo = Path(repo_root).resolve()
     brain = repo / "brain"
     if (brain / "schema" / "VERSION").is_file():
-        raise UsageError(f"a brain already exists in {brain}: use --upgrade to move it to docs/brain")
+        raise UsageError(f"a brain already exists in {brain}: an existing brain is upgraded with --upgrade")
     preset_dir = PLUGIN_ROOT / "presets" / preset
     if not (preset_dir / "VERSION").is_file():
         raise UsageError(f"unknown preset '{preset}'")

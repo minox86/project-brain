@@ -33,7 +33,7 @@ def _staged(repo, specs):
     return [f for f in out.split("\0") if f]
 
 
-def commit(brain, message, allow_default=False, include=(), exclude=()):
+def commit(brain, message, allow_default=False, include=()):
     repo = _repo_root(brain)
     branch = current_branch(repo)
     if not allow_default and branch == default_branch(repo):
@@ -44,7 +44,7 @@ def commit(brain, message, allow_default=False, include=(), exclude=()):
     include = [p for p in include if (repo / p).exists()
                or _git(repo, "ls-files", "--error-unmatch", "--", p, check=False).returncode == 0]
     # The generated files travel with the pages: the working branch carries both.
-    specs = [prefix] + [f":(exclude){prefix}/{rel}" for rel in exclude] + list(include)
+    specs = [prefix] + list(include)
     _git(repo, "add", "-A", "--", *specs)
     files = _staged(repo, specs)
     if not files:

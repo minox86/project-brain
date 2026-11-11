@@ -299,5 +299,5 @@ def brain_rel(brain, raw):
         return path.resolve().relative_to(brain.root).as_posix()
     except ValueError:
         rel = Path(raw).as_posix()
-        # brain/<path> typed from the user's checkout, where the brain is the managed copy.
+        # brain/<path> typed from the repo root while --brain points at another brain (a routine worktree).
         return rel[len("brain/"):] if rel.startswith("brain/") else rel

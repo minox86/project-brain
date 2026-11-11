@@ -45,7 +45,7 @@ class BrainRepoCase(GitRepoCase):
         self.assertEqual(code, 0, err)
         return data
 
-    def held(self, data):
+    def flagged(self, data):
         return {item["path"]: item["reasons"] for item in data["review"]}
 
 
@@ -131,7 +131,7 @@ class ReviewTest(BrainRepoCase):
         self.put("feature", "Approval", f"status: planned\n{SRC}", "Approves an [[Invoice]] once.\n")
         data = self.review()
         self.assertEqual(data["route"], "pr")
-        self.assertEqual(self.held(data), {rel: ["watch: decisions"]})
+        self.assertEqual(self.flagged(data), {rel: ["watch: decisions"]})
         self.assertEqual(data["direct"], ["functional/features/Approval.md"])
         self.assertEqual(data["reviewers"], {"areas": ["technical"], "handles": ["dev-lead", "acme/backend"],
                                              "users": ["dev-lead"], "teams": ["backend"]})
@@ -141,7 +141,7 @@ class ReviewTest(BrainRepoCase):
         self.policy("direct_min_confidence: high")
         rel = self.put("feature", "Approval", f"status: planned\n{SRC}", "Approves an [[Invoice]] once.\n")
         data = self.review("--confidence", f"{rel}=medium", "brain/other/Nope.md=low")
-        self.assertEqual(self.held(data), {rel: ["confidence: medium"]})
+        self.assertEqual(self.flagged(data), {rel: ["confidence: medium"]})
         self.assertEqual(data["ignored_confidence"], ["brain/other/Nope.md"])
         self.policy("direct_min_confidence: medium")
         self.assertEqual(self.review("--confidence", f"{rel}=medium")["route"], "direct")
@@ -153,7 +153,7 @@ class ReviewTest(BrainRepoCase):
         rel = self.put("feature", "Approval", f"status: planned\n{SRC}", "Approves an [[Invoice]] once.\n")
         self.assertEqual(self.review()["route"], "direct")
         self.put("feature", "Approval", f"status: released\n{SRC}", "Approves an [[Invoice]].\n")
-        self.assertEqual(self.held(self.review()), {rel: ["watch: feature · fields status"]})
+        self.assertEqual(self.flagged(self.review()), {rel: ["watch: feature · fields status"]})
 
     def test_delete_rule_and_cross_area_asks_everyone(self):
         self.policy("reviewers: {technical: [t], functional: [f], ux: [u]}\n"
@@ -169,19 +169,19 @@ class ReviewTest(BrainRepoCase):
         self.put("open-question", "Who approves", SRC)
         self.assertEqual(self.review()["reviewers"]["users"], ["t", "f", "u"])
 
-    def test_page_linking_a_held_new_page_is_held_too(self):
+    def test_page_linking_a_flagged_new_page_is_flagged_too(self):
         self.policy("watch: [{type: decision}]")
         decision = self.put("decision", "Single approver", f"area: functional\n{SRC}")
         feature = self.put("feature", "Approval", f"status: planned\n{SRC}",
                            "Approves an [[Invoice]], see [[Single approver]].\n")
-        held = self.held(self.review())
-        self.assertEqual(held[feature], ["links [[Single approver]], new and under review"])
-        self.assertIn(decision, held)
+        flagged = self.flagged(self.review())
+        self.assertEqual(flagged[feature], ["links [[Single approver]], new and under review"])
+        self.assertIn(decision, flagged)
 
-    def test_noise_holds_pages(self):
+    def test_noise_flags_pages(self):
         self.policy("noise_to_review: true")
         rel = self.put("feature", "Approval", "status: planned", "Approves an [[Invoice]].\n")
-        self.assertEqual(self.held(self.review()), {rel: ["noise: missing-source"]})
+        self.assertEqual(self.flagged(self.review()), {rel: ["noise: missing-source"]})
         self.policy("noise_to_review: false")
         self.assertEqual(self.review()["route"], "direct")
 
@@ -193,7 +193,7 @@ class ReviewTest(BrainRepoCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "-qm", "decision")
         self.assertEqual(self.review()["route"], "direct")
-        self.assertEqual(list(self.held(self.review("--base", base))), [rel])
+        self.assertEqual(list(self.flagged(self.review("--base", base))), [rel])
 
 
 class RoutineSplitTest(BrainRepoCase):
@@ -242,7 +242,7 @@ class TemplatesTest(unittest.TestCase):
         self.assertNotIn("paths:", text)
         self.assertIn("github.head_ref == 'docs/brain'", text)
         self.assertIn("head.repo.full_name == github.repository", text)
-        self.assertIn("grep -v -E '^(brain/|", text)
+        self.assertIn("grep -v -E '^brain/' ", text)
         self.assertNotIn("gh pr merge", text)
         self.assertNotIn("--approve", text)
         self.assertIn("AUTHOR: ${{ github.event.pull_request.user.login }}", text)

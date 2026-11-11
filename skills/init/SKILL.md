@@ -61,7 +61,7 @@ The decisions that define the schema, each with the decisions that hang off it:
 - Review policy (`brain/schema/review.md`, the preset's template as the starting point): which changes need the area reviewers, asked on the PR that carries them (by CI on a code PR, by the routine on the brain PR).
   - Points of attention, once the types are settled: for each kept type, which changes need a human (any change, creation only, deletion, or only when given fields change, e.g. feature `status`, module `paths`). Recommend the preset's `watch` rules adapted to the kept and added types.
   - Confidence: below which level the writer's own rating flags a change (`direct_min_confidence`: `high` recommended; `medium` for a team that wants fewer reviews; `low` never flags by confidence).
-  - Noise: whether pages still carrying a noise warning wait for review (`noise_to_review`, recommended `true`).
+  - Noise: whether pages still carrying a noise warning are flagged for review (`noise_to_review`, recommended `true`).
   - Reviewers per area: who reviews **technical** changes (modules, interfaces, environments, technical decisions), **functional** ones (features, concepts, functional decisions) and **design** ones (`ux` decisions); GitHub users or `org/team`. Recommend from the reviewer candidates. Cross-cutting pages (epics, open questions without area) ask every area.
 - Sources to register now or later via `/pb:routine-setup` (Teams channels, Confluence spaces, Jira projects whose epics the brain follows).
 - **GitHub** (section G).

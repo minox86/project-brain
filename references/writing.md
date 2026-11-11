@@ -72,7 +72,7 @@ Every writing operation in repo mode ends like this:
 
 1. `PB validate <created or changed pages>`. Fix errors and repeat, at most twice. If errors remain, stop and report them; do not save broken pages.
 2. Condense every page with an `over-budget` warning and fix every noise warning (below), then validate again.
-3. `PB save <every file this work created, changed or deleted>`: pages, and also `raw/` extracts, `.pb/state/*.json` (suppressions), `.pb/corrections.md`, `schema/` files. Every skill's closing flow means this list. It checks those files, regenerates index, glossary, feature catalogue, context packs and backlinks, and reports the watched points; it never commits or pushes. With `errors`: fix those files and save again. `code: no-brain`: see **Modes** in the conventions.
+3. `PB save <every file this work created, changed or deleted>`: pages, and also `raw/` extracts, `.pb/state/*.json` (suppressions only; cursors never change in a working branch), `.pb/corrections.md`, `schema/` files. Every skill's closing flow means this list. It checks those files, regenerates index, glossary, feature catalogue, context packs and backlinks, and reports the watched points; it never commits or pushes. With `errors`: fix those files and save again. `code: no-brain`: see **Modes** in the conventions.
 4. Tell the user, in one message:
    - the brain files changed (`files`), uncommitted in the branch `<branch>`: they commit them with their code, and the pages reach the default branch with that PR;
    - when `watched` is not empty: the points touched, with their reasons, and that the reviewers (`reviewers`) will be asked on the PR;

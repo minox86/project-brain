@@ -1,6 +1,6 @@
 ---
 name: sync
-description: Incrementally ingests into the project brain what changed in the configured sources since the last run — Teams channel threads (triaged), new or modified Confluence pages, merged GitHub PRs touching known modules, Jira epics of the configured projects, transcripts of the configured recurring Teams meetings — using stored cursors, always as a routine run on `docs/brain` that ends in the Brain updates PR, never in the user's branch; writes a digest when run by the routine. Use when the user asks to sync or update the brain from Teams, Confluence, GitHub or Jira, to check what would be ingested, or when the nightly routine runs.
+description: Incrementally ingests into the project brain what changed in the configured sources since the last run — Teams channel threads (triaged), new or modified Confluence pages, merged GitHub PRs touching known modules, Jira epics of the configured projects, transcripts of the configured recurring Teams meetings — using stored cursors, and writes a digest when run by the routine. Use when the user asks to sync or update the brain from Teams, Confluence, GitHub or Jira, to check what would be ingested, or when the nightly routine runs.
 argument-hint: "[teams] [confluence] [github] [jira] [meetings] [--check] [--digest]"
 ---
 
@@ -12,7 +12,7 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 
 ## 0. Setup
 
-- **Where it runs.** Always a routine run on `docs/brain` (see **Modes** in the conventions), never in the user's checkout: the cursors live there. Started by the routine prompt or by `/pb:routine-run`: the run is already started, use its brain. Typed by the user: say in one line that the result goes to `docs/brain` and the Brain updates PR, not to the current branch; then `PB routine start --branch docs/brain --worktree <tmp dir outside the repo>`, run every `PB` command as `PB --brain <brain from the result> …` and write files only under that `brain`.
+- **Where it runs.** Always a routine run on `docs/brain` (see **Modes** in the conventions), never in the user's checkout: the cursors live there. Started by the routine prompt or by `/pb:routine-run`: the run is already started, use its brain. Typed by the user: say in one line that the result goes to `docs/brain` and the Brain updates PR, not to the current branch; then `PB routine start --branch docs/brain --worktree <tmp dir outside the repo>`; from then on run every `PB` command and read and write every `brain/…` path against its `brain`, as **Modes** says.
 - Sources: the ones named in the arguments; none named → `teams confluence github jira meetings`.
 - `--check`: report what would be ingested, write nothing, move no cursor; then `PB routine cleanup` (step 6).
 - `--digest`: write `brain/digests/YYYY-MM-DD.md` (always on when run by the routine).
@@ -109,4 +109,4 @@ For each configured series (`meetings:` entries):
 4. Started by the routine prompt or by `/pb:routine-run`: stop here; their own steps finish the run. Typed by the user:
    - `PB routine finish --branch docs/brain -m "pb(sync): <sources> <YYYY-MM-DD>"`, with `--confidence` for pages below high (pages the user confirmed count as high). It commits, pushes `docs/brain` and keeps the Brain updates PR open, with the watched changes and their reviewers.
    - Always end with `PB routine cleanup --worktree <tmp dir>`, also after `--check` or a stop.
-   - Report: pages ingested (as `[[links]]`), the PR (`pr`), the `watched` points and their reviewers, and `problems` one line each. `behind` > 0: "`docs/brain` is behind <default>: run `/pb:merge` to bring these changes to <default>". `"conflict": true`: nothing was pushed (`docs/brain` moved meanwhile, probably a routine run) and no cursor moved on GitHub: running `/pb:sync` again picks the same content up.
+   - Report: pages ingested (as `[[links]]`), the PR (`pr`), the `watched` points and their reviewers, and `problems` one line each. `behind` > 0: "`docs/brain` is behind <default>: run `/pb:merge` to bring these changes to <default>". `"conflict": true`: nothing was pushed and no cursor moved; running `/pb:sync` again picks the same content up.

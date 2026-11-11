@@ -22,7 +22,7 @@ On `"alert": "outside-brain"` stop: nothing was merged or pushed and there is no
 ## 2. Brain conflicts
 
 - `conflicts.generated`: leave them alone. The next step regenerates them once the pages are settled.
-- `conflicts.state`: already resolved with the `docs/brain` side (state files change only there). Nothing to do.
+- `conflicts.state`: already resolved by `PB merge start`: `docs/brain`'s cursors, the union of both sides' suppressions. Nothing to do.
 - `conflicts.pages`: combine both versions into one page that follows the type's writing rules in `references/writing.md` and `brain/schema/types/<type>.md`. Keep every fact from both sides, drop duplicates, and remove the conflict markers. When the two sides disagree, the source or the date settles it as in step 3; otherwise ask about it there. Write the page in the worktree, then `git -C <worktree> add <path>`. Note what you kept from each side for the report.
 - `conflicts.schema` (`brain/schema/`, `brain/.pb/toolkit/`): the one kind you never settle alone. Ask the person, one question per file, showing both versions (`git -C <worktree> show :2:<path>` is the `docs/brain` side, `:3:<path>` the default branch side). Write what they choose, then `git -C <worktree> add <path>`.
 

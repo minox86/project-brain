@@ -33,7 +33,7 @@ Ignore generated files (`index.md`, `glossary.md`, `features.md`, `context/`): e
 
 ## 4. Trace the origin
 
-Read the `sources` of the wrong claim. If it came from an ingested source (Teams thread, Confluence page, PR), record it so sync will not bring it back: `PB state suppress <teams|confluence|github|jira> "<the wrong claim, one sentence>"`.
+Read the `sources` of the wrong claim. If it came from an ingested source (Teams thread, Confluence page, PR), record it so sync will not bring it back: `PB state suppress <teams|confluence|github|jira> "<the wrong claim, one sentence>"`. It travels with this branch's PR; never touch the cursors in the same file.
 
 ## 5. Preview and correct
 

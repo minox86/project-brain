@@ -218,6 +218,9 @@ def _cmd_stats(args):
     return stats(_brain(args)), 0
 
 
+SUMMARY_HELP = "the summary the commit_format of schema/brain.md wraps (with --raw: the whole message)"
+
+
 def build_parser():
     parser = _Parser(prog="pb", description="project-brain toolkit")
     parser.add_argument("--brain", help="path of the brain/ directory")
@@ -255,7 +258,7 @@ def build_parser():
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_correction)
     p = sub.add_parser("commit")
-    p.add_argument("-m", "--message", required=True, metavar="SUMMARY", help="the summary the commit_format of schema/brain.md wraps (with --raw: the whole message)")
+    p.add_argument("-m", "--message", required=True, metavar="SUMMARY", help=SUMMARY_HELP)
     p.add_argument("--skill", default="brain", help="the {skill} of commit_format (default: brain)")
     p.add_argument("--raw", action="store_true", help="-m is the whole message, used verbatim")
     p.add_argument("--allow-default", action="store_true")
@@ -269,7 +272,7 @@ def build_parser():
     p.add_argument("action", choices=["start", "finish", "discard", "cleanup"])
     p.add_argument("--branch")
     p.add_argument("--worktree", help="manual runs: work in a detached worktree at this path")
-    p.add_argument("-m", "--message", metavar="SUMMARY", help="the summary the commit_format of schema/brain.md wraps (with --raw: the whole message)")
+    p.add_argument("-m", "--message", metavar="SUMMARY", help=SUMMARY_HELP)
     p.add_argument("--skill", help="finish: the {skill} of commit_format (default: routine)")
     p.add_argument("--raw", action="store_true", help="finish: -m is the whole message, used verbatim")
     p.add_argument("--confidence", nargs="+", action="extend", metavar="PATH=LEVEL",
@@ -278,7 +281,7 @@ def build_parser():
     p = sub.add_parser("merge")
     p.add_argument("action", choices=["start", "finish", "land"])
     p.add_argument("--worktree", help="start, finish: the temporary worktree on docs/brain")
-    p.add_argument("-m", "--message", metavar="SUMMARY", help="the summary the commit_format of schema/brain.md wraps (with --raw: the whole message)")
+    p.add_argument("-m", "--message", metavar="SUMMARY", help=SUMMARY_HELP)
     p.add_argument("--raw", action="store_true", help="finish: -m is the whole message, used verbatim")
     p.add_argument("--wait", type=int, default=600, help="land: seconds to wait for the PR's checks")
     p.set_defaults(handler=_cmd_merge)

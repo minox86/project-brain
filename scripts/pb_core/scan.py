@@ -82,7 +82,8 @@ def commit_rules(root):
         package = {}
     if isinstance(package, dict) and "commitlint" in package:
         found.append("package.json")
-    hooks = [f for f, words in HOOKS if (root / f).is_file() and (not words or any(w in _text(root / f) for w in words))]
+    hooks = [f for f, words in HOOKS
+             if (root / f).is_file() and (not words or any(w in _text(root / f) for w in words))]
     workflows = root / ".github" / "workflows"
     checks = [f".github/workflows/{p.name}" for p in (workflows.iterdir() if workflows.is_dir() else ())
               if p.is_file() and any(w in _text(p) for w in PR_CHECKS)]

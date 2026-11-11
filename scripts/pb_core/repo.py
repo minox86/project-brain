@@ -80,8 +80,8 @@ def brain_pr_body(markdown, behind, base):
 
 def ensure_brain_pr(owner, base, body, title=BRAIN_PR_TITLE):
     """The open PR docs/brain -> base, found (its body refreshed) or opened. Returns (url, number, problem, author),
-    author the PR's `user.login` (None when unknown). `title` (pr_title_brain) only names a PR it opens: the PR is found by
-    head and base. gh api, not gh pr: cloud routines can only reach the REST API."""
+    author the PR's `user.login` (None when unknown). `title` (pr_title_brain) only names a PR it opens: the PR is
+    found by head and base. gh api, not gh pr: cloud routines can only reach the REST API."""
     found = gh_json(["api", f"repos/{owner}/pulls?head={owner.split('/')[0]}:{BRAIN_BRANCH}&base={base}&state=open"])
     if found is None:
         return None, None, f"GitHub could not be reached (gh): the {BRAIN_PR_TITLE} PR was not checked", None

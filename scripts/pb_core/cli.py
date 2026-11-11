@@ -14,7 +14,7 @@ from .generate import generate
 from .retention import apply_retention
 from .lint import lint
 from .stats import stats
-from . import gitops, state
+from . import gitops, merge, state
 from .repo import repo_root
 from .scaffold import scaffold, sync_toolkit, upgrade
 from .scan import scan
@@ -157,6 +157,22 @@ def _cmd_routine(args):
     return result, 1 if result["conflict"] else 0
 
 
+def _cmd_merge(args):
+    repo = repo_root(Path.cwd())
+    if args.action == "land":
+        result = merge.merge_land(repo, args.wait)
+        return result, 0 if result["merged"] else 1
+    if not args.worktree:
+        raise UsageError(f"pb merge {args.action} needs --worktree")
+    if args.action == "start":
+        result = merge.merge_start(repo, args.worktree)
+        return result, 1 if result["alert"] else 0
+    if not args.message:
+        raise UsageError("pb merge finish needs -m MESSAGE")
+    result = merge.merge_finish(repo, args.worktree, args.message)
+    return result, 1 if result["errors"] or result["unresolved"] or not result["pushed"] else 0
+
+
 def _cmd_save(args):
     result = save(repo_root(Path.cwd()), args.paths)
     return result, 1 if result["errors"] else 0
@@ -239,6 +255,12 @@ def build_parser():
     p.add_argument("--confidence", nargs="+", action="extend", metavar="PATH=LEVEL",
                    help="finish: pages written with less than high confidence (low, medium)")
     p.set_defaults(handler=_cmd_routine)
+    p = sub.add_parser("merge")
+    p.add_argument("action", choices=["start", "finish", "land"])
+    p.add_argument("--worktree", help="start, finish: the temporary worktree on docs/brain")
+    p.add_argument("-m", "--message")
+    p.add_argument("--wait", type=int, default=600, help="land: seconds to wait for the PR's checks")
+    p.set_defaults(handler=_cmd_merge)
     p = sub.add_parser("review")
     p.add_argument("--base", default="HEAD", help="git commit to compare with (default: HEAD, uncommitted changes)")
     p.add_argument("--confidence", nargs="+", action="extend", metavar="PATH=LEVEL",

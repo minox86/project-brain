@@ -25,6 +25,11 @@ class PluginLayoutTest(unittest.TestCase):
             self.assertEqual(meta["name"].strip(), skill.parent.name, skill)
             self.assertTrue(meta.get("description", "").strip(), skill)
 
+    def test_merge_skill_is_present(self):
+        text = (ROOT / "skills/merge/SKILL.md").read_text()
+        for command in ("PB merge start", "PB merge finish", "PB merge land", "PB routine cleanup"):
+            self.assertIn(command, text)
+
 
 if __name__ == "__main__":
     unittest.main()

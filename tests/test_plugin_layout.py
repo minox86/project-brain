@@ -12,6 +12,13 @@ class PluginLayoutTest(unittest.TestCase):
         self.assertEqual(market["name"], "project-brain")
         self.assertEqual(market["plugins"][0]["name"], "pb")
         self.assertEqual(market["plugins"][0]["source"], "./")
+        self.assertEqual(manifest["version"], "0.5.0")
+
+    def test_readme_describes_the_current_model(self):
+        text = (ROOT / "README.md").read_text()
+        self.assertIn("/pb:merge", text)
+        for word in ("pb-brain-branch", "PB_BRAIN_TOKEN", "review PR"):
+            self.assertNotIn(word, text)
 
     def test_no_bin_dir(self):
         self.assertFalse((ROOT / "bin").exists())

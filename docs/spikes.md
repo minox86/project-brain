@@ -1,26 +1,26 @@
 # Verification spikes
 
-Run these on real accounts before rolling project-brain out to the team. Each one checks an assumption the design (spec §8) depends on, and names the fallback if it fails.
+Run these on real accounts before rolling project-brain out to the team. Each one checks an assumption the design (`docs/specs/2026-11-11-git-interaction-redesign.md` §10) depends on, and names the fallback if it fails.
 
-## S1 — Cowork reads `brain/` through the GitHub connector
+## S1 — Cowork reads `brain/` on the default branch through the GitHub connector
 
 **Steps**
 1. In Cowork, as a non-developer account with read access to the monorepo, connect the GitHub connector and install the `pb` plugin.
-2. Ask `/pb:ask what modules does the product have?` and `/pb:context <a feature title>`.
+2. Ask `/pb:ask what modules does the product have?` and `/pb:context <a feature title>`, without selecting any branch.
 
-**Expected:** Claude reads `brain/index.md`, `brain/glossary.md`, `brain/context/<feature>.md` and linked pages, and answers with `[[Page]]` citations. Check that the connector can read the `docs/brain` branch (the freshest brain) and not only the default branch, which gets the brain only when the PR from `docs/brain` is merged; and whether a large monorepo hits size limits.
+**Expected:** Claude reads `brain/index.md`, `brain/glossary.md`, `brain/context/<feature>.md` and linked pages from the default branch, and answers with `[[Page]]` citations. Check whether a large monorepo hits the connector's size limits.
 
 **If it fails:** publish a read-only Confluence mirror of `brain/` from a GitHub Action (deferred phase), and point read mode at it through the Atlassian connector.
 
-## S2 — the cloud routine pushes to `docs/brain`
+## S2 — the cloud routine pushes to `docs/brain` and opens the PR to the default branch
 
 **Steps**
-1. Create the routine with `/pb:routine-setup` (target branch `docs/brain`), merge the review PR with its configuration, then "Run now".
+1. Create the routine with `/pb:routine-setup` (target branch `docs/brain`), commit its configuration and merge its PR, then "Run now".
 2. Let a run ingest a page on a watched point (e.g. a decision).
 
-**Expected:** `pb routine finish` pushes to `docs/brain` (not a `claude/…` branch): `docs/brain` is unprotected, so no bypass is needed. Held pages go to a `pb/review/<timestamp>` PR towards `docs/brain` opened through `gh api` (with reviewers), and the PR from `docs/brain` to the default branch is found or opened.
+**Expected:** `pb routine finish` pushes to `docs/brain` (not a `claude/…` branch): `docs/brain` is unprotected, so no bypass is needed. The PR "Brain updates" from `docs/brain` to the default branch is found or opened through `gh api`, its description lists the watched change, and the area reviewers are requested on it.
 
-**If it fails:** if the push goes to a `claude/…` branch, say explicitly in the prompt that it may push to `docs/brain`; if `gh api` is not available, the run reports the review branch in `review.problems` and the PRs are opened by hand.
+**If it fails:** if the push goes to a `claude/…` branch, say explicitly in the prompt that it may push to `docs/brain`; if `gh api` is not available, the run reports it in `problems` and the PR is opened by hand.
 
 ## S3 — Microsoft 365 connector reads channel messages incrementally
 
@@ -44,13 +44,21 @@ Run these on real accounts before rolling project-brain out to the team. Each on
 
 **Expected:** not required. Read mode only reads files. Note the result: if Python is available, read mode could use `pb context` directly.
 
-## S6 — the brain PR and the merge back into `docs/brain`
+## S6′ — the routine restarts `docs/brain` when the default branch changed workflow files
 
 **Steps**
-1. Save a page with `/pb:put` and check the PR "Brain updates" from `docs/brain` to the default branch: `pb-validate` (`validate`, `brain-only`) runs and passes.
-2. Merge it with the repository's usual merge method (squash included), then save another page.
-3. Merge a code PR that changes a file under `.github/workflows/`, then merge the brain PR again.
+1. Let the routine open "Brain updates", then merge it with the repository's usual merge method (squash included) or with `/pb:merge`.
+2. Merge a code PR that changes a file under `.github/workflows/`.
+3. Run the routine ("Run now", or `/pb:routine-run`).
 
-**Expected:** after each merge, `pb-brain-branch` merges the default branch back into `docs/brain`, and the next brain PR shows only the new pages. With a workflow file changed on the default branch, the merge back needs the `PB_BRAIN_TOKEN` secret (a token with the `workflow` scope): without it the job fails with a message that says so.
+**Expected:** `docs/brain` holds nothing the default branch lacks, so the run restarts it from the default branch (a non-fast-forward push) and the push is accepted although the new history carries workflow changes. The next "Brain updates" shows only the new pages.
 
-**If it fails:** run `pb-brain-branch` by hand (workflow_dispatch) after setting `PB_BRAIN_TOKEN`; as a last resort, merge the default branch into `docs/brain` locally and push.
+**If it fails:** the routine leaves `docs/brain` as it is and reports it as behind, in the digest and in the PR description; the maintainer realigns it with `/pb:merge`.
+
+## S7 — a workflow requests reviewers with the default token
+
+**Steps:** in a working branch, change a page on a watched point (e.g. accept a decision) and open a PR; watch the `review` job of `pb-validate`.
+
+**Expected:** the job summary lists the watched points, and the area reviewers in `brain/schema/review.md` (users and teams) are requested on the PR with the workflow's default `GITHUB_TOKEN`.
+
+**If it fails:** the `review` job only writes the summary and a PR comment; the reviewers are asked by hand.

@@ -1,3 +1,5 @@
+> Superseded in part by [`2026-11-11-git-interaction-redesign.md`](2026-11-11-git-interaction-redesign.md) (modes, write flow, CI).
+
 # project-brain — Design
 
 - **Date:** 2026-10-31

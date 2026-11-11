@@ -29,7 +29,7 @@ Resolve the path once (no `..`, no quotes unless it contains spaces), so permiss
 | `PB generate` | Index, glossary, feature catalogue (`features.md`), context packs, backlinks. Safe by hand at any time; it is what resolves a conflict on generated files |
 | `PB commit -m MSG [--allow-default] [--include PATH…]` | Commit `brain/` changes (pages and generated files), plus any `--include` paths, on the current branch. Only when the user asks, and in `/pb:init` |
 | `PB routine start --branch B [--worktree DIR]` | Check out `B` (created or restarted from the default branch when needed), or with `--worktree` a temporary worktree (`worktree`, `brain`). Also `created`, `restarted`, `behind` |
-| `PB routine finish --branch B -m MSG [--confidence PATH=LEVEL…]` | Retention, commit, regenerate, push `B`, keep the PR "Brain updates" open with reviewers. Never merges. Returns `committed`, `pushed`, `conflict`, `pr`, `watched`, `reviewers`, `behind`, `retention`, `problems` |
+| `PB routine finish --branch B -m MSG [--confidence PATH=LEVEL…]` | Retention, regenerate, commit, push `B`, keep the PR "Brain updates" open with reviewers. Never merges. Returns `committed`, `pushed`, `conflict`, `pr`, `watched`, `reviewers`, `behind`, `retention`, `problems` |
 | `PB routine discard` / `PB routine cleanup --worktree DIR` | Drop the run's brain changes except digests / remove the run's worktree |
 | `PB retention [--today D]` | Flag old closed pages `archived`, delete old digests. `PB routine finish` runs it: never by hand |
 | `PB merge start --worktree DIR` / `PB merge finish --worktree DIR -m MSG` / `PB merge land [--wait S]` | `/pb:merge` only: bring the default branch into `docs/brain`, push it, merge the "Brain updates" PR |

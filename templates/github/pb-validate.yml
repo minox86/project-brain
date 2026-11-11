@@ -99,21 +99,32 @@ jobs:
             exit 0
           }
           touched=$(git diff --name-only "$BASE"...HEAD -- brain/schema brain/.pb/toolkit)
+          users=$(jq -r '.reviewers.users[]' "$RUNNER_TEMP/review.json")
+          teams=$(jq -r '.reviewers.teams[]' "$RUNNER_TEMP/review.json")
+          if [ -n "$touched" ]; then
+            # Schema or toolkit changed: the technical area reviewers too (absent from an older base toolkit).
+            users="$users"$'\n'"$(jq -r '.area_reviewers.technical.users[]?' "$RUNNER_TEMP/review.json")"
+            teams="$teams"$'\n'"$(jq -r '.area_reviewers.technical.teams[]?' "$RUNNER_TEMP/review.json")"
+          fi
+          args=()
+          # GitHub refuses the whole request when the PR's author is listed.
+          for user in $(printf '%s\n' $users | sort -u); do
+            [ "${user,,}" = "${AUTHOR,,}" ] && continue
+            args+=(-f "reviewers[]=$user")
+          done
+          for team in $(printf '%s\n' $teams | sort -u); do args+=(-f "team_reviewers[]=$team"); done
           {
             jq -r '.markdown' "$RUNNER_TEMP/review.json"
             if [ -n "$touched" ]; then
               echo
               echo "### Schema or toolkit changed"
               printf '%s\n' "$touched" | sed 's/^/- `/; s/$/`/'
+              if [ "${#args[@]}" -eq 0 ]; then
+                echo
+                echo "Configuration or toolkit files changed and no reviewer could be derived: brain/schema/review.md names no technical reviewer besides the PR's author."
+              fi
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-          args=()
-          # GitHub refuses the whole request when the PR's author is listed.
-          for user in $(jq -r '.reviewers.users[]' "$RUNNER_TEMP/review.json"); do
-            [ "${user,,}" = "${AUTHOR,,}" ] && continue
-            args+=(-f "reviewers[]=$user")
-          done
-          for team in $(jq -r '.reviewers.teams[]' "$RUNNER_TEMP/review.json"); do args+=(-f "team_reviewers[]=$team"); done
           if [ "${#args[@]}" -gt 0 ]; then
             gh api -X POST "repos/$REPO/pulls/$NUMBER/requested_reviewers" "${args[@]}" > /dev/null \
               || echo "::warning::Could not request the reviewers (a fork PR or a missing permission); the review is in the job summary."

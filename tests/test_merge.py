@@ -174,6 +174,17 @@ class MergeStartTest(MergeCase):
         self.assertIn("no docs/brain on origin", out["error"])
         self.assertFalse(self.worktree.exists())
 
+    def test_start_with_nothing_to_merge_stops_early(self):
+        self.on_brain_branch(lambda: self.put("decision", "R", f"area: technical\n{SRC}"))
+        self.on_main(lambda: self.put("decision", "R", f"area: technical\n{SRC}"))  # as a squash merge does
+        before = self.remote_sha("docs/brain")
+        code, out, _ = self.start_cli()
+        self.assertEqual(code, 1, out)
+        self.assertEqual(out["alert"], "nothing-to-merge")
+        self.assertIsNone(out["worktree"])
+        self.assertFalse(self.worktree.exists())
+        self.assertEqual(self.remote_sha("docs/brain"), before)
+
     def test_start_ignores_code_only_on_main(self):
         self.on_brain_branch(lambda: self.put("decision", "R", f"area: technical\n{SRC}"))
         self.on_main(lambda: self.write("src/app.py", "print('x')\n"))
@@ -363,6 +374,25 @@ class MergeLandTest(MergeCase):
         self.assertFalse(out["merged"])
         self.assertIn("nothing", out["problems"][0])
         self.assertFalse([c for c in gh.calls if "POST" in c])
+
+    def test_land_waits_once_when_no_check_run_is_reported_yet(self):
+        gh = LandGh(checks=())
+        out = self.land(gh)
+        self.assertTrue(out["merged"])
+        self.assertEqual(self.sleeps, [15])
+        self.assertEqual(gh.merges(), [["merge_method=merge", "sha=abc123"]])
+
+    def test_land_waits_for_check_runs_that_appear_late(self):
+        gh = LandGh(checks=())
+
+        def sleep(seconds):
+            self.sleeps.append(seconds)
+            gh.checks = [["validate", "completed", "failure"]]
+        with mock.patch("pb_core.repo.gh_json", gh), mock.patch("pb_core.merge.gh_json", gh):
+            out = merge_land(self.repo, wait=600, sleep=sleep)
+        self.assertFalse(out["merged"])
+        self.assertEqual(out["missing"], ["check validate failed"])
+        self.assertEqual(gh.merges(), [])
 
     def test_land_never_pushes_to_the_default_branch(self):
         before = self.remote_sha("main")

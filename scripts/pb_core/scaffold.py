@@ -46,21 +46,34 @@ def upgrade(repo_root):
             "default_branch": default}
 
 
-AGENTS_OLD = "Write through the `pb` plugin skills"
+# How the writing rule of brain/AGENTS.md began before 0.5: pre-0.4 ("Write through…") and 0.4 (the brain on
+# docs/brain, "Write only through…", "Never edit `brain/` in a code branch").
+AGENTS_OLD = ("Write through the `pb` plugin skills", "Write only through the `pb` plugin skills",
+              "The brain lives on the branch `docs/brain`")
+AGENTS_NEXT = "Content enters only if it is:"
 
 
 def _refresh_agents(brain):
-    """Older AGENTS.md told agents to write brain/ in code branches: replace that paragraph."""
+    """Older AGENTS.md told agents to write brain/ elsewhere or not at all: put the current writing rule in place."""
     path = brain / "AGENTS.md"
     if not path.is_file():
         return
-    lines = path.read_text(encoding="utf-8").split("\n")
+    text = path.read_text(encoding="utf-8")
     template = (PLUGIN_ROOT / "templates" / "brain" / "AGENTS.md").read_text(encoding="utf-8")
     start = template.index("The brain in this checkout is the brain of your branch")
-    end = template.index("\n", start)
-    new = template[start:end]
-    out = [new if line.startswith(AGENTS_OLD) else line for line in lines]
-    path.write_text("\n".join(out), encoding="utf-8")
+    new = template[start:template.index("\n", start)]
+    old = [text.find(marker) for marker in AGENTS_OLD if marker in text]
+    if not old:
+        return
+    first = min(old)
+    first = text.rfind("\n", 0, first) + 1  # from the start of its line
+    end = text.find(AGENTS_NEXT, first)
+    if end < 0:  # no list after it: only the paragraphs that start with an old form go
+        paragraphs = text[first:].split("\n\n")
+        rest = [p for p in paragraphs if not p.startswith(AGENTS_OLD)]
+        path.write_text(text[:first] + "\n\n".join([new] + rest), encoding="utf-8")
+        return
+    path.write_text(text[:first] + new + "\n\n" + text[end:], encoding="utf-8")
 
 
 def _write_gitattributes(brain):

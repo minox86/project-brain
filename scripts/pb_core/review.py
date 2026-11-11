@@ -65,6 +65,8 @@ def review(brain, base="HEAD", confidence=(), noise_holds=True):
         "direct": sorted(rel for rel in changed if rel not in flagged),
         "review": items,
         "reviewers": reviewers_for(rules, items),
+        # Per area, whatever is flagged: CI asks the technical ones when brain/schema or the toolkit changes.
+        "area_reviewers": {area: reviewers_for(rules, [{"area": area}]) for area in policy.AREAS},
         "ignored_confidence": ignored,
         "markdown": _markdown(items),
     }

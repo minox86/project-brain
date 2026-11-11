@@ -68,6 +68,25 @@ class ScaffoldTest(unittest.TestCase):
                       "and commit them with your code.", agents.read_text())
         self.assertNotIn("Write through the `pb` plugin skills", agents.read_text())
 
+    def test_upgrade_refreshes_the_writing_rule_of_a_0_4_agents_md(self):
+        self.scaffold()
+        agents = self.repo / "brain/AGENTS.md"
+        text = agents.read_text()
+        start, end = text.index("The brain in this checkout"), text.index("Content enters only if it is:")
+        old = ("The brain lives on the branch `docs/brain`; `brain/` in a code branch is a copy that can be a few days "
+               "behind (it arrives through a PR from `docs/brain`). The latest version: the `pb` skills, or "
+               "`git show origin/docs/brain:brain/<path>`.\n\n"
+               "Write only through the `pb` plugin skills (`/pb:put`, `/pb:capture`, `/pb:fix`): they save to "
+               "`docs/brain`. Never edit `brain/` in a code branch (it would conflict with the brain coming from "
+               "`docs/brain`), and never edit generated files: `index.md`, `glossary.md`, `features.md`, `context/`, "
+               "`.pb/backlinks.json`.\n\n")
+        agents.write_text(text[:start] + old + text[end:])
+        code, _, err = run_cli("scaffold", "--repo", self.repo, "--upgrade")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(agents.read_text(), text)
+        for gone in ("Never edit `brain/` in a code branch", "The brain lives on the branch", "Write only through"):
+            self.assertNotIn(gone, agents.read_text())
+
     def test_validate_workflow_shape(self):
         text = (ROOT / "templates/github/pb-validate.yml").read_text()
         self.assertNotIn("push:", text)

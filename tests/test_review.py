@@ -137,6 +137,15 @@ class ReviewTest(BrainRepoCase):
                                              "users": ["dev-lead"], "teams": ["backend"]})
         self.assertIn(f"`{rel}`", data["markdown"])
 
+    def test_area_reviewers_are_listed_even_with_nothing_flagged(self):
+        self.policy('reviewers: {technical: ["@dev-lead", "acme/backend"], functional: [pm]}')
+        data = self.review()
+        self.assertEqual(data["review"], [])
+        self.assertEqual(data["area_reviewers"]["technical"],
+                         {"areas": ["technical"], "handles": ["dev-lead", "acme/backend"], "users": ["dev-lead"],
+                          "teams": ["backend"]})
+        self.assertEqual(data["area_reviewers"]["ux"]["handles"], [])
+
     def test_confidence_threshold(self):
         self.policy("direct_min_confidence: high")
         rel = self.put("feature", "Approval", f"status: planned\n{SRC}", "Approves an [[Invoice]] once.\n")
@@ -247,6 +256,10 @@ class TemplatesTest(unittest.TestCase):
         self.assertNotIn("--approve", text)
         self.assertIn("AUTHOR: ${{ github.event.pull_request.user.login }}", text)
         self.assertIn('[ "${user,,}" = "${AUTHOR,,}" ] && continue', text)
+        # Schema or toolkit touched: the technical area reviewers (spec section 7).
+        self.assertIn(".area_reviewers.technical.users[]?", text)
+        self.assertIn(".area_reviewers.technical.teams[]?", text)
+        self.assertIn("no reviewer could be derived", text)
         self.assertIn("contents: read", text)
 
     def test_scaffold_ships_the_review_policy(self):

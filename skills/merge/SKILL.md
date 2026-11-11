@@ -17,6 +17,8 @@ Running it is the request: carry the merge through without asking to confirm any
 
 `PB merge start --worktree <tmp dir outside the repo>`. It fetches, then merges the default branch into `docs/brain` in that worktree without committing. The result gives `worktree`, `brain`, `base` (the commit both sides start from), `behind` and `ahead`, the brain conflicts by kind in `conflicts`, and the brain pages each side changed since `base` in `changed.routine` (what the routine wrote) and `changed.default` (what developers merged).
 
+On `"alert": "nothing-to-merge"`: `docs/brain` holds nothing the default branch lacks, nothing to bring: say so and stop.
+
 On `"alert": "outside-brain"` stop: nothing was merged or pushed and there is no worktree to clean. `docs/brain` must differ from the default branch only under `brain/`. List the `files`, say that a person has to move them to a code PR, and that `/pb:merge` can run once they are gone.
 
 ## 2. Brain conflicts

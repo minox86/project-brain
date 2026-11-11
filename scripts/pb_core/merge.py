@@ -91,6 +91,8 @@ def merge_start(repo, worktree):
            "conflicts": {"pages": [], "schema": [], "generated": [], "state": []},
            "changed": {"routine": _pages(_names(repo, "diff", "--name-only", base, ours, paths=["brain"])),
                        "default": _pages(_names(repo, "diff", "--name-only", base, theirs, paths=["brain"]))}}
+    if adds_nothing(repo, BRAIN_BRANCH, base_branch):  # e.g. the Brain updates PR was squash-merged
+        return dict(out, alert="nothing-to-merge")
     outside = [f for f in _names(repo, "diff", "--name-only", f"{theirs}...{ours}") if not f.startswith("brain/")]
     if outside:
         return dict(out, alert="outside-brain", files=outside)
@@ -195,7 +197,7 @@ def merge_land(repo, wait=600, interval=15, sleep=time.sleep):
             out["problems"].append(problem)
         if number is None:
             return out
-    waited = 0
+    waited, seen_none = 0, False
     while True:
         pr = gh_json(["api", f"repos/{owner}/pulls/{number}"])
         sha = ((pr or {}).get("head") or {}).get("sha")
@@ -211,13 +213,17 @@ def merge_land(repo, wait=600, interval=15, sleep=time.sleep):
             out["missing"] = [f"check {name} failed" for name in failed]
             return out
         pending = [r.get("name") for r in runs if r.get("status") != "completed"]
+        # No check run yet: the checks may not have started. Wait one interval before taking it as none.
+        too_early = not runs and not seen_none
+        seen_none = seen_none or not runs
         state = pr.get("mergeable_state")
-        if not pending and state not in (None, "unknown"):
+        if not pending and not too_early and state not in (None, "unknown"):
             break
         if waited >= wait:
             out["missing"] = [f"checks still running: {', '.join(pending)} (run /pb:merge again once they finish)"
-                              if pending else "GitHub has not yet worked out whether the PR can be merged: "
-                                              "run /pb:merge again"]
+                              if pending else "no check has reported on the PR yet: run /pb:merge again"
+                              if too_early else "GitHub has not yet worked out whether the PR can be merged: "
+                                                "run /pb:merge again"]
             return out
         sleep(interval)
         waited += interval

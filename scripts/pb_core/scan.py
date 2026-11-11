@@ -1,7 +1,10 @@
 """Facts about a monorepo used to bootstrap the brain: modules, specs, ADRs, ownership, documentation."""
 import fnmatch
+import json
 import os
 from pathlib import Path
+
+from .repo import default_branch, git
 
 SKIP = {".git", "node_modules", "vendor", "dist", "build", ".venv", "venv", "brain", "target", "__pycache__", ".next"}
 MANIFESTS = ["package.json", "pyproject.toml", "setup.py", "go.mod", "pom.xml", "build.gradle", "build.gradle.kts",
@@ -13,6 +16,16 @@ SPECS = [("openapi*.yaml", "openapi"), ("openapi*.yml", "openapi"), ("openapi*.j
 ADR_DIRS = {"adr", "adrs", "decisions"}
 CODEOWNERS = ["CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"]
 CI_FILES = [".gitlab-ci.yml", "azure-pipelines.yml", "Jenkinsfile", "bitbucket-pipelines.yml"]
+COMMITLINT = ["commitlint.config.js", "commitlint.config.cjs", "commitlint.config.mjs", "commitlint.config.ts",
+              ".commitlintrc", ".commitlintrc.json", ".commitlintrc.yaml", ".commitlintrc.yml", ".commitlintrc.js",
+              ".commitlintrc.cjs", ".commitlintrc.mjs", ".commitlintrc.ts"]
+# Hook files that enforce commit messages: (path, words one of which it must contain; empty: any content).
+HOOKS = [(".husky/commit-msg", ()), ("lefthook.yml", ("commit-msg",)), (".lefthook.yml", ("commit-msg",)),
+         ("lefthook.yaml", ("commit-msg",)),
+         (".pre-commit-config.yaml", ("commit-msg", "commitlint", "conventional-pre-commit", "gitlint")),
+         (".gitlint", ())]
+PR_CHECKS = ("action-semantic-pull-request", "commitlint")
+RECENT_SUBJECTS = 15
 MAX_MODULE_DEPTH = 3
 DOC_EXTENSIONS = (".md", ".mdx", ".rst", ".adoc", ".asciidoc")
 DOC_DIRS = {"docs", "doc", "documentation", "wiki", "handbook", "guides", "rfcs", "rfc", "design"}
@@ -51,6 +64,38 @@ def _doc_facts(path):
         first = first or line
     title = front_title or heading or first
     return (title[:120] if title else None), len(text.split())
+
+
+def _text(path):
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def commit_rules(root):
+    """Where the repo states its commit rules, and the subjects of its recent commits. Claude reads the files."""
+    found = [f for f in COMMITLINT if (root / f).is_file()]
+    try:
+        package = json.loads(_text(root / "package.json") or "{}")
+    except ValueError:
+        package = {}
+    if isinstance(package, dict) and "commitlint" in package:
+        found.append("package.json")
+    hooks = [f for f, words in HOOKS if (root / f).is_file() and (not words or any(w in _text(root / f) for w in words))]
+    workflows = root / ".github" / "workflows"
+    checks = [f".github/workflows/{p.name}" for p in (workflows.iterdir() if workflows.is_dir() else ())
+              if p.is_file() and any(w in _text(p) for w in PR_CHECKS)]
+    subjects = []
+    top = git(root, "rev-parse", "--show-toplevel", check=False).stdout.strip()
+    if top and Path(top).resolve() == root:  # the repo's own history, not that of a repo around it
+        ref = f"origin/{default_branch(root)}"
+        if git(root, "rev-parse", "--verify", "--quiet", ref, check=False).returncode:
+            ref = "HEAD"
+        log = git(root, "log", f"-{RECENT_SUBJECTS}", "--format=%s", ref, "--", check=False)
+        subjects = log.stdout.splitlines() if log.returncode == 0 else []
+    return {"commitlint": sorted(found), "hooks": sorted(hooks), "pr_checks": sorted(checks),
+            "recent_subjects": subjects}
 
 
 def scan(repo_root):
@@ -113,4 +158,5 @@ def scan(repo_root):
         "top_level": top,
         "docs": sorted(docs, key=lambda d: d["path"]),
         "docs_words": sum(d["words"] for d in docs),
+        "commit_rules": commit_rules(root),
     }

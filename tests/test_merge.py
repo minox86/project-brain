@@ -166,6 +166,14 @@ class MergeStartTest(MergeCase):
         self.assertEqual(self.remote_sha("docs/brain"), before)
         self.assertFalse(self.worktree.exists())
 
+    def test_start_when_github_deleted_docs_brain(self):
+        git(self.repo, "fetch", "-q", "origin")
+        git(self.remote, "branch", "-D", "docs/brain")
+        code, out, _ = self.start_cli()
+        self.assertEqual(code, 2, out)
+        self.assertIn("no docs/brain on origin", out["error"])
+        self.assertFalse(self.worktree.exists())
+
     def test_start_ignores_code_only_on_main(self):
         self.on_brain_branch(lambda: self.put("decision", "R", f"area: technical\n{SRC}"))
         self.on_main(lambda: self.write("src/app.py", "print('x')\n"))

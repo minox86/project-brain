@@ -105,7 +105,7 @@ def routine_start(repo, branch, worktree=None):
     """Needs only the clone: the brain lives on the branch, not necessarily in the current checkout."""
     repo = Path(repo)
     _routine_branch(repo, branch)
-    _git(repo, "fetch", "-q", "origin")
+    _git(repo, "fetch", "-q", "--prune", "origin")
     start, created, restarted, behind = _start_point(repo, branch)
     out = {"branch": branch, "created": created, "restarted": restarted, "behind": behind}
     if worktree is not None:
@@ -136,7 +136,7 @@ def routine_finish(brain, branch, message, confidence=()):
     before = _git(repo, "rev-parse", "HEAD").stdout.strip()
     generate(brain)  # one commit carries the pages and the generated files
     done = commit(brain, message, allow_default=True)
-    _git(repo, "fetch", "-q", "origin")
+    _git(repo, "fetch", "-q", "--prune", "origin")
     # Everything the PR holds, not only this run: the changes since the fork from the default branch.
     # Confidence levels are known for this run's pages only.
     fork = _git(repo, "merge-base", f"origin/{base}", "HEAD", check=False)

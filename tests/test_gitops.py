@@ -410,6 +410,18 @@ class RoutineFinishTest(BrainBranchCase):
         self.assertNotIn("brain/digests/2020-01-01.md",
                          git(self.repo, "ls-tree", "-r", "--name-only", "origin/docs/brain").splitlines())
 
+    def test_run_after_github_deleted_docs_brain(self):
+        self.start()
+        self.add_page("Approval")
+        self.assertTrue(self.finish()["pushed"])
+        git(self.remote, "branch", "-D", "docs/brain")  # squash-merged, head branch deleted by GitHub
+        out = self.start()
+        self.assertEqual((out["created"], out["restarted"]), (True, False))
+        self.add_page("Second")
+        out = self.finish()
+        self.assertEqual((out["pushed"], out["conflict"]), (True, False))
+        self.assertEqual(git(self.remote, "rev-parse", "docs/brain"), git(self.repo, "rev-parse", "HEAD"))
+
     def test_finish_with_nothing_ahead_opens_no_pr(self):
         run_cli("generate", cwd=self.repo)
         self.commit_all("generated", "main")

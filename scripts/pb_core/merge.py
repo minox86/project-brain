@@ -80,7 +80,7 @@ def _merge_state(cwd, path):
 
 def merge_start(repo, worktree):
     repo = Path(repo)
-    git(repo, "fetch", "-q", "origin")
+    git(repo, "fetch", "-q", "--prune", "origin")
     base_branch = default_branch(repo)
     if git(repo, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{BRAIN_BRANCH}", check=False).returncode:
         raise UsageError(f"no {BRAIN_BRANCH} on origin: the routine has written nothing to merge")
@@ -172,7 +172,7 @@ def merge_land(repo, wait=600, interval=15, sleep=time.sleep):
     """Wait for the checks of the Brain updates PR and merge it through the GitHub API. Never pushes."""
     repo = Path(repo)
     out = {"merged": False, "pr": None, "missing": [], "problems": []}
-    git(repo, "fetch", "-q", "origin")
+    git(repo, "fetch", "-q", "--prune", "origin")
     base = default_branch(repo)
     owner = _owner(repo)
     if not owner:

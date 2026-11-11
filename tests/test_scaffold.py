@@ -34,10 +34,12 @@ class ScaffoldTest(unittest.TestCase):
         self.assertTrue((brain / ".pb/toolkit/VERSION").read_text().strip())
         self.assertTrue((self.repo / ".github/workflows/pb-validate.yml").is_file())
         self.assertFalse((self.repo / ".github/workflows/pb-generate.yml").exists())
-        merge_back = (self.repo / ".github/workflows/pb-brain-branch.yml").read_text()
-        self.assertIn('branches: ["main"]', merge_back)
-        self.assertIn("origin/main", merge_back)
-        self.assertNotIn("{{default_branch}}", merge_back)
+        self.assertFalse((self.repo / ".github/workflows/pb-brain-branch.yml").exists())
+        self.assertNotIn("{{default_branch}}", (self.repo / ".github/workflows/pb-validate.yml").read_text())
+        attrs = (brain / ".gitattributes").read_text()
+        for line in ("index.md linguist-generated", "glossary.md linguist-generated", "features.md linguist-generated",
+                     "context/** linguist-generated", ".pb/backlinks.json linguist-generated"):
+            self.assertIn(line, attrs)
         settings = json.loads((self.repo / ".claude/settings.json").read_text())
         self.assertTrue(settings["enabledPlugins"]["pb@project-brain"])
         claude = (self.repo / "CLAUDE.md").read_text()
@@ -48,7 +50,8 @@ class ScaffoldTest(unittest.TestCase):
     def test_upgrade_rewrites_workflows_of_an_existing_brain(self):
         self.scaffold()
         (self.repo / ".github/workflows/pb-generate.yml").write_text("old\n")
-        (self.repo / ".github/workflows/pb-brain-branch.yml").unlink()
+        (self.repo / ".github/workflows/pb-brain-branch.yml").write_text("old\n")
+        (self.repo / "brain/.gitattributes").unlink()
         agents = self.repo / "brain/AGENTS.md"
         agents.write_text(agents.read_text().replace(
             agents.read_text()[agents.read_text().index("The brain lives"):agents.read_text().index("never edit generated files")],
@@ -56,8 +59,20 @@ class ScaffoldTest(unittest.TestCase):
         code, data, err = run_cli("scaffold", "--repo", self.repo, "--upgrade")
         self.assertEqual(code, 0, err)
         self.assertFalse((self.repo / ".github/workflows/pb-generate.yml").exists())
-        self.assertTrue((self.repo / ".github/workflows/pb-brain-branch.yml").is_file())
+        self.assertFalse((self.repo / ".github/workflows/pb-brain-branch.yml").exists())
+        self.assertIn(".github/workflows/pb-brain-branch.yml", data["deleted"])
+        self.assertIn(".github/workflows/pb-generate.yml", data["deleted"])
+        self.assertIn("index.md linguist-generated", (self.repo / "brain/.gitattributes").read_text())
         self.assertIn("Write only through the `pb` plugin skills", agents.read_text())
+
+    def test_validate_workflow_shape(self):
+        text = (ROOT / "templates/github/pb-validate.yml").read_text()
+        self.assertNotIn("push:", text)
+        self.assertIn("Generated files are stale: run `PB generate` and commit", text)
+        self.assertIn("review:", text)
+        self.assertIn("pull-requests: write", text)
+        self.assertIn("brain-only:", text)
+        self.assertFalse((ROOT / "templates/github/pb-brain-branch.yml").exists())
 
     def test_scaffold_refuses_existing_brain(self):
         self.scaffold()

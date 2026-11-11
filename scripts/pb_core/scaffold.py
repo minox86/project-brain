@@ -13,15 +13,18 @@ PROPOSALS = "# Schema proposals\n\nOne line per proposal: `- [ ] P<n> · <propos
 # Skills the cloud routine follows from the repo: sync, and those sync defers to (put's analysis, meeting's step 3).
 ROUTINE_SKILLS = ("sync", "put", "meeting")
 ROUTINE_SYNC_SKILL = "skills/sync/SKILL.md"
-WORKFLOWS = ("pb-validate.yml", "pb-brain-branch.yml")
-RETIRED_WORKFLOWS = ("pb-generate.yml",)  # generated files are now refreshed by every save
+WORKFLOWS = ("pb-validate.yml",)
+# pb-generate: the generated files are committed with the pages. pb-brain-branch: nothing merges the default branch back any more.
+RETIRED_WORKFLOWS = ("pb-generate.yml", "pb-brain-branch.yml")
+GITATTRIBUTES = "".join(f"{path} linguist-generated\n" for path in (
+    "index.md", "glossary.md", "features.md", "context/**", ".pb/backlinks.json"))
 MARKETPLACE = {"project-brain": {"source": {"source": "github", "repo": "minox86/project-brain"}}}
 PLUGIN_ID = "pb@project-brain"
 NEEDS_QUOTES = re.compile(r"""^[\[\]{}#&*!|>'"%@`-]|[:#]\s|\s#|,\s""")
 
 
 def upgrade(repo_root):
-    """An existing brain moves to docs/brain: current workflows (overwritten), plugin settings, toolkit."""
+    """An existing brain gets the current workflows (overwritten), .gitattributes, plugin settings and toolkit."""
     repo = Path(repo_root).resolve()
     brain = repo / "brain"
     if not (brain / "schema" / "VERSION").is_file():
@@ -29,15 +32,18 @@ def upgrade(repo_root):
     created = [sync_toolkit(brain).relative_to(repo).as_posix()]
     default = _default_branch(repo)
     created += _write_workflows(repo, default, overwrite=True)[0]
+    created.append(_write_gitattributes(brain).relative_to(repo).as_posix())
+    deleted = []
     for name in RETIRED_WORKFLOWS:
         old = repo / ".github" / "workflows" / name
         if old.is_file():
             old.unlink()
-            created.append(f"deleted {old.relative_to(repo).as_posix()}")
+            deleted.append(old.relative_to(repo).as_posix())
     _refresh_agents(brain)
     if enable_plugin(repo):
         created.append(".claude/settings.json")
-    return {"brain": str(brain), "created": created, "skipped": [], "default_branch": default}
+    return {"brain": str(brain), "created": created, "deleted": deleted, "skipped": [],
+            "default_branch": default}
 
 
 AGENTS_OLD = "Write through the `pb` plugin skills"
@@ -55,6 +61,12 @@ def _refresh_agents(brain):
     new = template[start:end]
     out = [new if line.startswith(AGENTS_OLD) else line for line in lines]
     path.write_text("\n".join(out), encoding="utf-8")
+
+
+def _write_gitattributes(brain):
+    path = brain / ".gitattributes"
+    path.write_text(GITATTRIBUTES, encoding="utf-8")
+    return path
 
 
 def _write_workflows(repo, default, overwrite=False):
@@ -108,6 +120,7 @@ def scaffold(repo_root, product, preset="software-product"):
         note(brain / name)
 
     note(sync_toolkit(brain))
+    note(_write_gitattributes(brain))
 
     default = _default_branch(repo)
     written, skipped = _write_workflows(repo, default)

@@ -69,7 +69,7 @@ class ScaffoldBranchTest(unittest.TestCase):
                 code, data, _ = run_cli("scaffold", "--repo", repo, "--product", "P")
                 self.assertEqual(code, 0)
                 self.assertEqual(data["default_branch"], "main")
-                self.assertIn('branches: ["main"]', (repo / ".github/workflows/pb-brain-branch.yml").read_text())
+                self.assertNotIn("{{default_branch}}", (repo / ".github/workflows/pb-validate.yml").read_text())
         finally:
             for k, v in saved.items():
                 if v is None:

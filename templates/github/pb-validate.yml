@@ -86,6 +86,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           if git diff --quiet "$BASE"...HEAD -- brain; then
             echo "No file under brain/ changed."
@@ -107,7 +108,11 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
           args=()
-          for user in $(jq -r '.reviewers.users[]' "$RUNNER_TEMP/review.json"); do args+=(-f "reviewers[]=$user"); done
+          # GitHub refuses the whole request when the PR's author is listed.
+          for user in $(jq -r '.reviewers.users[]' "$RUNNER_TEMP/review.json"); do
+            [ "${user,,}" = "${AUTHOR,,}" ] && continue
+            args+=(-f "reviewers[]=$user")
+          done
           for team in $(jq -r '.reviewers.teams[]' "$RUNNER_TEMP/review.json"); do args+=(-f "team_reviewers[]=$team"); done
           if [ "${#args[@]}" -gt 0 ]; then
             gh api -X POST "repos/$REPO/pulls/$NUMBER/requested_reviewers" "${args[@]}" > /dev/null \

@@ -245,6 +245,8 @@ class TemplatesTest(unittest.TestCase):
         self.assertIn("grep -v -E '^(brain/|", text)
         self.assertNotIn("gh pr merge", text)
         self.assertNotIn("--approve", text)
+        self.assertIn("AUTHOR: ${{ github.event.pull_request.user.login }}", text)
+        self.assertIn('[ "${user,,}" = "${AUTHOR,,}" ] && continue', text)
         self.assertIn("contents: read", text)
 
     def test_scaffold_ships_the_review_policy(self):

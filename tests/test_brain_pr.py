@@ -26,7 +26,7 @@ class FakeGh:
         if kind == "list":
             return self.open_prs
         if kind == "open":
-            return {"number": 7, "html_url": PR_URL.format(7)}
+            return {"number": 7, "html_url": PR_URL.format(7), "user": {"login": "routine-bot"}}
         if kind == "patch":
             number = int(path.rsplit("/", 1)[1])
             return {"number": number, "html_url": PR_URL.format(number)}
@@ -65,7 +65,7 @@ class EnsureBrainPrTest(unittest.TestCase):
     def test_opens_the_pr_when_none_is_open(self):
         gh = FakeGh()
         with mock.patch("pb_core.repo.gh_json", gh):
-            url, number, problem = ensure_brain_pr("o/r", "main", "the body")
+            url, number, problem, _ = ensure_brain_pr("o/r", "main", "the body")
         self.assertEqual((url, number, problem), (PR_URL.format(7), 7, None))
         self.assertEqual(gh.calls[0][:2], ["api", "repos/o/r/pulls?head=o:docs/brain&base=main&state=open"])
         self.assertEqual(gh.fields("open"), ["title=Brain updates", "head=docs/brain", "base=main", "body=the body"])
@@ -73,29 +73,37 @@ class EnsureBrainPrTest(unittest.TestCase):
     def test_found_pr_gets_its_body_updated(self):
         gh = FakeGh(open_prs=[{"number": 12, "html_url": PR_URL.format(12)}])
         with mock.patch("pb_core.repo.gh_json", gh):
-            url, number, problem = ensure_brain_pr("o/r", "main", "new body")
+            url, number, problem, _ = ensure_brain_pr("o/r", "main", "new body")
         self.assertEqual((url, number, problem), (PR_URL.format(12), 12, None))
         self.assertIsNone(gh.fields("open"))
         patch = [args for args in gh.calls if "PATCH" in args][0]
         self.assertEqual(patch[1], "repos/o/r/pulls/12")
         self.assertEqual(gh.fields("patch"), ["body=new body"])
 
+    def test_author_of_the_pr_is_returned(self):
+        for gh, expected in ((FakeGh(), "routine-bot"),
+                             (FakeGh(open_prs=[{"number": 12, "html_url": PR_URL.format(12),
+                                                "user": {"login": "owner"}}]), "owner"),
+                             (FakeGh(fail={"list"}), None)):
+            with self.subTest(expected=expected), mock.patch("pb_core.repo.gh_json", gh):
+                self.assertEqual(ensure_brain_pr("o/r", "main", "b")[3], expected)
+
     def test_unreachable_github_is_a_problem(self):
         with mock.patch("pb_core.repo.gh_json", FakeGh(fail={"list"})):
-            url, number, problem = ensure_brain_pr("o/r", "main", "b")
+            url, number, problem, _ = ensure_brain_pr("o/r", "main", "b")
         self.assertEqual((url, number), (None, None))
         self.assertIn("GitHub could not be reached", problem)
 
     def test_failed_open_is_a_problem(self):
         with mock.patch("pb_core.repo.gh_json", FakeGh(fail={"open"})):
-            url, number, problem = ensure_brain_pr("o/r", "main", "b")
+            url, number, problem, _ = ensure_brain_pr("o/r", "main", "b")
         self.assertEqual((url, number), (None, None))
         self.assertIn("could not be opened", problem)
 
     def test_failed_body_update_keeps_the_pr(self):
         gh = FakeGh(open_prs=[{"number": 12, "html_url": PR_URL.format(12)}], fail={"patch"})
         with mock.patch("pb_core.repo.gh_json", gh):
-            url, number, problem = ensure_brain_pr("o/r", "main", "b")
+            url, number, problem, _ = ensure_brain_pr("o/r", "main", "b")
         self.assertEqual((url, number), (PR_URL.format(12), 12))
         self.assertIn("description", problem)
 
@@ -113,6 +121,19 @@ class RequestReviewersTest(unittest.TestCase):
         gh = FakeGh()
         with mock.patch("pb_core.repo.gh_json", gh):
             self.assertEqual(request_reviewers("o/r", 7, {"users": [], "teams": []}), [])
+        self.assertEqual(gh.calls, [])
+
+    def test_the_pr_author_is_never_requested(self):
+        gh = FakeGh()
+        with mock.patch("pb_core.repo.gh_json", gh):
+            problems = request_reviewers("o/r", 7, {"users": ["Owner", "pm"], "teams": ["backend"]}, exclude=["owner"])
+        self.assertEqual(problems, [])
+        self.assertEqual(gh.fields("reviewers"), ["reviewers[]=pm", "team_reviewers[]=backend"])
+
+    def test_only_the_author_listed_no_call(self):
+        gh = FakeGh()
+        with mock.patch("pb_core.repo.gh_json", gh):
+            self.assertEqual(request_reviewers("o/r", 7, {"users": ["owner"], "teams": []}, exclude=["owner"]), [])
         self.assertEqual(gh.calls, [])
 
     def test_failed_request_is_a_problem(self):

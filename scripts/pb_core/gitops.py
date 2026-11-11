@@ -177,12 +177,13 @@ def _brain_pr(brain, base, routed, out):
         out["problems"].append(f"no GitHub repo (github.repo in sources.md): the {BRAIN_PR_TITLE} PR from "
                                f"{BRAIN_BRANCH} to {base} was not opened")
         return
-    url, number, problem = ensure_brain_pr(owner, base, brain_pr_body(routed["markdown"], out["behind"], base))
+    url, number, problem, author = ensure_brain_pr(owner, base,
+                                                   brain_pr_body(routed["markdown"], out["behind"], base))
     out["pr"] = url
     if problem:
         out["problems"].append(problem)
     if number is not None:
-        out["problems"] += request_reviewers(owner, number, routed["reviewers"])
+        out["problems"] += request_reviewers(owner, number, routed["reviewers"], exclude=[author])
 
 
 def routine_discard(brain):

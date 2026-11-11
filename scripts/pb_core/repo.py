@@ -79,29 +79,36 @@ def brain_pr_body(markdown, behind, base):
 
 
 def ensure_brain_pr(owner, base, body):
-    """The open PR docs/brain -> base, found (its body refreshed) or opened. Returns (url, number, problem).
-    gh api, not gh pr: cloud routines can only reach the REST API."""
+    """The open PR docs/brain -> base, found (its body refreshed) or opened. Returns (url, number, problem, author),
+    author the PR's `user.login` (None when unknown). gh api, not gh pr: cloud routines can only reach the REST API."""
     found = gh_json(["api", f"repos/{owner}/pulls?head={owner.split('/')[0]}:{BRAIN_BRANCH}&base={base}&state=open"])
     if found is None:
-        return None, None, f"GitHub could not be reached (gh): the {BRAIN_PR_TITLE} PR was not checked"
+        return None, None, f"GitHub could not be reached (gh): the {BRAIN_PR_TITLE} PR was not checked", None
     if isinstance(found, list) and found:
         pr = found[0]
         number = pr.get("number")
         problem = None
         if gh_json(["api", f"repos/{owner}/pulls/{number}", "-X", "PATCH", "-f", f"body={body}"]) is None:
             problem = f"the description of the {BRAIN_PR_TITLE} PR could not be updated"
-        return pr.get("html_url"), number, problem
+        return pr.get("html_url"), number, problem, _author(pr)
     pr = gh_json(["api", f"repos/{owner}/pulls", "-X", "POST", "-f", f"title={BRAIN_PR_TITLE}",
                   "-f", f"head={BRAIN_BRANCH}", "-f", f"base={base}", "-f", f"body={body}"])
     if not pr:
         return None, None, (f"the {BRAIN_PR_TITLE} PR could not be opened: it is retried at the next run "
-                            f"(or open it by hand from {BRAIN_BRANCH} to {base})")
-    return pr.get("html_url"), pr.get("number"), None
+                            f"(or open it by hand from {BRAIN_BRANCH} to {base})"), None
+    return pr.get("html_url"), pr.get("number"), None, _author(pr)
 
 
-def request_reviewers(owner, number, reviewers):
-    """Ask the area reviewers (users and team slugs) to review PR `number`. Returns the problems."""
-    users, teams = (reviewers or {}).get("users") or [], (reviewers or {}).get("teams") or []
+def _author(pr):
+    return ((pr.get("user") if isinstance(pr, dict) else None) or {}).get("login")
+
+
+def request_reviewers(owner, number, reviewers, exclude=()):
+    """Ask the area reviewers (users and team slugs) to review PR `number`, except the users in `exclude` (the PR's
+    author: GitHub refuses the whole request when it is listed). Returns the problems."""
+    skip = {e.lower() for e in exclude if e}
+    users = [u for u in (reviewers or {}).get("users") or [] if u.lower() not in skip]
+    teams = (reviewers or {}).get("teams") or []
     if not users and not teams:
         return []
     args = ["api", f"repos/{owner}/pulls/{number}/requested_reviewers", "-X", "POST"]

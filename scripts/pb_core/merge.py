@@ -190,7 +190,7 @@ def merge_land(repo, wait=600, interval=15, sleep=time.sleep):
     else:
         body = (f"Brain pages the pb routine wrote on `{BRAIN_BRANCH}`, brought up to date with `{base}` by "
                 f"`/pb:merge`. Merging this PR brings them to `{base}`.\n")
-        out["pr"], number, problem = ensure_brain_pr(owner, base, body)
+        out["pr"], number, problem, _ = ensure_brain_pr(owner, base, body)
         if problem:
             out["problems"].append(problem)
         if number is None:

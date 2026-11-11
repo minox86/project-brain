@@ -347,6 +347,19 @@ class RoutineFinishTest(BrainBranchCase):
         self.assertEqual(out["reviewers"]["users"], ["pm"])
         self.assertEqual(out["problems"], [])
 
+    def test_finish_never_requests_the_pr_author(self):
+        self.write("brain/schema/review.md",
+                   '---\nreviewers: {functional: [owner]}\nwatch: [{type: decision}]\n---\n# Review policy\n')
+        self.commit_all("policy", "main")
+        self.gh.open_prs = [{"number": 12, "html_url": "https://github.com/o/r/pull/12", "user": {"login": "owner"}}]
+        self.start()
+        rel, text = page("decision", "X", "area: functional")
+        self.write("brain/" + rel, text)
+        out = self.finish()
+        self.assertEqual(out["reviewers"]["users"], ["owner"])
+        self.assertIsNone(self.gh.fields("reviewers"))
+        self.assertEqual(out["problems"], [])
+
     def test_finish_on_behind_branch_reports_behind(self):
         self.brain_branch_with_page()
         self.main_moves_on(2)

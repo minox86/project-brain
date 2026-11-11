@@ -248,6 +248,19 @@ class RoutineFinishTest(BrainBranchCase):
         self.assertEqual(self.gh.fields("open")[:3], ["title=Brain updates", "head=docs/brain", "base=main"])
         self.assertIn("decisions/X.md", self.gh.fields("open")[3])
 
+    def test_finish_body_keeps_watched_changes_of_earlier_runs(self):
+        self.start()
+        rel, text = page("decision", "X")
+        self.write("brain/" + rel, text)
+        self.finish()
+        self.gh.open_prs = [{"number": 7, "html_url": "https://github.com/o/r/pull/7"}]
+        self.start()
+        self.add_page("Unwatched")
+        out = self.finish()
+        self.assertIn("decisions/X.md", [w["path"] for w in out["watched"]])
+        self.assertIn("decisions/X.md", self.gh.fields("patch")[0])
+        self.assertNotIn("nothing on a watched point", self.gh.fields("patch")[0])
+
     def test_finish_low_confidence_page_is_watched(self):
         self.start()
         self.add_page("Approval")

@@ -116,13 +116,17 @@ def routine_finish(brain, branch, message, confidence=()):
     if branch == base:
         raise UsageError(f"the routine never pushes to the default branch '{base}': use --branch {BRAIN_BRANCH}")
     retention = apply_retention(brain, datetime.date.today())
-    routed = review(brain, "HEAD", confidence)
+    before = _git(repo, "rev-parse", "HEAD").stdout.strip()
     done = commit(brain, message, allow_default=True)
     regenerate(brain.root, repo)
+    _git(repo, "fetch", "-q", "origin")
+    # Everything the PR holds, not only this run: the changes since the fork from the default branch.
+    # Confidence levels are known for this run's pages only.
+    fork = _git(repo, "merge-base", f"origin/{base}", "HEAD", check=False)
+    routed = review(brain, fork.stdout.strip() if fork.returncode == 0 else before, confidence)
     out = {"committed": done["committed"], "pushed": False, "conflict": False, "pr": None,
            "watched": routed["review"], "reviewers": routed["reviewers"], "behind": 0,
            "retention": retention, "problems": []}
-    _git(repo, "fetch", "-q", "origin")
     push = ["push", "-q"]
     if _remote_has(repo, branch):
         tip = _git(repo, "rev-parse", f"origin/{branch}").stdout.strip()

@@ -45,6 +45,11 @@ def _flag(path):
         return False
     for i in range(start, len(lines)):
         if lines[i].rstrip() == "---":
+            for j in range(start, i):
+                if lines[j].startswith("archived:"):
+                    lines[j] = "archived: true" + ("\r" if lines[j].endswith("\r") else "")
+                    path.write_bytes("\n".join(lines).encode("utf-8"))
+                    return True
             eol = "\r" if lines[i].endswith("\r") else ""
             lines.insert(i, "archived: true" + eol)
             path.write_bytes("\n".join(lines).encode("utf-8"))

@@ -37,6 +37,17 @@ class RetentionTest(unittest.TestCase):
         apply_retention(Brain(root), TODAY)
         self.assertEqual(path.read_text(), before.replace("updated: 2026-01-01\n---\n", "updated: 2026-01-01\narchived: true\n---\n", 1))
 
+    def test_existing_archived_key_is_replaced_not_duplicated(self):
+        root = self.brain(files_of(page("decision", "Old", "area: ux\nstatus: superseded\nupdated: 2026-01-01\narchived: false")))
+        path = root / "decisions/Old.md"
+        self.assertEqual(apply_retention(Brain(root), TODAY)["archived"], ["decisions/Old.md"])
+        text = path.read_text()
+        self.assertEqual(text.count("archived:"), 1)
+        self.assertIn("\narchived: true\n", text)
+        self.assertNotIn("archived: false", text)
+        self.assertEqual(apply_retention(Brain(root), TODAY)["archived"], [])
+        self.assertEqual(path.read_text(), text)
+
     def test_recent_or_open_pages_are_not_flagged(self):
         root = self.brain(files_of(
             page("decision", "Recent", "area: ux\nstatus: superseded\nupdated: 2026-10-01"),

@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -106,6 +107,35 @@ class MergeStartTest(MergeCase):
         self.assertEqual(code, 0, (done, err))
         self.assertEqual(done["unresolved"], [])
         self.assertEqual(git(self.remote, "show", f"docs/brain:{state}"), '{"cursor": "routine"}')
+
+    def test_state_conflict_keeps_docs_brain_cursors_and_both_suppressions(self):
+        state = "brain/.pb/state/teams.json"
+        self.on_main(lambda: self.write(state, json.dumps({"cursor": "c1", "suppressed": ["old claim"]}) + "\n"))
+        git(self.repo, "push", "-q", "-f", "origin", "main:refs/heads/docs/brain")
+        self.on_brain_branch(lambda: self.write(
+            state, json.dumps({"cursor": "c2", "suppressed": ["old claim"]}) + "\n"))
+        self.on_main(lambda: self.write(
+            state, json.dumps({"cursor": "c1", "suppressed": ["old claim", "fixed claim"]}) + "\n"))
+        out = self.start()
+        self.assertEqual(out["conflicts"]["state"], [state])
+        expected = {"cursor": "c2", "suppressed": ["old claim", "fixed claim"]}
+        self.assertEqual(json.loads((self.worktree / state).read_text()), expected)
+        self.assertEqual((self.worktree / state).read_text(),
+                         json.dumps(expected, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+        code, done, err = self.finish_cli()
+        self.assertEqual(code, 0, (done, err))
+        self.assertEqual(done["unresolved"], [])
+        self.assertEqual(json.loads(git(self.remote, "show", f"docs/brain:{state}")), expected)
+
+    def test_state_conflict_not_json_keeps_docs_brain_side(self):
+        state = "brain/.pb/state/teams.json"
+        self.on_brain_branch(lambda: self.write(state, '{"cursor": "routine", "suppressed": ["a"]}\n'))
+        self.on_main(lambda: self.write(state, "not json\n"))
+        self.start()
+        self.assertEqual((self.worktree / state).read_text(), '{"cursor": "routine", "suppressed": ["a"]}\n')
+        code, done, err = self.finish_cli()
+        self.assertEqual(code, 0, (done, err))
+        self.assertEqual(done["unresolved"], [])
 
     def test_schema_conflict_is_listed_never_resolved(self):
         schema = "brain/schema/brain.md"

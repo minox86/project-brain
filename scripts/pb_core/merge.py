@@ -2,6 +2,7 @@
 
 Only docs/brain is ever pushed; the default branch is reached only by merging the PR through the GitHub API.
 """
+import json
 import time
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from .generate import generate
 from .gitops import adds_nothing, routine_cleanup
 from .repo import BRAIN_BRANCH, BRAIN_PR_TITLE, default_branch, ensure_brain_pr, gh_json, gh_repo, git, origin_repo
 from .save import _generated, check
+from .state import _save
 
 STATE = "brain/.pb/state/"
 SCHEMA = ("brain/schema/", "brain/.pb/toolkit/")
@@ -43,6 +45,37 @@ def _take_ours(cwd, path):
     else:
         git(cwd, "rm", "-q", "--cached", "--ignore-unmatch", "--", path)
         (Path(cwd) / path).unlink(missing_ok=True)
+
+
+def _stage(cwd, path, n):
+    """The JSON of a conflicted path at merge stage n (2: docs/brain, 3: the default branch); None if absent or invalid."""
+    shown = git(cwd, "show", f":{n}:{path}", check=False)
+    if shown.returncode:
+        return None
+    try:
+        data = json.loads(shown.stdout)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _merge_state(cwd, path):
+    """A conflicted state file keeps docs/brain's cursors and the union of both sides' suppressions. Either side
+    missing or not valid JSON: the docs/brain side, as it is."""
+    ours, theirs = _stage(cwd, path, 2), _stage(cwd, path, 3)
+    if ours is None or theirs is None:
+        return _take_ours(cwd, path)
+    mine, other = ours.get("suppressed") or [], theirs.get("suppressed") or []
+    if not isinstance(mine, list) or not isinstance(other, list):
+        return _take_ours(cwd, path)
+    union = list(mine)
+    for claim in other:
+        if claim not in union:
+            union.append(claim)
+    if len(union) == len(mine):  # nothing new from the default branch: docs/brain's file as it is
+        return _take_ours(cwd, path)
+    _save(Path(cwd) / path, dict(ours, suppressed=union))
+    git(cwd, "add", "--", path)
 
 
 def merge_start(repo, worktree):
@@ -79,7 +112,7 @@ def merge_start(repo, worktree):
         if _generated(f):
             conflicts["generated"].append(f)
         elif f.startswith(STATE):
-            _take_ours(worktree, f)  # state changes only on docs/brain
+            _merge_state(worktree, f)  # docs/brain's cursors, both sides' suppressions
             conflicts["state"].append(f)
         elif f.startswith(SCHEMA):
             conflicts["schema"].append(f)

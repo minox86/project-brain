@@ -38,7 +38,7 @@ jobs:
           toolkit=.pb-base/brain/.pb/toolkit/pb.py
           # The PR that introduces the brain has no toolkit on the base branch: use the PR's own.
           [ -f "$toolkit" ] || toolkit=brain/.pb/toolkit/pb.py
-          echo "$pages" | tr '\n' '\0' | xargs -0 python3 "$toolkit" --brain brain validate
+          echo "$pages" | tr '\n' '\0' | xargs -0 python3 -B "$toolkit" --brain brain validate
       - name: Generated files are fresh
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -55,7 +55,7 @@ jobs:
           if ! git diff --quiet "$BASE"...HEAD -- brain/.pb/toolkit; then
             toolkit=brain/.pb/toolkit/pb.py
           fi
-          python3 "$toolkit" --brain brain generate
+          python3 -B "$toolkit" --brain brain generate
           if [ -n "$(git status --porcelain -- brain)" ]; then
             git status --short -- brain
             echo 'Generated files are stale: run `PB generate` and commit'
@@ -93,7 +93,7 @@ jobs:
           fi
           toolkit=.pb-base/brain/.pb/toolkit/pb.py
           [ -f "$toolkit" ] || toolkit=brain/.pb/toolkit/pb.py
-          python3 "$toolkit" --brain brain review --base "$BASE" --no-noise > "$RUNNER_TEMP/review.json" || {
+          python3 -B "$toolkit" --brain brain review --base "$BASE" --no-noise > "$RUNNER_TEMP/review.json" || {
             echo "::warning::The review could not be evaluated."
             exit 0
           }

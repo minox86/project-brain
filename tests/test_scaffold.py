@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import subprocess
 import sys
@@ -131,6 +132,22 @@ class ScaffoldTest(unittest.TestCase):
         text = (base / "SKILL.md").read_text()
         for rel in sorted(set(re.findall(r"BASE/([\w./-]+\.md)", text))):
             self.assertTrue((base / rel).resolve().is_file(), rel)
+
+    def test_vendored_toolkit_writes_no_bytecode_under_brain(self):
+        self.scaffold()
+        env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPYCACHEPREFIX", "PYTHONDONTWRITEBYTECODE")}
+        # As stock CPython does: Apple's python3 redirects the cache, so put the defaults back first.
+        script = str(self.repo / "brain/.pb/toolkit/pb.py")
+        boot = ("import runpy, sys; sys.pycache_prefix = None; sys.dont_write_bytecode = False; "
+                f"sys.argv = [{script!r}, 'version']; runpy.run_path({script!r}, run_name='__main__')")
+        out = subprocess.run([sys.executable, "-c", boot], cwd=str(self.repo), capture_output=True, text=True, env=env)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(list((self.repo / "brain").rglob("__pycache__")), [])
+
+    def test_validate_workflow_runs_the_toolkit_without_bytecode(self):
+        text = (ROOT / "templates/github/pb-validate.yml").read_text()
+        self.assertNotRegex(text, r"python3 (?!-B )")
+        self.assertEqual(text.count('python3 -B "$toolkit"'), 3)
 
     def test_toolkit_sync_from_vendored_copy_refuses_and_keeps_toolkit(self):
         self.scaffold()

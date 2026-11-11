@@ -45,7 +45,7 @@ What the sources or the dates settle, fix in the worktree and note for the repor
 
 - `unresolved`: paths still in conflict. Settle them (step 2) and run it again.
 - `errors`: fix each page in the worktree, `git -C <worktree> add` it, and run it again.
-- `rejected`: the repo's commit rules refused the commit; the merge is still in progress. Read `output`, rewrite the whole message so it satisfies them and run it again with `--raw -m "<message>"`; never bypass a hook.
+- `rejected`: the commit was refused; the merge is still in progress: handle it as the closing flow of `writing.md` says (the same command with `--raw -m "<message>"`, every other argument unchanged).
 - `"pushed": false` with a problem: `docs/brain` moved on origin meanwhile (a routine run). Clean up (step 6) and start `/pb:merge` again.
 
 ## 5. `docs/brain` into the default branch

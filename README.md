@@ -199,7 +199,7 @@ Once the brain and the routine are set up, these happen without anyone running a
 | The brain in my code branch is old | It is the brain as of your branch: bring the default branch in to get what others merged |
 | The brain PR is in conflict, or `docs/brain` is behind | `/pb:merge` |
 | CI says generated files are stale, or they conflict | Take either side, run `python3 brain/.pb/toolkit/pb.py generate`, commit |
-| A commit was rejected by the repo's rules | Claude rewrites the message to satisfy them and retries; fix the format for good with `/pb:schema` (`commit_format`, `commit_rules`) |
+| A commit was rejected by the repo's rules | Claude rewrites the message to satisfy them and retries (the nightly routine reports it instead); fix the format for good with `/pb:schema` (`commit_format`, `commit_rules`) |
 | "Reviewers not requested" on a PR | Check the handles in `brain/schema/review.md` (`/pb:schema`); the review is in the job summary anyway |
 | Nothing was added overnight | `/pb:routine-run status`, then "Problems" in the latest digest |
 | Wrong information | `/pb:fix` in Claude Code |

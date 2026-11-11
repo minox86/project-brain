@@ -13,7 +13,7 @@ Steps:
 4. If validation still fails: run `$PB routine discard` (drops every brain change of this run except today's digest), write the failure at the top of today's digest under "Problems", and continue to step 5: only the digest is committed. Do not move any sync cursor in this case.
 5. `$PB routine finish --branch {{branch}} --skill routine -m "sync <YYYY-MM-DD>" --confidence <the same PATH=LEVEL items you passed to PB review>` (omit `--confidence` if every page is high). It applies retention, regenerates the generated files, commits, pushes `{{branch}}` and opens or updates the Brain updates PR. Report `pr`, the `watched` points with their `reviewers`, and `problems` (a PR that could not be opened, reviewers that could not be requested).
 6. If `conflict` is true: nothing was pushed (`{{branch}}` moved on origin). Do not retry in a loop and never merge to get past it; the next run starts from the remote branch and its cursors, so the same content will be ingested again. Report the conflict and `behind` in your final summary; the next run records it under "Problems".
-7. If `rejected` is not null: the repo's commit rules refused the commit and nothing was pushed. Write it under "Problems" in today's digest with the hook's `output`, then stop: never bypass the hook, never retry. Report it in your final summary: `commit_format` must be corrected with `/pb:schema`.
+7. If `rejected` is not null: the commit was refused and nothing was pushed, digest included. Stop: never bypass the hook, never retry. Your final summary says what was rejected (`rejected.message`), the hook's `output`, and that `commit_format` must be corrected with `/pb:schema`.
 
 Constraints:
 - `gh pr …` commands do not work in this environment: use `gh api` REST calls only.

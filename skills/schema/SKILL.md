@@ -26,7 +26,7 @@ Changes like "send feature status changes to review", "design reviews go to @acm
 
 ## Commit settings
 
-Changes like "our commits must be `docs(brain): …`" or "subjects stay under 72 characters" edit those four settings of `brain/schema/brain.md` (its prose describes them; a brain without them uses the defaults it lists). `commit_format` takes only `{skill}` and `{summary}`, and `{summary}` is required: `PB validate` reports `bad-commit-format`. Show the setting before and after with an example (`PB message -m "add X"`), confirm, then validate and save like any schema change.
+Changes like "our commits must be `docs(brain): …`" or "subjects stay under 72 characters" edit those four settings of `brain/schema/brain.md` (its prose describes them; a brain without them uses the defaults it lists). `commit_format` is written quoted and takes only `{skill}` and `{summary}`, and `{summary}` is required: `PB validate` reports `bad-commit-format`. Show the setting before and after with an example (`PB message -m "add X"`), confirm, then validate and save like any schema change.
 
 ## apply <Pn> or a change in plain words
 

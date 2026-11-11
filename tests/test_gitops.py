@@ -66,7 +66,7 @@ class GitopsTest(GitRepoCase):
         self.write("brain/index.md", "generated\n")
         self.write("apps/web/a.ts", "code\n")
         git(self.repo, "add", "apps/web/a.ts")
-        code, data, err = run_cli("commit", "-m", "pb(put): add approval", cwd=self.repo)
+        code, data, err = run_cli("commit", "--skill", "put", "-m", "add approval", cwd=self.repo)
         self.assertEqual(code, 0, err)
         self.assertTrue(data["committed"])
         self.assertEqual(data["branch"], "feat/x")
@@ -102,11 +102,11 @@ class GitopsTest(GitRepoCase):
     def test_routine_finish_pushes(self):
         run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
         self.add_page("Approval")
-        code, data, err = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "pb(routine): sync", cwd=self.repo)
+        code, data, err = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "sync", cwd=self.repo)
         self.assertEqual(code, 0, err)
         self.assertEqual(data, {"committed": True, "pushed": True, "conflict": False, "pr": None, "watched": [],
                                 "reviewers": NO_REVIEWERS, "behind": 0,
-                                "retention": {"archived": [], "deleted": []}, "problems": [
+                                "retention": {"archived": [], "deleted": []}, "rejected": None, "problems": [
                                     "no GitHub repo (github.repo in sources.md): the Brain updates PR from "
                                     "docs/brain to main was not opened"]})
         log = git(self.remote, "log", "--format=%s", "docs/brain")
@@ -122,7 +122,7 @@ class GitopsTest(GitRepoCase):
         run_cli("routine", "start", "--branch", "main", cwd=self.repo)
         self.add_page("Approval")
         before = git(self.remote, "rev-parse", "main")
-        code, data, _ = run_cli("routine", "finish", "--branch", "main", "-m", "pb(routine): sync", cwd=self.repo)
+        code, data, _ = run_cli("routine", "finish", "--branch", "main", "-m", "sync", cwd=self.repo)
         self.assertEqual(code, 2)
         self.assertIn("default branch", data["error"])
         self.assertEqual(git(self.remote, "rev-parse", "main"), before)
@@ -153,7 +153,7 @@ class RoutineGuardTest(GitRepoCase):
 
     def test_finish_refuses_on_a_working_branch(self):
         before = self.developer_at_work()
-        code, data, _ = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "pb(routine): sync",
+        code, data, _ = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "sync",
                                 cwd=self.repo)
         self.assertEqual(code, 2, data)
         self.assertIn("feat/x", data["error"])
@@ -226,7 +226,7 @@ class BrainBranchCase(GitRepoCase):
         return data
 
     def finish(self, *extra, expect=0):
-        code, data, err = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "pb(routine): sync",
+        code, data, err = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "sync",
                                   *extra, cwd=self.repo)
         self.assertEqual(code, expect, (data, err))
         return data

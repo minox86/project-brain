@@ -8,6 +8,7 @@ from . import frontmatter, links, policy
 from .brain import _as_list
 from .changes import changed_pages
 from .errors import FrontmatterError
+from .messages import format_problem
 from .scaffold import ROUTINE_SYNC_SKILL
 from .secrets import scan
 
@@ -94,6 +95,10 @@ def validate(brain, paths=None, base="HEAD"):
         report(warnings, "schema/sources.md", "routine-instructions-missing",
                "the cloud routine reads its instructions from brain/.pb/toolkit, which has none: "
                "run `PB toolkit-sync` from the plugin and commit it to the routine's branch")
+
+    problem = format_problem(brain.config.get("commit_format"))
+    if problem:
+        report(errors, "schema/brain.md", "bad-commit-format", problem)
 
     for problem in policy.problems(brain):
         report(errors, "schema/review.md", "bad-review-policy", problem)

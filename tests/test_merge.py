@@ -69,7 +69,7 @@ class MergeCase(GitRepoCase):
         return out
 
     def finish_cli(self):
-        return run_cli("merge", "finish", "--worktree", self.worktree, "-m", "pb(merge): bring main into docs/brain",
+        return run_cli("merge", "finish", "--worktree", self.worktree, "-m", "bring main into docs/brain",
                        cwd=self.repo)
 
     def remote_sha(self, branch):

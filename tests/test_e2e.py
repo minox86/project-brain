@@ -23,7 +23,7 @@ class EndToEndTest(unittest.TestCase):
                 code, _, err = run_cli("scaffold", "--repo", repo, "--product", "Fatture Pro")
                 self.assertEqual(code, 0, err)
                 git(repo, "checkout", "-qb", "feat/approval")
-                run_cli("commit", "-m", "pb(init): create brain", cwd=repo)
+                run_cli("commit", "--skill", "init", "-m", "create brain", cwd=repo)
                 pages = [
                     page("module", "Billing", "paths: [services/billing/**]\nsummary: Invoices and payments",
                          "## Responsibility\nOwns invoices.\n"),
@@ -38,7 +38,7 @@ class EndToEndTest(unittest.TestCase):
                     target.write_text(text)
                 code, data, _ = run_cli("validate", cwd=repo)
                 self.assertEqual(code, 0, data)
-                code, data, err = run_cli("commit", "-m", "pb(put): seed", cwd=repo)
+                code, data, err = run_cli("commit", "--skill", "put", "-m", "seed", cwd=repo)
                 self.assertEqual(code, 0, err)
                 self.assertEqual(len(data["files"]), 6)
                 code, _, _ = run_cli("generate", cwd=repo)

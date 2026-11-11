@@ -4,6 +4,7 @@ from pathlib import Path
 
 from . import frontmatter
 from .errors import FrontmatterError, NotInBrain
+from .repo import BRAIN_PR_TITLE
 
 DEFAULTS = {
     "product": None,
@@ -13,6 +14,10 @@ DEFAULTS = {
     "digest_retention_days": 30,
     "context_pack_max_words": 4000,
     "raw_max_words": 3000,
+    "commit_format": "pb({skill}): {summary}",
+    "pr_title_brain": BRAIN_PR_TITLE,
+    "pr_title_init": "Create the project brain",
+    "commit_rules": None,
 }
 
 GENERATED = ["index.md", "glossary.md", "features.md", "context/", ".pb/backlinks.json"]

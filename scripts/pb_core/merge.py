@@ -9,7 +9,8 @@ from pathlib import Path
 from .brain import MARKER, Brain
 from .errors import GitError, UsageError
 from .generate import generate
-from .gitops import adds_nothing, routine_cleanup
+from .gitops import adds_nothing, routine_cleanup, try_commit
+from .messages import compose, pr_title
 from .repo import BRAIN_BRANCH, BRAIN_PR_TITLE, default_branch, ensure_brain_pr, gh_json, gh_repo, git, origin_repo
 from .save import _generated, check
 from .state import _save
@@ -132,11 +133,12 @@ def _on_top_of_brain_branch(worktree):
                          "nothing was changed")
 
 
-def merge_finish(repo, worktree, message):
-    """Settle the generated files, regenerate, run the save checks, commit the merge and push docs/brain."""
+def merge_finish(repo, worktree, summary, raw=False):
+    """Settle the generated files, regenerate, run the save checks, commit the merge and push docs/brain. A commit
+    the repo's hooks reject leaves the merge in progress, for a retry with a message given in full (`raw`)."""
     worktree = Path(worktree).resolve()
     _on_top_of_brain_branch(worktree)
-    out = {"committed": False, "pushed": False, "errors": [], "unresolved": [], "problems": []}
+    out = {"committed": False, "pushed": False, "errors": [], "unresolved": [], "problems": [], "rejected": None}
     unmerged = _unmerged(worktree)
     out["unresolved"] = [f for f in unmerged if not _generated(f)]
     if out["unresolved"]:
@@ -155,7 +157,10 @@ def merge_finish(repo, worktree, message):
         return out
     merging = git(worktree, "rev-parse", "-q", "--verify", "MERGE_HEAD", check=False).returncode == 0
     if merging or git(worktree, "diff", "--cached", "--quiet", check=False).returncode:
-        git(worktree, "commit", "-q", "-m", message)
+        out["rejected"] = try_commit(worktree, compose(Brain(worktree / "brain"), "merge", summary, raw))
+        if out["rejected"]:
+            out["problems"].append("the commit was rejected by the repo's commit rules")
+            return out
         out["committed"] = True
     if git(worktree, "push", "-q", "origin", f"HEAD:refs/heads/{BRAIN_BRANCH}", check=False).returncode:
         out["problems"].append(f"the push to {BRAIN_BRANCH} was refused ({BRAIN_BRANCH} moved on origin, probably a "
@@ -163,6 +168,11 @@ def merge_finish(repo, worktree, message):
     else:
         out["pushed"] = True
     return out
+
+
+def _pr_title(repo):
+    root = Path(repo) / "brain"
+    return pr_title(Brain(root), "brain") if (root / MARKER).is_file() else BRAIN_PR_TITLE
 
 
 def _owner(repo):
@@ -192,7 +202,7 @@ def merge_land(repo, wait=600, interval=15, sleep=time.sleep):
     else:
         body = (f"Brain pages the pb routine wrote on `{BRAIN_BRANCH}`, brought up to date with `{base}` by "
                 f"`/pb:merge`. Merging this PR brings them to `{base}`.\n")
-        out["pr"], number, problem, _ = ensure_brain_pr(owner, base, body)
+        out["pr"], number, problem, _ = ensure_brain_pr(owner, base, body, _pr_title(repo))
         if problem:
             out["problems"].append(problem)
         if number is None:

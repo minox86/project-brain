@@ -13,6 +13,7 @@ from .context import build_context
 from .generate import generate
 from .retention import apply_retention
 from .lint import lint
+from .messages import commit_message, compose, pr_title
 from .stats import stats
 from . import gitops, merge, state
 from .repo import repo_root
@@ -133,7 +134,17 @@ def _cmd_correction(args):
 
 
 def _cmd_commit(args):
-    return gitops.commit(_brain(args), args.message, args.allow_default, args.include or ()), 0
+    brain = _brain(args)
+    result = gitops.commit(brain, compose(brain, args.skill, args.message, args.raw), args.allow_default,
+                           args.include or ())
+    return result, 1 if result["rejected"] else 0
+
+
+def _cmd_message(args):
+    brain = _brain(args)
+    return {"message": commit_message(brain, args.skill, args.message), "pr_title_brain": pr_title(brain, "brain"),
+            "pr_title_init": pr_title(brain, "init"), "commit_format": brain.config.get("commit_format"),
+            "commit_rules": brain.config.get("commit_rules")}, 0
 
 
 def _cmd_routine(args):
@@ -152,9 +163,10 @@ def _cmd_routine(args):
     if not args.branch:
         raise UsageError(f"pb routine {args.action} needs --branch")
     if not args.message:
-        raise UsageError("pb routine finish needs -m MESSAGE")
-    result = gitops.routine_finish(brain, args.branch, args.message, args.confidence or ())
-    return result, 1 if result["conflict"] else 0
+        raise UsageError("pb routine finish needs -m SUMMARY")
+    message = compose(brain, args.skill or "routine", args.message, args.raw)
+    result = gitops.routine_finish(brain, args.branch, message, args.confidence or ())
+    return result, 1 if result["conflict"] or result["rejected"] else 0
 
 
 def _cmd_merge(args):
@@ -168,8 +180,8 @@ def _cmd_merge(args):
         result = merge.merge_start(repo, args.worktree)
         return result, 1 if result["alert"] else 0
     if not args.message:
-        raise UsageError("pb merge finish needs -m MESSAGE")
-    result = merge.merge_finish(repo, args.worktree, args.message)
+        raise UsageError("pb merge finish needs -m SUMMARY")
+    result = merge.merge_finish(repo, args.worktree, args.message, args.raw)
     return result, 1 if result["errors"] or result["unresolved"] or not result["pushed"] else 0
 
 
@@ -243,22 +255,31 @@ def build_parser():
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_correction)
     p = sub.add_parser("commit")
-    p.add_argument("-m", "--message", required=True)
+    p.add_argument("-m", "--message", required=True, metavar="SUMMARY", help="the summary the commit_format of schema/brain.md wraps (with --raw: the whole message)")
+    p.add_argument("--skill", default="brain", help="the {skill} of commit_format (default: brain)")
+    p.add_argument("--raw", action="store_true", help="-m is the whole message, used verbatim")
     p.add_argument("--allow-default", action="store_true")
     p.add_argument("--include", nargs="+", help="extra repo paths to commit (e.g. CI workflows from init)")
     p.set_defaults(handler=_cmd_commit)
+    p = sub.add_parser("message", help="the commit message and PR titles in the repo's format; commits nothing")
+    p.add_argument("-m", "--message", required=True, metavar="SUMMARY")
+    p.add_argument("--skill", default="brain")
+    p.set_defaults(handler=_cmd_message)
     p = sub.add_parser("routine")
     p.add_argument("action", choices=["start", "finish", "discard", "cleanup"])
     p.add_argument("--branch")
     p.add_argument("--worktree", help="manual runs: work in a detached worktree at this path")
-    p.add_argument("-m", "--message")
+    p.add_argument("-m", "--message", metavar="SUMMARY", help="the summary the commit_format of schema/brain.md wraps (with --raw: the whole message)")
+    p.add_argument("--skill", help="finish: the {skill} of commit_format (default: routine)")
+    p.add_argument("--raw", action="store_true", help="finish: -m is the whole message, used verbatim")
     p.add_argument("--confidence", nargs="+", action="extend", metavar="PATH=LEVEL",
                    help="finish: pages written with less than high confidence (low, medium)")
     p.set_defaults(handler=_cmd_routine)
     p = sub.add_parser("merge")
     p.add_argument("action", choices=["start", "finish", "land"])
     p.add_argument("--worktree", help="start, finish: the temporary worktree on docs/brain")
-    p.add_argument("-m", "--message")
+    p.add_argument("-m", "--message", metavar="SUMMARY", help="the summary the commit_format of schema/brain.md wraps (with --raw: the whole message)")
+    p.add_argument("--raw", action="store_true", help="finish: -m is the whole message, used verbatim")
     p.add_argument("--wait", type=int, default=600, help="land: seconds to wait for the PR's checks")
     p.set_defaults(handler=_cmd_merge)
     p = sub.add_parser("review")

@@ -59,7 +59,7 @@ class LocalRunTest(GitRepoCase):
 
         self.add_page("From routine", root=wt)
         code, data, err = run_cli("--brain", wt / "brain", "routine", "finish", "--branch", "docs/brain",
-                                  "-m", "pb(routine): manual", cwd=self.repo)
+                                  "-m", "manual", cwd=self.repo)
         self.assertEqual(code, 0, err)
         self.assertEqual({k: data[k] for k in ("committed", "pushed", "conflict", "pr", "watched", "problems")},
                          {"committed": True, "pushed": True, "conflict": False, "pr": None, "watched": [],

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .errors import GitError, UsageError
 from .generate import generate
+from .messages import pr_title
 from .repo import (BRAIN_BRANCH, BRAIN_PR_TITLE, brain_pr_body, default_branch, ensure_brain_pr, gh_repo,
                    git as _git, request_reviewers)
 from .retention import apply_retention
@@ -33,7 +34,17 @@ def _staged(repo, specs):
     return [f for f in out.split("\0") if f]
 
 
+def try_commit(cwd, message, *specs):
+    """git commit with the repo's hooks; a refusal (commit-msg, pre-commit) is returned, not raised, and leaves the
+    changes as git left them. None when committed."""
+    done = _git(cwd, "commit", "-q", "-m", message, *(("--", *specs) if specs else ()), check=False)
+    if done.returncode == 0:
+        return None
+    return {"message": message, "output": "\n".join(x.strip() for x in (done.stderr, done.stdout) if x.strip())}
+
+
 def commit(brain, message, allow_default=False, include=()):
+    """Commit the brain (and `include`) with `message`, composed by messages.compose."""
     repo = _repo_root(brain)
     branch = current_branch(repo)
     if not allow_default and branch == default_branch(repo):
@@ -48,10 +59,12 @@ def commit(brain, message, allow_default=False, include=()):
     _git(repo, "add", "-A", "--", *specs)
     files = _staged(repo, specs)
     if not files:
-        return {"committed": False, "sha": None, "branch": branch, "files": []}
-    _git(repo, "commit", "-q", "-m", message, "--", *specs)
+        return {"committed": False, "sha": None, "branch": branch, "files": [], "rejected": None}
+    rejected = try_commit(repo, message, *specs)
+    if rejected:
+        return {"committed": False, "sha": None, "branch": branch, "files": files, "rejected": rejected}
     sha = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    return {"committed": True, "sha": sha, "branch": branch, "files": files}
+    return {"committed": True, "sha": sha, "branch": branch, "files": files, "rejected": None}
 
 
 def adds_nothing(repo, branch, base):
@@ -143,7 +156,10 @@ def routine_finish(brain, branch, message, confidence=()):
     routed = review(brain, fork.stdout.strip() if fork.returncode == 0 else before, confidence)
     out = {"committed": done["committed"], "pushed": False, "conflict": False, "pr": None,
            "watched": routed["review"], "reviewers": routed["reviewers"], "behind": 0,
-           "retention": retention, "problems": []}
+           "retention": retention, "problems": [], "rejected": done["rejected"]}
+    if done["rejected"]:  # nothing pushed, no PR: the run's changes stay in the checkout
+        out["problems"].append("the commit was rejected by the repo's commit rules")
+        return out
     push = ["push", "-q"]
     if _remote_has(repo, branch):
         tip = _git(repo, "rev-parse", f"origin/{branch}").stdout.strip()
@@ -178,7 +194,8 @@ def _brain_pr(brain, base, routed, out):
                                f"{BRAIN_BRANCH} to {base} was not opened")
         return
     url, number, problem, author = ensure_brain_pr(owner, base,
-                                                   brain_pr_body(routed["markdown"], out["behind"], base))
+                                                   brain_pr_body(routed["markdown"], out["behind"], base),
+                                                   pr_title(brain, "brain"))
     out["pr"] = url
     if problem:
         out["problems"].append(problem)

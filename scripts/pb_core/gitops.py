@@ -5,7 +5,7 @@ from pathlib import Path
 from .errors import GitError, UsageError
 from .generate import generate
 from .messages import pr_title
-from .repo import (BRAIN_BRANCH, BRAIN_PR_TITLE, brain_pr_body, default_branch, ensure_brain_pr, gh_repo,
+from .repo import (BRAIN_BRANCH, brain_pr_body, default_branch, ensure_brain_pr, gh_repo,
                    git as _git, request_reviewers)
 from .retention import apply_retention
 from .review import review
@@ -190,7 +190,7 @@ def _ahead(repo, base):
 def _brain_pr(brain, base, routed, out):
     owner = gh_repo(brain)
     if not owner:
-        out["problems"].append(f"no GitHub repo (github.repo in sources.md): the {BRAIN_PR_TITLE} PR from "
+        out["problems"].append(f"no GitHub repo (github.repo in sources.md): the brain PR from "
                                f"{BRAIN_BRANCH} to {base} was not opened")
         return
     url, number, problem, author = ensure_brain_pr(owner, base,

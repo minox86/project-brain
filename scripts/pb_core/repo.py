@@ -80,22 +80,23 @@ def brain_pr_body(markdown, behind, base):
 
 def ensure_brain_pr(owner, base, body, title=BRAIN_PR_TITLE):
     """The open PR docs/brain -> base, found (its body refreshed) or opened. Returns (url, number, problem, author),
-    author the PR's `user.login` (None when unknown). `title` (pr_title_brain) only names a PR it opens: the PR is
-    found by head and base. gh api, not gh pr: cloud routines can only reach the REST API."""
+    author the PR's `user.login` (None when unknown). The PR is found by head and base; `title` (pr_title_brain) is
+    set on it, opened or found, so a changed format reaches the open PR. gh api, not gh pr: cloud routines can only reach the REST API."""
     found = gh_json(["api", f"repos/{owner}/pulls?head={owner.split('/')[0]}:{BRAIN_BRANCH}&base={base}&state=open"])
     if found is None:
-        return None, None, f"GitHub could not be reached (gh): the {BRAIN_PR_TITLE} PR was not checked", None
+        return None, None, "GitHub could not be reached (gh): the brain PR was not checked", None
     if isinstance(found, list) and found:
         pr = found[0]
         number = pr.get("number")
         problem = None
-        if gh_json(["api", f"repos/{owner}/pulls/{number}", "-X", "PATCH", "-f", f"body={body}"]) is None:
-            problem = f"the description of the {BRAIN_PR_TITLE} PR could not be updated"
+        if gh_json(["api", f"repos/{owner}/pulls/{number}", "-X", "PATCH", "-f", f"title={title}",
+                    "-f", f"body={body}"]) is None:
+            problem = "the title and description of the brain PR could not be updated"
         return pr.get("html_url"), number, problem, _author(pr)
     pr = gh_json(["api", f"repos/{owner}/pulls", "-X", "POST", "-f", f"title={title}",
                   "-f", f"head={BRAIN_BRANCH}", "-f", f"base={base}", "-f", f"body={body}"])
     if not pr:
-        return None, None, (f"the {BRAIN_PR_TITLE} PR could not be opened: it is retried at the next run "
+        return None, None, ("the brain PR could not be opened: it is retried at the next run "
                             f"(or open it by hand from {BRAIN_BRANCH} to {base})"), None
     return pr.get("html_url"), pr.get("number"), None, _author(pr)
 
@@ -116,5 +117,5 @@ def request_reviewers(owner, number, reviewers, exclude=()):
     args += [x for u in users for x in ("-f", f"reviewers[]={u}")]
     args += [x for t in teams for x in ("-f", f"team_reviewers[]={t}")]
     if gh_json(args) is None:
-        return [f"reviewers not requested on the {BRAIN_PR_TITLE} PR: {', '.join(users + teams)}"]
+        return [f"reviewers not requested on the brain PR: {', '.join(users + teams)}"]
     return []

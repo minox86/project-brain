@@ -259,7 +259,7 @@ class NeverBypassTest(unittest.TestCase):
         found = []
         for path in SCRIPTS.rglob("*.py"):
             text = path.read_text(encoding="utf-8")
-            for banned in ("--no-verify", "core.hooksPath", "HUSKY=0", '"-n"'):
+            for banned in ("--no-verify", "core.hooksPath", "HUSKY=0", '"-n"', "'-n'"):
                 if banned in text:
                     found.append(f"{path.relative_to(SCRIPTS)}: {banned}")
         self.assertEqual(found, [])

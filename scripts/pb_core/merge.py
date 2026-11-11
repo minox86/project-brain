@@ -188,14 +188,14 @@ def merge_land(repo, wait=600, interval=15, sleep=time.sleep):
     base = default_branch(repo)
     owner = _owner(repo)
     if not owner:
-        out["problems"].append(f"no GitHub repo (github.repo in sources.md): the {BRAIN_PR_TITLE} PR cannot be merged")
+        out["problems"].append("no GitHub repo (github.repo in sources.md): the brain PR cannot be merged")
         return out
     if adds_nothing(repo, BRAIN_BRANCH, base):
         out["problems"].append(f"{BRAIN_BRANCH} holds nothing {base} lacks: there is nothing to merge")
         return out
     found = gh_json(["api", f"repos/{owner}/pulls?head={owner.split('/')[0]}:{BRAIN_BRANCH}&base={base}&state=open"])
     if found is None:
-        out["problems"].append(f"GitHub could not be reached (gh): the {BRAIN_PR_TITLE} PR was not checked")
+        out["problems"].append("GitHub could not be reached (gh): the brain PR was not checked")
         return out
     if found:  # found, not refreshed: its description is the routine's
         out["pr"], number = found[0].get("html_url"), found[0].get("number")
@@ -213,7 +213,7 @@ def merge_land(repo, wait=600, interval=15, sleep=time.sleep):
         sha = ((pr or {}).get("head") or {}).get("sha")
         runs = gh_json(["api", f"repos/{owner}/commits/{sha}/check-runs"]) if sha else None
         if runs is None:
-            out["problems"].append(f"GitHub could not be reached (gh): the checks of the {BRAIN_PR_TITLE} PR were "
+            out["problems"].append("GitHub could not be reached (gh): the checks of the brain PR were "
                                    "not read")
             return out
         runs = (runs.get("check_runs") or []) if isinstance(runs, dict) else []
@@ -249,7 +249,7 @@ def merge_land(repo, wait=600, interval=15, sleep=time.sleep):
         done = put("squash")  # merge commits are disabled on this repository
     out["merged"] = bool(isinstance(done, dict) and done.get("merged"))
     if not out["merged"]:
-        out["problems"].append(f"GitHub refused to merge the {BRAIN_PR_TITLE} PR: see {out['pr']}")
+        out["problems"].append(f"GitHub refused to merge the brain PR: see {out['pr']}")
     return out
 
 

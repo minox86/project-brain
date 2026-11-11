@@ -63,7 +63,7 @@ class LocalRunTest(GitRepoCase):
         self.assertEqual(code, 0, err)
         self.assertEqual({k: data[k] for k in ("committed", "pushed", "conflict", "pr", "watched", "problems")},
                          {"committed": True, "pushed": True, "conflict": False, "pr": None, "watched": [],
-                          "problems": ["no GitHub repo (github.repo in sources.md): the Brain updates PR from "
+                          "problems": ["no GitHub repo (github.repo in sources.md): the brain PR from "
                                        "docs/brain to main was not opened"]})
         self.assertEqual(git(self.remote, "log", "--format=%s", "-2", "docs/brain").splitlines(),
                          ["pb(routine): manual", "init"])

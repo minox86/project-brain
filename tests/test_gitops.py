@@ -107,7 +107,7 @@ class GitopsTest(GitRepoCase):
         self.assertEqual(data, {"committed": True, "pushed": True, "conflict": False, "pr": None, "watched": [],
                                 "reviewers": NO_REVIEWERS, "behind": 0,
                                 "retention": {"archived": [], "deleted": []}, "rejected": None, "problems": [
-                                    "no GitHub repo (github.repo in sources.md): the Brain updates PR from "
+                                    "no GitHub repo (github.repo in sources.md): the brain PR from "
                                     "docs/brain to main was not opened"]})
         log = git(self.remote, "log", "--format=%s", "docs/brain")
         self.assertEqual(log.splitlines()[:2], ["pb(routine): sync", "init"])
@@ -319,8 +319,8 @@ class RoutineFinishTest(BrainBranchCase):
         self.add_page("Unwatched")
         out = self.finish()
         self.assertIn("decisions/X.md", [w["path"] for w in out["watched"]])
-        self.assertIn("decisions/X.md", self.gh.fields("patch")[0])
-        self.assertNotIn("nothing on a watched point", self.gh.fields("patch")[0])
+        self.assertIn("decisions/X.md", self.gh.fields("patch")[-1])
+        self.assertNotIn("nothing on a watched point", self.gh.fields("patch")[-1])
 
     def test_finish_low_confidence_page_is_watched(self):
         self.start()
@@ -342,7 +342,7 @@ class RoutineFinishTest(BrainBranchCase):
         out = self.finish()
         self.assertEqual(out["pr"], "https://github.com/o/r/pull/12")
         self.assertIsNone(self.gh.fields("open"))
-        self.assertIn("decisions/X.md", self.gh.fields("patch")[0])
+        self.assertIn("decisions/X.md", self.gh.fields("patch")[-1])
         self.assertEqual(sorted(self.gh.fields("reviewers")), ["reviewers[]=pm", "team_reviewers[]=backend"])
         self.assertEqual(out["reviewers"]["users"], ["pm"])
         self.assertEqual(out["problems"], [])

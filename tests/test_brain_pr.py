@@ -78,7 +78,13 @@ class EnsureBrainPrTest(unittest.TestCase):
         self.assertIsNone(gh.fields("open"))
         patch = [args for args in gh.calls if "PATCH" in args][0]
         self.assertEqual(patch[1], "repos/o/r/pulls/12")
-        self.assertEqual(gh.fields("patch"), ["body=new body"])
+        self.assertEqual(gh.fields("patch"), ["title=Brain updates", "body=new body"])
+
+    def test_found_pr_gets_the_configured_title(self):
+        gh = FakeGh(open_prs=[{"number": 12, "html_url": PR_URL.format(12), "title": "Brain updates"}])
+        with mock.patch("pb_core.repo.gh_json", gh):
+            ensure_brain_pr("o/r", "main", "new body", "docs: brain updates")
+        self.assertEqual(gh.fields("patch"), ["title=docs: brain updates", "body=new body"])
 
     def test_author_of_the_pr_is_returned(self):
         for gh, expected in ((FakeGh(), "routine-bot"),

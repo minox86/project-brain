@@ -1,12 +1,10 @@
 """Git operations: dev commits on the current branch, routine runs on a target branch."""
-import datetime
 from pathlib import Path
 
-from .brain import GENERATED
+from .brain import GENERATED, Brain
 from .errors import GitError
-from .review import review
-from .workspace import (BRAIN_BRANCH, REVIEW_PREFIX, _git, _remote_has, default_branch, ensure_promotion,
-                        open_review_pr, origin_repo, regenerate)
+from .generate import generate
+from .repo import default_branch, git as _git
 
 
 def _repo_root(brain):
@@ -15,6 +13,11 @@ def _repo_root(brain):
 
 def _brain_prefix(brain, repo):
     return brain.root.resolve().relative_to(repo.resolve()).as_posix()
+
+
+def _remote_has(repo, branch):
+    return _git(repo, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}",
+                check=False).returncode == 0
 
 
 def current_branch(repo):
@@ -81,20 +84,9 @@ def routine_cleanup(repo, worktree):
 
 
 def routine_finish(brain, branch, message, confidence=()):
-    """Push the run to `branch`; changes the review policy holds back go to a PR on top of it instead."""
+    """Commit the run and push it to `branch`."""
     repo = _repo_root(brain)
-    routed = review(brain, "HEAD", confidence)
-    held = [item["path"] for item in routed["review"]]
-    done = commit(brain, message, allow_default=True, exclude=held)
-    direct_tip = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    held_commit = None
-    if held:
-        prefix = _brain_prefix(brain, repo)
-        specs = [f"{prefix}/{rel}" for rel in held]
-        _git(repo, "add", "-A", "--", *specs)
-        _git(repo, "commit", "-q", "-m", f"{message} (review)", "--", *specs)
-        held_commit = _git(repo, "rev-parse", "HEAD").stdout.strip()
-        _git(repo, "reset", "-q", "--keep", direct_tip)
+    done = commit(brain, message, allow_default=True)
     _git(repo, "fetch", "-q", "origin")
     if _remote_has(repo, branch):
         rebase = _git(repo, "rebase", "-q", f"origin/{branch}", check=False)
@@ -106,43 +98,25 @@ def routine_finish(brain, branch, message, confidence=()):
     if _git(repo, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", check=False).returncode:
         return {"committed": done["committed"], "pushed": False, "conflict": True, "review": None,
                 "promotion": None, "problems": [f"the push to {branch} was refused (someone pushed meanwhile?)"]}
-    result = {"committed": done["committed"], "pushed": True, "conflict": False, "review": None,
-              "promotion": None, "problems": []}
-    if held_commit:
-        result["review"] = _open_review(brain, repo, branch, message, routed, held_commit)
-    if branch == BRAIN_BRANCH and done["committed"]:
-        result["promotion"], problem = ensure_promotion(repo, _owner(brain, repo))
-        if problem:
-            result["problems"].append(problem)
-    return result
+    return {"committed": done["committed"], "pushed": True, "conflict": False, "review": None,
+            "promotion": None, "problems": []}
 
 
-def _open_review(brain, repo, branch, message, routed, held_commit):
-    """Put the held changes on a pb/review/ branch off the pushed tip and open a PR with the area reviewers."""
-    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
-    head = f"{REVIEW_PREFIX}{stamp}"
-    out = {"branch": head, "pages": [item["path"] for item in routed["review"]], "pr": None, "problems": []}
-    back = current_branch(repo) or _git(repo, "rev-parse", "HEAD").stdout.strip()
-    _git(repo, "checkout", "-q", "--detach")
-    try:
-        if _git(repo, "cherry-pick", held_commit, check=False).returncode != 0:
-            _git(repo, "cherry-pick", "--abort", check=False)
-            out["problems"].append(f"the held changes no longer apply on {branch}: they are dropped for this run")
-            return out
-        _git(repo, "push", "-q", "origin", f"HEAD:refs/heads/{head}")
-    finally:
-        _git(repo, "checkout", "-q", back)
-    body = routed["markdown"] + "\nOpened by the pb routine. Merge to accept, edit the pages here to correct them, " \
-                                "close to drop them.\n"
-    out["pr"], problems = open_review_pr(_owner(brain, repo), head, f"{message} (review)", body, routed["reviewers"],
-                                         base=branch)
-    out["problems"] += problems
-    out["reviewers"] = routed["reviewers"]
-    return out
-
-
-def _owner(brain, repo):
-    return (brain.sources.get("github") or {}).get("repo") or origin_repo(repo)
+def regenerate(brain_root, repo):
+    """Refresh index, glossary, context packs and backlinks from the committed pages; commit them if they changed.
+    Runs after the rebase on the latest branch, so generated files never conflict."""
+    done = generate(Brain(brain_root))
+    prefix = Path(brain_root).resolve().relative_to(Path(repo).resolve()).as_posix()
+    specs = [f"{prefix}/{g.rstrip('/')}" for g in GENERATED] + [f"{prefix}/{d}" for d in done["deleted"]]
+    specs = [spec for spec in specs if (Path(repo) / spec).exists()
+             or _git(repo, "cat-file", "-e", f"HEAD:{spec}", check=False).returncode == 0]
+    if not specs:
+        return False
+    _git(repo, "add", "-A", "--", *specs)
+    if _git(repo, "diff", "--cached", "--quiet", "--", *specs, check=False).returncode == 0:
+        return False
+    _git(repo, "commit", "-q", "-m", "pb(generate): refresh generated files", "--", *specs)
+    return True
 
 
 def routine_discard(brain):

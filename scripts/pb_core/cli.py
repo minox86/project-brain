@@ -14,13 +14,15 @@ from .generate import generate
 from .retention import apply_retention
 from .lint import lint
 from .stats import stats
-from . import gitops, state, workspace
+from . import gitops, state
+from .repo import repo_root
 from .scaffold import scaffold, sync_toolkit, upgrade
 from .scan import scan
 from .errors import PbError, UsageError
 from .prs import merged_prs
 from .resolve import resolve
 from .review import review
+from .save import save
 from .validate import validate
 
 
@@ -136,7 +138,7 @@ def _cmd_commit(args):
 
 def _cmd_routine(args):
     if args.action in ("start", "cleanup"):
-        repo = workspace.repo_root(Path.cwd())
+        repo = repo_root(Path.cwd())
         if args.action == "cleanup":
             if not args.worktree:
                 raise UsageError("pb routine cleanup needs --worktree")
@@ -155,19 +157,9 @@ def _cmd_routine(args):
     return result, 1 if result["conflict"] else 0
 
 
-def _cmd_workspace(args):
-    return workspace.sync(workspace.repo_root(Path.cwd())), 0
-
-
 def _cmd_save(args):
-    repo = workspace.repo_root(Path.cwd())
-    if args.cont:
-        result = workspace.save_continue(repo)
-    else:
-        if not args.message:
-            raise UsageError("pb save needs -m MESSAGE")
-        result = workspace.save(repo, args.message, args.paths, force_review=args.force_review)
-    return result, 1 if (result["conflict"] or result["errors"]) else 0
+    result = save(repo_root(Path.cwd()), args.paths)
+    return result, 1 if result["errors"] else 0
 
 
 def _repo_arg(args):
@@ -262,14 +254,8 @@ def build_parser():
     p.add_argument("--upgrade", action="store_true", help="existing brain: current workflows, plugin settings, toolkit")
     p.add_argument("--preset", default="software-product")
     p.set_defaults(handler=_cmd_scaffold)
-    p = sub.add_parser("workspace")
-    p.add_argument("action", choices=["sync"])
-    p.set_defaults(handler=_cmd_workspace)
     p = sub.add_parser("save")
-    p.add_argument("paths", nargs="*", help="the pages this save is about (default: every unsaved brain file)")
-    p.add_argument("-m", "--message")
-    p.add_argument("--continue", dest="cont", action="store_true", help="resume after resolving a conflict")
-    p.add_argument("--force-review", action="store_true", help="configuration or toolkit changes: review PR only")
+    p.add_argument("paths", nargs="*", help="the pages this save is about (default: every changed brain file)")
     p.set_defaults(handler=_cmd_save)
     sub.add_parser("toolkit-sync").set_defaults(handler=_cmd_toolkit_sync)
     p = sub.add_parser("lint")

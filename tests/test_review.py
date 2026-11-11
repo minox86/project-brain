@@ -224,58 +224,12 @@ class RoutineSplitTest(BrainRepoCase):
         self.addCleanup(lambda: [os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
                                  for k, v in saved.items()])
 
-    def remote_files(self, ref):
-        return git(self.remote, "ls-tree", "-r", "--name-only", ref, "brain/").splitlines()
-
-    def test_held_pages_go_to_a_review_pr(self):
-        run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
-        decision = self.put("decision", "Single approver", f"area: technical\n{SRC}")
-        feature = self.put("feature", "Approval", f"status: planned\n{SRC}",
-                           "Approves an [[Invoice]] once, see [[Single approver]].\n")
-        concept = self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}", "Billed by [[Billing]] monthly.\n")
-        self.write("brain/digests/2026-11-01.md", "# Digest\n")
-        code, data, err = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "pb(routine): sync",
-                                  "--confidence", f"brain/{concept}=high", cwd=self.repo)
-        self.assertEqual(code, 0, err)
-        self.assertTrue(data["pushed"])
-        review = data["review"]
-        self.assertEqual(review["pr"], "https://github.com/o/r/pull/7")
-        self.assertEqual(sorted(review["pages"]), sorted([decision, feature]))
-        self.assertEqual(review["problems"], [])
-        direct = self.remote_files("brain/inbox")
-        self.assertIn(f"brain/{concept}", direct)
-        self.assertIn("brain/digests/2026-11-01.md", direct)
-        self.assertNotIn(f"brain/{decision}", direct)
-        held = self.remote_files(review["branch"])
-        self.assertIn(f"brain/{decision}", held)
-        self.assertIn("Approves an [[Invoice]] once", git(self.remote, "show", f"{review['branch']}:brain/{feature}"))
-        self.assertEqual(git(self.remote, "rev-parse", f"{review['branch']}~1"),
-                         git(self.remote, "rev-parse", "brain/inbox"))
-        calls = self.log.read_text()
-        self.assertIn("head=pb/review/", calls)
-        self.assertIn("base=brain/inbox", calls)
-        self.assertIn("team_reviewers[]=backend", calls)
-        self.assertIn("reviewers[]=pm", calls)
-        self.assertEqual(git(self.repo, "branch", "--show-current"), "brain/inbox")
-        self.assertEqual(git(self.repo, "status", "--porcelain", "brain"), "")
-
     def test_without_held_pages_nothing_is_opened(self):
         run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
         self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}", "Billed by [[Billing]] monthly.\n")
         code, data, _ = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "m", cwd=self.repo)
         self.assertEqual((code, data["review"]), (0, None))
         self.assertEqual(self.log.read_text(), "")
-
-    def test_pr_failure_keeps_the_branch_and_reports(self):
-        os.environ["FAKE_GH_FIXTURES"] = str(Path(self.tmp.name) / "none.json")
-        Path(os.environ["FAKE_GH_FIXTURES"]).write_text("{}")
-        run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
-        decision = self.put("decision", "Single approver", f"area: technical\n{SRC}")
-        code, data, _ = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "m", cwd=self.repo)
-        self.assertEqual(code, 0)
-        self.assertIsNone(data["review"]["pr"])
-        self.assertIn("open it by hand", data["review"]["problems"][0])
-        self.assertIn(f"brain/{decision}", self.remote_files(data["review"]["branch"]))
 
 
 class TemplatesTest(unittest.TestCase):

@@ -180,6 +180,6 @@ def _set_product(path, product):
 
 
 def _default_branch(repo):
-    from .workspace import default_branch
+    from .repo import default_branch
     inside = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=str(repo), capture_output=True, text=True)
     return default_branch(repo) if inside.returncode == 0 else "main"

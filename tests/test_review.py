@@ -214,6 +214,7 @@ class RoutineSplitTest(BrainRepoCase):
         self.log.write_text("")
         fixtures = base / "fixtures.json"
         fixtures.write_text(json.dumps({
+            "repos/o/r/pulls?head=o:docs/brain&base=main&state=open": [],
             "repos/o/r/pulls": {"number": 7, "html_url": "https://github.com/o/r/pull/7"},
             "repos/o/r/pulls/7/requested_reviewers": {},
         }))
@@ -224,13 +225,13 @@ class RoutineSplitTest(BrainRepoCase):
         self.addCleanup(lambda: [os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
                                  for k, v in saved.items()])
 
-    def test_without_held_pages_nothing_is_opened(self):
-        run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
+    def test_without_watched_pages_no_reviewer_is_requested(self):
+        run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
         self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}", "Billed by [[Billing]] monthly.\n")
-        code, data, _ = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "m", cwd=self.repo)
-        self.assertEqual((code, data["watched"], data["pr"]), (0, [], None))
+        code, data, _ = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "m", cwd=self.repo)
+        self.assertEqual((code, data["watched"], data["pr"]), (0, [], "https://github.com/o/r/pull/7"))
         self.assertNotIn("review", data)
-        self.assertEqual(self.log.read_text(), "")
+        self.assertNotIn("requested_reviewers", self.log.read_text())
 
 
 class TemplatesTest(unittest.TestCase):

@@ -44,7 +44,7 @@ class CommitFixesTest(test_gitops.GitRepoCase):
         self.assertIn("?? apps/", git(self.repo, "status", "--porcelain"))
 
     def test_routine_discard_keeps_only_digest(self):
-        run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
+        run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
         self.add_page("Invalid")
         self.write("brain/schema/brain.md", "changed\n")
         self.write("brain/digests/2026-10-31.md", "# Digest\n")

@@ -121,9 +121,19 @@ def merge_start(repo, worktree):
     return out
 
 
+def _on_top_of_brain_branch(worktree):
+    """The worktree of `merge start`: detached, origin/docs/brain at HEAD (merge in progress) or below it (concluded)."""
+    detached = git(worktree, "symbolic-ref", "-q", "HEAD", check=False).returncode != 0
+    on_top = git(worktree, "merge-base", "--is-ancestor", f"origin/{BRAIN_BRANCH}", "HEAD", check=False).returncode == 0
+    if not (detached and on_top):
+        raise UsageError(f"{worktree} is not the worktree of `pb merge start` (detached, on top of origin/{BRAIN_BRANCH}): "
+                         "nothing was changed")
+
+
 def merge_finish(repo, worktree, message):
     """Settle the generated files, regenerate, run the save checks, commit the merge and push docs/brain."""
     worktree = Path(worktree).resolve()
+    _on_top_of_brain_branch(worktree)
     out = {"committed": False, "pushed": False, "errors": [], "unresolved": [], "problems": []}
     unmerged = _unmerged(worktree)
     out["unresolved"] = [f for f in unmerged if not _generated(f)]

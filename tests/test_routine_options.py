@@ -51,23 +51,24 @@ class LocalRunTest(GitRepoCase):
         git(self.repo, "checkout", "-qb", "feat/wip")
         self.write("apps/web/wip.ts", "uncommitted\n")
         wt = Path(self.tmp.name) / "run"
-        code, data, err = run_cli("routine", "start", "--branch", "brain/inbox", "--worktree", wt, cwd=self.repo)
+        code, data, err = run_cli("routine", "start", "--branch", "docs/brain", "--worktree", wt, cwd=self.repo)
         self.assertEqual(code, 0, err)
         self.assertEqual(data["brain"], str((wt / "brain").resolve()))
         self.assertEqual(git(self.repo, "branch", "--show-current"), "feat/wip")
         self.assertTrue((self.repo / "apps/web/wip.ts").is_file())
 
         self.add_page("From routine", root=wt)
-        code, data, err = run_cli("--brain", wt / "brain", "routine", "finish", "--branch", "brain/inbox",
+        code, data, err = run_cli("--brain", wt / "brain", "routine", "finish", "--branch", "docs/brain",
                                   "-m", "pb(routine): manual", cwd=self.repo)
         self.assertEqual(code, 0, err)
         self.assertEqual({k: data[k] for k in ("committed", "pushed", "conflict", "pr", "watched", "problems")},
                          {"committed": True, "pushed": True, "conflict": False, "pr": None, "watched": [],
-                          "problems": []})
-        self.assertEqual(git(self.remote, "log", "--format=%s", "-2", "brain/inbox").splitlines(),
+                          "problems": ["no GitHub repo (github.repo in sources.md): the Brain updates PR from "
+                                       "docs/brain to main was not opened"]})
+        self.assertEqual(git(self.remote, "log", "--format=%s", "-2", "docs/brain").splitlines(),
                          ["pb(routine): manual", "init"])
         self.assertIn("brain/index.md",
-                      git(self.remote, "show", "--name-only", "--format=", "brain/inbox").splitlines())
+                      git(self.remote, "show", "--name-only", "--format=", "docs/brain").splitlines())
 
         code, data, err = run_cli("routine", "cleanup", "--worktree", wt, cwd=self.repo)
         self.assertEqual(code, 0, err)
@@ -75,12 +76,12 @@ class LocalRunTest(GitRepoCase):
         self.assertEqual(git(self.repo, "branch", "--show-current"), "feat/wip")
 
     def test_worktree_start_on_existing_branch(self):
-        git(self.repo, "push", "-q", "origin", "main:refs/heads/brain/inbox")
+        git(self.repo, "push", "-q", "origin", "main:refs/heads/docs/brain")
         wt = Path(self.tmp.name) / "run2"
-        code, data, err = run_cli("routine", "start", "--branch", "brain/inbox", "--worktree", wt, cwd=self.repo)
+        code, data, err = run_cli("routine", "start", "--branch", "docs/brain", "--worktree", wt, cwd=self.repo)
         self.assertEqual(code, 0, err)
         self.assertFalse(data["created"])
-        self.assertEqual(git(wt, "rev-parse", "HEAD"), git(self.repo, "rev-parse", "origin/brain/inbox"))
+        self.assertEqual(git(wt, "rev-parse", "HEAD"), git(self.repo, "rev-parse", "origin/docs/brain"))
 
     def test_cleanup_needs_worktree(self):
         code, _, _ = run_cli("routine", "cleanup", cwd=self.repo)

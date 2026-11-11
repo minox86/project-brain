@@ -84,9 +84,27 @@ def _start_point(repo, branch):
     return f"origin/{branch}", False, False, _behind(repo, branch, base)
 
 
+def _routine_branch(repo, branch):
+    """pb pushes only to docs/brain."""
+    if branch == default_branch(repo):
+        raise UsageError(f"the routine never pushes to the default branch '{branch}': use --branch {BRAIN_BRANCH}")
+    if branch != BRAIN_BRANCH:
+        raise UsageError(f"the routine writes only on {BRAIN_BRANCH}, not on '{branch}': use --branch {BRAIN_BRANCH}")
+
+
+def _in_routine_checkout(repo, action):
+    """A routine run works on a detached worktree or a checkout of docs/brain, never on a developer's branch."""
+    branch = current_branch(repo)
+    if branch and branch != BRAIN_BRANCH:
+        raise UsageError(f"pb routine {action} runs only in a routine run (a detached worktree or a checkout of "
+                         f"{BRAIN_BRANCH}), not on '{branch}': nothing was changed. In a worktree, pass "
+                         "--brain <brain of the run>")
+
+
 def routine_start(repo, branch, worktree=None):
     """Needs only the clone: the brain lives on the branch, not necessarily in the current checkout."""
     repo = Path(repo)
+    _routine_branch(repo, branch)
     _git(repo, "fetch", "-q", "origin")
     start, created, restarted, behind = _start_point(repo, branch)
     out = {"branch": branch, "created": created, "restarted": restarted, "behind": behind}
@@ -112,8 +130,8 @@ def routine_finish(brain, branch, message, confidence=()):
     Never merges: a branch that moved on origin is pushed over only when it holds nothing the default branch lacks."""
     repo = _repo_root(brain)
     base = default_branch(repo)
-    if branch == base:
-        raise UsageError(f"the routine never pushes to the default branch '{base}': use --branch {BRAIN_BRANCH}")
+    _routine_branch(repo, branch)
+    _in_routine_checkout(repo, "finish")
     retention = apply_retention(brain, datetime.date.today())
     before = _git(repo, "rev-parse", "HEAD").stdout.strip()
     generate(brain)  # one commit carries the pages and the generated files
@@ -170,6 +188,7 @@ def _brain_pr(brain, base, routed, out):
 def routine_discard(brain):
     """Throw away every brain/ change of this run except the digests."""
     repo = _repo_root(brain)
+    _in_routine_checkout(repo, "discard")
     prefix = _brain_prefix(brain, repo)
     specs = [prefix, f":(exclude){prefix}/digests"]
     _git(repo, "reset", "-q", "--", *specs)

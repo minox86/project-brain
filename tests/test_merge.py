@@ -209,6 +209,26 @@ class MergeFinishTest(MergeCase):
         self.assertEqual(git(self.repo, "branch", "--show-current"), "main")
         self.assertEqual(git(self.repo, "rev-parse", "HEAD"), git(self.repo, "rev-parse", "origin/main"))
 
+    def test_finish_refuses_a_worktree_not_on_top_of_docs_brain(self):
+        self.on_brain_branch(lambda: self.put("decision", "R", f"area: technical\n{SRC}"))
+        git(self.repo, "fetch", "-q", "origin")
+        git(self.repo, "checkout", "-qb", "feat/x")
+        self.put("concept", "D", f"term_en: D\n{SRC}")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-qm", "developer")
+        other = Path(self.tmp.name) / "other"
+        git(self.repo, "worktree", "add", "-q", "--detach", str(other), "origin/main")
+        before = (self.remote_sha("docs/brain"), git(self.repo, "rev-parse", "HEAD"), git(other, "rev-parse", "HEAD"))
+        for wrong in (self.repo, other):  # the developer's checkout; a detached worktree off main
+            with self.subTest(worktree=wrong):
+                code, out, _ = run_cli("merge", "finish", "--worktree", wrong, "-m", "m", cwd=self.repo)
+                self.assertEqual(code, 2, out)
+                self.assertIn("docs/brain", out["error"])
+        self.assertEqual((self.remote_sha("docs/brain"), git(self.repo, "rev-parse", "HEAD"),
+                          git(other, "rev-parse", "HEAD")), before)
+        self.assertEqual(git(self.repo, "branch", "--show-current"), "feat/x")
+        self.assertEqual(git(self.repo, "status", "--porcelain"), "")
+
     def test_finish_blocks_on_invalid_resolved_page(self):
         self.both_sides()
         self.start()

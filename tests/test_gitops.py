@@ -94,26 +94,28 @@ class GitopsTest(GitRepoCase):
         self.assertFalse(data["committed"])
 
     def test_routine_start_creates_missing_branch(self):
-        code, data, err = run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
+        code, data, err = run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
         self.assertEqual(code, 0, err)
-        self.assertEqual(data, {"branch": "brain/inbox", "created": True, "restarted": False, "behind": 0})
-        self.assertEqual(git(self.repo, "branch", "--show-current"), "brain/inbox")
+        self.assertEqual(data, {"branch": "docs/brain", "created": True, "restarted": False, "behind": 0})
+        self.assertEqual(git(self.repo, "branch", "--show-current"), "docs/brain")
 
     def test_routine_finish_pushes(self):
-        run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
+        run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
         self.add_page("Approval")
-        code, data, err = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "pb(routine): sync", cwd=self.repo)
+        code, data, err = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "pb(routine): sync", cwd=self.repo)
         self.assertEqual(code, 0, err)
         self.assertEqual(data, {"committed": True, "pushed": True, "conflict": False, "pr": None, "watched": [],
                                 "reviewers": NO_REVIEWERS, "behind": 0,
-                                "retention": {"archived": [], "deleted": []}, "problems": []})
-        log = git(self.remote, "log", "--format=%s", "brain/inbox")
+                                "retention": {"archived": [], "deleted": []}, "problems": [
+                                    "no GitHub repo (github.repo in sources.md): the Brain updates PR from "
+                                    "docs/brain to main was not opened"]})
+        log = git(self.remote, "log", "--format=%s", "docs/brain")
         self.assertEqual(log.splitlines()[:2], ["pb(routine): sync", "init"])
-        shown = git(self.remote, "show", "--name-only", "--format=", "brain/inbox").splitlines()
+        shown = git(self.remote, "show", "--name-only", "--format=", "docs/brain").splitlines()
         self.assertIn("brain/functional/features/Approval.md", shown)
         self.assertIn("brain/index.md", shown)  # one commit carries pages and generated files
         self.assertEqual(git(self.repo, "status", "--porcelain", "--", "brain"), "")
-        code, data, _ = run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
+        code, data, _ = run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
         self.assertFalse(data["created"])
 
     def test_routine_finish_refuses_the_default_branch(self):
@@ -127,6 +129,60 @@ class GitopsTest(GitRepoCase):
 
 
 NO_REVIEWERS = {"areas": [], "handles": [], "users": [], "teams": []}
+
+
+class RoutineGuardTest(GitRepoCase):
+    """The routine commands never act on a developer's checkout and never push anywhere but docs/brain."""
+
+    def developer_at_work(self):
+        git(self.repo, "push", "-q", "origin", "main:refs/heads/docs/brain")
+        git(self.repo, "checkout", "-qb", "feat/x")
+        self.write("apps/web/a.ts", "code\n")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-qm", "code")
+        self.add_page("Draft")
+        self.write("apps/web/b.ts", "staged\n")
+        git(self.repo, "add", "apps/web/b.ts")
+        return self.snapshot()
+
+    def snapshot(self):
+        return {"head": git(self.repo, "rev-parse", "HEAD"), "branch": git(self.repo, "branch", "--show-current"),
+                "status": git(self.repo, "status", "--porcelain", "--untracked-files=all"),
+                "index": git(self.repo, "diff", "--cached"),
+                "remote": git(self.remote, "for-each-ref", "--format=%(refname) %(objectname)")}
+
+    def test_finish_refuses_on_a_working_branch(self):
+        before = self.developer_at_work()
+        code, data, _ = run_cli("routine", "finish", "--branch", "docs/brain", "-m", "pb(routine): sync",
+                                cwd=self.repo)
+        self.assertEqual(code, 2, data)
+        self.assertIn("feat/x", data["error"])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_discard_refuses_on_a_working_branch(self):
+        before = self.developer_at_work()
+        code, data, _ = run_cli("routine", "discard", cwd=self.repo)
+        self.assertEqual(code, 2, data)
+        self.assertIn("feat/x", data["error"])
+        self.assertEqual(self.snapshot(), before)
+        self.assertTrue((self.repo / "brain/functional/features/Draft.md").is_file())
+
+    def test_start_and_finish_reject_another_branch(self):
+        before = self.snapshot()
+        code, data, _ = run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
+        self.assertEqual(code, 2, data)
+        self.assertIn("docs/brain", data["error"])
+        wt = Path(self.tmp.name) / "run"
+        code, data, _ = run_cli("routine", "start", "--branch", "brain/inbox", "--worktree", wt, cwd=self.repo)
+        self.assertEqual(code, 2, data)
+        self.assertFalse(wt.exists())
+        self.assertEqual(self.snapshot(), before)
+        run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
+        self.add_page("Approval")
+        code, data, _ = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "m", cwd=self.repo)
+        self.assertEqual(code, 2, data)
+        self.assertIn("docs/brain", data["error"])
+        self.assertEqual(git(self.remote, "for-each-ref", "--format=%(refname)"), "refs/heads/main")
 
 
 class BrainBranchCase(GitRepoCase):

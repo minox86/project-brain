@@ -85,7 +85,7 @@ For each configured series (`meetings:` entries):
 
 ## 6. Write, digest, cursors
 
-1. `PB validate <every page this run created or changed>`: fix errors and retry at most twice; condense over-budget pages. Still failing: `PB routine discard`, write the failure under "Problems" in the digest, move no cursor.
+1. `PB validate <every page this run created or changed>`: fix errors and retry at most twice; condense over-budget pages. Still failing: `PB --brain <brain> routine discard`, write the failure under "Problems" in the digest, move no cursor.
 2. With `--digest`, write `brain/digests/YYYY-MM-DD.md` (no frontmatter):
 
        # Digest YYYY-MM-DD
@@ -107,6 +107,6 @@ For each configured series (`meetings:` entries):
    Take the size from `PB stats`. For "Watched": rate the confidence of every page you created or updated (see **Confidence and review** in the writing conventions), run `PB review --confidence <path>=<level>…` passing only pages below high, and list the pages it flags with their reasons. Keep the same `--confidence` arguments for `PB routine finish`.
 3. Only after the pages are written and valid, move the cursors: `PB state set <source> <key> '<json>'`.
 4. Started by the routine prompt or by `/pb:routine-run`: stop here; their own steps finish the run. Typed by the user:
-   - `PB routine finish --branch docs/brain -m "pb(sync): <sources> <YYYY-MM-DD>"`, with `--confidence` for pages below high (pages the user confirmed count as high). It commits, pushes `docs/brain` and keeps the Brain updates PR open, with the watched changes and their reviewers.
+   - `PB --brain <brain> routine finish --branch docs/brain -m "pb(sync): <sources> <YYYY-MM-DD>"`, with `--confidence` for pages below high (pages the user confirmed count as high). It commits, pushes `docs/brain` and keeps the Brain updates PR open, with the watched changes and their reviewers.
    - Always end with `PB routine cleanup --worktree <tmp dir>`, also after `--check` or a stop.
    - Report: pages ingested (as `[[links]]`), the PR (`pr`), the `watched` points and their reviewers, and `problems` one line each. `behind` > 0: "`docs/brain` is behind <default>: run `/pb:merge` to bring these changes to <default>". `"conflict": true`: nothing was pushed and no cursor moved; running `/pb:sync` again picks the same content up.

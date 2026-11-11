@@ -7,16 +7,17 @@ from pb_core.context import path_matches
 
 def billing_brain(tmp, extra=()):
     return make_brain(tmp, files_of(
-        page("module", "Billing", 'paths: [services/billing/**]\ninterfaces: ["[[Invoice Events]]"]', "Owns invoices.\n"),
+        page("module", "Billing", "paths: [services/billing/**]", "Owns invoices.\n"),
         page("module", "Web", "paths: [apps/web/]"),
-        page("interface", "Billing API", 'kind: rest\nprovided_by: "[[Billing]]"\nconsumed_by: ["[[Web]]"]'),
-        page("interface", "Invoice Events", "kind: event"),
-        page("feature", "Invoice Approval", 'jira: [FIN-1]\nmodules: ["[[Billing]]"]\nconcepts: ["[[Invoice]]"]'),
+        page("contract", "Billing API", 'kind: api\nprovided_by: Billing'),
+        page("contract", "Invoice Events", 'kind: event\nprovided_by: Web\nconsumed_by: [Billing]'),
+        page("contract", "Web Theme", "kind: ui"),
+        page("feature", "Invoice Approval", 'jira: [FIN-1]\nmodules: [Billing]\nconcepts: [Invoice]'),
         page("concept", "Invoice", "term_en: Invoice"),
-        page("decision", "Single approver", 'area: functional\nstatus: accepted\naffects: ["[[Invoice Approval]]"]'),
-        page("decision", "Old approver rule", 'area: functional\nstatus: superseded\naffects: ["[[Invoice Approval]]"]'),
-        page("open-question", "Approval limits", 'area: functional\nstatus: open\naffects: ["[[Billing]]"]'),
-        page("open-question", "Closed one", 'area: functional\nstatus: resolved\naffects: ["[[Billing]]"]'),
+        page("decision", "Single approver", 'area: functional\nstatus: accepted\naffects: [Invoice Approval]'),
+        page("decision", "Old approver rule", 'area: functional\nstatus: superseded\naffects: [Invoice Approval]'),
+        page("open-question", "Approval limits", 'area: functional\nstatus: open\naffects: [Billing]'),
+        page("open-question", "Closed one", 'area: functional\nstatus: resolved\naffects: [Billing]'),
         *extra,
     ))
 
@@ -39,7 +40,7 @@ class ContextTest(unittest.TestCase):
         self.assertTrue(path_matches("apps/billing/src/x.ts", target))
         self.assertFalse(path_matches("apps/bill", target))
 
-    def test_context_by_paths_expands_interfaces_features_decisions(self):
+    def test_context_by_paths_expands_contracts_features_decisions(self):
         repo = billing_brain(self.tmp.name)
         code, data, _ = run_cli("context", "--paths", "services/billing/api/handler.py", cwd=repo)
         self.assertEqual(code, 0)
@@ -49,15 +50,16 @@ class ContextTest(unittest.TestCase):
         md = data["markdown"]
         self.assertTrue(md.startswith("# Context: Billing"))
         self.assertLess(md.index("## Features"), md.index("## Modules"))
+        self.assertLess(md.index("## Modules"), md.index("## Contracts"))
         self.assertIn("### Billing\n", md)
 
     def test_context_follows_roles_integrations_and_domain_types(self):
         repo = billing_brain(self.tmp.name, [
             page("role", "Accountant"),
-            page("integration", "SDI", 'kind: api\nused_by: ["[[Billing]]"]'),
-            page("feature", "Approval", 'capability: Invoicing\nroles: ["[[Accountant]]"]\nmodules: ["[[Billing]]"]'),
+            page("integration", "SDI", 'kind: api\nused_by: [Billing]'),
+            page("feature", "Approval", 'capability: Invoicing\nroles: [Accountant]\nmodules: [Billing]'),
         ])
-        rule = repo / "brain/schema/types/rule.md"
+        rule = repo / "brain/.pb/schema/types/rule.md"
         rule.write_text("---\nname: rule\narea: functional\nfolder: functional/rules\nmax_words: 300\n"
                         "fields:\n  status: {kind: enum, values: [active, retired], default: active}\n"
                         "  applies_to: {kind: list, of: link}\nrequired: []\n---\n# Rule\n")
@@ -65,7 +67,7 @@ class ContextTest(unittest.TestCase):
             path = repo / f"brain/functional/rules/{title}.md"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(f'---\ntype: rule\ntitle: "{title}"\nstatus: {status}\n'
-                            f'applies_to: ["[[Approval]]"]\n---\nRule body.\n')
+                            f'applies_to: [Approval]\n---\nRule body.\n')
         _, data, _ = run_cli("context", "--feature", "Approval", cwd=repo)
         got = titles(data)
         for title in ("Accountant", "SDI", "Rounding", "Billing"):
@@ -92,6 +94,14 @@ class ContextTest(unittest.TestCase):
         _, data, _ = run_cli("context", "--jira", "FIN-2", cwd=repo)
         self.assertEqual(data["seeds"], ["Refunds"])
 
+    def test_context_by_jira_matches_every_feature_carrying_the_key(self):
+        repo = billing_brain(self.tmp.name, [page("feature", "Approval Rules", 'jira: [FIN-9, fin-1]')])
+        _, data, _ = run_cli("context", "--jira", "fin-1", cwd=repo)
+        self.assertEqual(sorted(data["seeds"]), ["Approval Rules", "Invoice Approval"])
+        code, data, _ = run_cli("context", "--jira", "FIN-404", cwd=repo)
+        self.assertEqual(code, 0)
+        self.assertEqual((data["seeds"], data["pages"], data["markdown"]), ([], [], ""))
+
     def test_context_unknown_seed_returns_empty(self):
         repo = billing_brain(self.tmp.name)
         code, data, _ = run_cli("context", "--paths", "docs/readme.md", cwd=repo)
@@ -100,13 +110,23 @@ class ContextTest(unittest.TestCase):
 
     def test_max_words_degrades_to_summary(self):
         long_body = "## Purpose\nShort first paragraph.\n\n" + "filler " * 300
-        repo = billing_brain(self.tmp.name, [page("feature", "Big", 'summary: Big feature\nmodules: ["[[Billing]]"]', long_body)])
+        repo = billing_brain(self.tmp.name, [page("feature", "Big", 'summary: Big feature\nmodules: [Billing]', long_body)])
         _, data, _ = run_cli("context", "--paths", "services/billing/x", "--max-words", "150", cwd=repo)
         self.assertLessEqual(data["words"], 150)
         big = [p for p in data["pages"] if p["title"] == "Big"][0]
         self.assertEqual(big["included"], "summary")
         self.assertIn("Big feature", data["markdown"])
-        self.assertIn("(see brain/functional/features/Big.md)", data["markdown"])
+        # PB context answers with links valid from the repo root; the written packs keep theirs.
+        self.assertIn("Big feature ([Big](brain/functional/features/Big.md))", data["markdown"])
+
+    def test_cli_pack_links_are_repo_paths(self):
+        repo = billing_brain(self.tmp.name, [page("role", "Accountant"),
+                                            page("feature", "Pay", "", "By an [[Accountant]].\n")])
+        _, data, _ = run_cli("context", "--feature", "Pay", cwd=repo)
+        self.assertIn("By an [Accountant](brain/functional/roles/Accountant.md).", data["markdown"])
+        run_cli("generate", cwd=repo)
+        self.assertIn("By an [Accountant](../../functional/roles/Accountant.md).",
+                      (repo / "brain/.pb/context/Pay.md").read_text())
 
     def test_requires_exactly_one_seed_kind(self):
         repo = billing_brain(self.tmp.name)

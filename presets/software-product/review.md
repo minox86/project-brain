@@ -7,7 +7,7 @@ reviewers:
   ux: []
 watch:
   - {type: decision, why: "decisions constrain future work"}
-  - {type: interface, why: "contracts between modules"}
+  - {type: contract, why: "contracts between modules or with the outside world"}
   - {type: integration, change: [create, delete], why: "external systems the product depends on"}
   - {type: feature, fields: [status], why: "feature status changes"}
   - {type: concept, change: create, why: "new glossary terms"}
@@ -19,14 +19,14 @@ watch:
 Decides which brain changes a human must look at. Nothing is held back: watched changes are named on the PR that carries them, and the area reviewers are asked there. Written by `/pb:init`, changed with `/pb:schema`. `PB review` applies it; `PB validate` checks it.
 
 Where it applies:
-- **Pages written in a working branch** (`PB save`): the save names the watched points touched; on the PR, CI lists them and requests the reviewers. The user confirmed what they save, so confidence and noise never flag a page here. Changes to `schema/` (this file included) and to the toolkit are always watched.
+- **Pages written in a working branch** (`PB save`): the save names the watched points touched; on the PR, CI lists them and requests the reviewers. The user confirmed what they save, so confidence and noise never flag a page here. Changes to `.pb/schema/` (this file included) and to the toolkit are always watched.
 - **Routine runs**: the same, plus the routine's own confidence ratings and, with `noise_to_review`, its noise warnings, all in the description of the Brain updates PR.
 
 ## Fields
 
 - `direct_min_confidence`: `low`, `medium` or `high`. A page the writer rated below this level is flagged for review. `high`: only what the model is sure of goes unflagged. `low`: confidence never flags anything.
 - `noise_to_review`: `true` flags pages that still carry a noise warning from `PB validate` (`possible-duplicate`, `new-orphan`, `missing-source`, `log-heading`, `ephemeral`, `verbatim`).
-- `reviewers`: GitHub users (`login`) or teams (`org/team-slug`) per area: `technical` (modules, interfaces, integrations, environments, technical decisions), `functional` (features, concepts, roles, functional decisions), `ux` (design decisions). A page with no area of its own (epics, open questions, decisions without `area`) asks every area.
+- `reviewers`: GitHub users (`login`) or teams (`org/team-slug`) per area: `technical` (modules, contracts, integrations, environments, technical decisions), `functional` (features, processes, concepts, roles, functional decisions), `ux` (design decisions). A page with no area of its own (open questions, decisions without `area`) asks every area.
 - `watch`: the points of the schema where any change needs a review. Each rule matches when all its keys match:
   - `type`: a type name, a list, or `"*"`;
   - `change`: `create`, `update`, `delete`, or a list (default: any);

@@ -4,7 +4,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import __version__, frontmatter
+from . import __version__
+from .brain import DIGESTS, MARKER, OLD_FORMAT, RAW, SCHEMA, Brain, is_old_format
 from .errors import UsageError
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
@@ -16,8 +17,9 @@ ROUTINE_SYNC_SKILL = "skills/sync/SKILL.md"
 WORKFLOWS = ("pb-validate.yml",)
 # pb-generate: the generated files are committed with the pages. pb-brain-branch: nothing merges the default branch back any more.
 RETIRED_WORKFLOWS = ("pb-generate.yml", "pb-brain-branch.yml")
+# `README.md` (no slash) covers the index and every type folder's README.md.
 GITATTRIBUTES = "".join(f"{path} linguist-generated\n" for path in (
-    "index.md", "glossary.md", "features.md", "context/**", ".pb/backlinks.json"))
+    "README.md", ".pb/context/**", ".pb/backlinks.json"))
 MARKETPLACE = {"project-brain": {"source": {"source": "github", "repo": "minox86/project-brain"}}}
 PLUGIN_ID = "pb@project-brain"
 NEEDS_QUOTES = re.compile(r"""^[\[\]{}#&*!|>'"%@`-]|[:#]\s|\s#|,\s""")
@@ -27,7 +29,8 @@ def upgrade(repo_root):
     """An existing brain gets the current workflows (overwritten), .gitattributes, plugin settings and toolkit."""
     repo = Path(repo_root).resolve()
     brain = repo / "brain"
-    if not (brain / "schema" / "VERSION").is_file():
+    _refuse_old_format(brain)
+    if not (brain / MARKER).is_file():
         raise UsageError(f"no brain in {brain} to upgrade")
     created = [sync_toolkit(brain).relative_to(repo).as_posix()]
     default = _default_branch(repo)
@@ -76,6 +79,11 @@ def _refresh_agents(brain):
     path.write_text(text[:first] + new + "\n\n" + text[end:], encoding="utf-8")
 
 
+def _refuse_old_format(brain):
+    if is_old_format(brain):
+        raise UsageError(OLD_FORMAT, {"code": "old-format", "error": OLD_FORMAT})
+
+
 def _write_gitattributes(brain):
     path = brain / ".gitattributes"
     path.write_text(GITATTRIBUTES, encoding="utf-8")
@@ -101,7 +109,8 @@ def _write_workflows(repo, default, overwrite=False):
 def scaffold(repo_root, product, preset="software-product"):
     repo = Path(repo_root).resolve()
     brain = repo / "brain"
-    if (brain / "schema" / "VERSION").is_file():
+    _refuse_old_format(brain)
+    if (brain / MARKER).is_file():
         raise UsageError(f"a brain already exists in {brain}: an existing brain is upgraded with --upgrade")
     preset_dir = PLUGIN_ROOT / "presets" / preset
     if not (preset_dir / "VERSION").is_file():
@@ -111,29 +120,27 @@ def scaffold(repo_root, product, preset="software-product"):
     def note(path):
         created.append(path.relative_to(repo).as_posix())
 
-    shutil.copytree(str(preset_dir), str(brain / "schema"), dirs_exist_ok=True)
-    note(brain / "schema")
-    _set_product(brain / "schema" / "brain.md", product)
-    (brain / "schema" / "proposals.md").write_text(PROPOSALS, encoding="utf-8")
+    schema = brain / SCHEMA
+    shutil.copytree(str(preset_dir), str(schema), dirs_exist_ok=True)
+    note(schema)
+    _set_product(schema / "brain.md", product)
+    (schema / "proposals.md").write_text(PROPOSALS, encoding="utf-8")
 
-    folders = ["digests", "raw"]
-    for path in sorted((brain / "schema" / "types").glob("*.md")):
-        meta, _ = frontmatter.parse(path.read_text(encoding="utf-8"))
-        if meta and meta.get("folder"):
-            folders.append(str(meta["folder"]).strip("/"))
-    for folder in folders:
+    # Type folders get their generated README.md below; only these would otherwise be empty.
+    for folder in (DIGESTS, RAW):
         keep = brain / folder / ".gitkeep"
         keep.parent.mkdir(parents=True, exist_ok=True)
         keep.touch()
         note(keep)
 
-    for name in ("AGENTS.md", "README.md"):
-        text = (PLUGIN_ROOT / "templates" / "brain" / name).read_text(encoding="utf-8")
-        (brain / name).write_text(text.replace("{{product}}", product), encoding="utf-8")
-        note(brain / name)
+    text = (PLUGIN_ROOT / "templates" / "brain" / "AGENTS.md").read_text(encoding="utf-8")
+    (brain / "AGENTS.md").write_text(text.replace("{{product}}", product), encoding="utf-8")
+    note(brain / "AGENTS.md")
 
     note(sync_toolkit(brain))
     note(_write_gitattributes(brain))
+    from .generate import generate
+    created += [f"brain/{rel}" for rel in generate(Brain(brain))["written"]]
 
     default = _default_branch(repo)
     written, skipped = _write_workflows(repo, default)

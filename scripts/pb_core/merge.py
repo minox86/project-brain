@@ -6,8 +6,9 @@ import json
 import time
 from pathlib import Path
 
-from .brain import MARKER, Brain
-from .errors import GitError, UsageError
+from . import frontmatter, links
+from .brain import MARKER, SCHEMA as SCHEMA_DIR, Brain
+from .errors import FrontmatterError, GitError, UsageError
 from .generate import generate
 from .gitops import adds_nothing, routine_cleanup, try_commit
 from .messages import compose, pr_title
@@ -16,7 +17,7 @@ from .save import _generated, check
 from .state import _save
 
 STATE = "brain/.pb/state/"
-SCHEMA = ("brain/schema/", "brain/.pb/toolkit/")
+SCHEMA = (f"brain/{SCHEMA_DIR}/", "brain/.pb/toolkit/")
 OK_CHECKS = ("success", "neutral", "skipped")
 MERGEABLE = ("clean", "unstable", "has_hooks")
 
@@ -34,9 +35,28 @@ def _count(cwd, spec):
     return int(git(cwd, "rev-list", "--count", spec).stdout.strip())
 
 
-def _pages(names):
-    """Brain files a person writes: not generated, not pb's own state."""
-    return [f for f in names if f.startswith("brain/") and not _generated(f) and not f.startswith("brain/.pb/")]
+PB_OWN = ("brain/.pb/toolkit/", "brain/.pb/state/", "brain/.pb/corrections.md")
+
+
+def _type_folders(cwd, *refs):
+    """The type folders of the brain schema at each ref, together (a type one side added counts too)."""
+    folders = set()
+    for ref in refs:
+        listed = git(cwd, "ls-tree", "-z", "--name-only", ref, "--", "brain/.pb/schema/types/", check=False)
+        for path in (p for p in listed.stdout.split("\0") if p.endswith(".md")):
+            shown = git(cwd, "show", f"{ref}:{path}", check=False)
+            try:
+                meta, _ = frontmatter.parse(shown.stdout) if shown.returncode == 0 else (None, "")
+            except FrontmatterError:
+                meta = None
+            if meta and meta.get("folder"):
+                folders.add(str(meta["folder"]).strip("/"))
+    return folders
+
+
+def _pages(names, folders):
+    """Brain files a person writes (pages, the schema, digests, raw text): not generated, not pb's own files."""
+    return [f for f in names if f.startswith("brain/") and not _generated(f, folders) and not f.startswith(PB_OWN)]
 
 
 def _take_ours(cwd, path):
@@ -87,11 +107,13 @@ def merge_start(repo, worktree):
         raise UsageError(f"no {BRAIN_BRANCH} on origin: the routine has written nothing to merge")
     theirs, ours = f"origin/{base_branch}", f"origin/{BRAIN_BRANCH}"
     base = git(repo, "merge-base", theirs, ours).stdout.strip()
+    folders = _type_folders(repo, ours, theirs)
     out = {"alert": None, "files": [], "worktree": None, "brain": None, "base": base,
            "behind": _count(repo, f"{ours}..{theirs}"), "ahead": _count(repo, f"{theirs}..{ours}"),
            "conflicts": {"pages": [], "schema": [], "generated": [], "state": []},
-           "changed": {"routine": _pages(_names(repo, "diff", "--name-only", base, ours, paths=["brain"])),
-                       "default": _pages(_names(repo, "diff", "--name-only", base, theirs, paths=["brain"]))}}
+           "changed": {"routine": _pages(_names(repo, "diff", "--name-only", base, ours, paths=["brain"]), folders),
+                       "default": _pages(_names(repo, "diff", "--name-only", base, theirs, paths=["brain"]),
+                                         folders)}}
     if adds_nothing(repo, BRAIN_BRANCH, base_branch):  # e.g. the Brain updates PR was squash-merged
         return dict(out, alert="nothing-to-merge")
     outside = [f for f in _names(repo, "diff", "--name-only", f"{theirs}...{ours}") if not f.startswith("brain/")]
@@ -112,7 +134,7 @@ def merge_start(repo, worktree):
         return dict(out, alert="outside-brain", files=outside, worktree=None, brain=None)
     conflicts = out["conflicts"]
     for f in unmerged:
-        if _generated(f):
+        if _generated(f, folders):
             conflicts["generated"].append(f)
         elif f.startswith(STATE):
             _merge_state(worktree, f)  # docs/brain's cursors, both sides' suppressions
@@ -140,19 +162,27 @@ def merge_finish(repo, worktree, summary, raw=False):
     _on_top_of_brain_branch(worktree)
     out = {"committed": False, "pushed": False, "errors": [], "unresolved": [], "problems": [], "rejected": None}
     unmerged = _unmerged(worktree)
-    out["unresolved"] = [f for f in unmerged if not _generated(f)]
+    theirs = f"origin/{default_branch(repo)}"
+    folders = _type_folders(worktree, "HEAD", theirs)
+    out["unresolved"] = [f for f in unmerged if not _generated(f, folders)]
     if out["unresolved"]:
         return out
     for f in unmerged:  # either side: generate rewrites them
         _take_ours(worktree, f)
-    generate(Brain(worktree / "brain"))
     git(worktree, "add", "-A", "--", "brain")
-    theirs = f"origin/{default_branch(repo)}"
     fork = git(worktree, "merge-base", "HEAD", theirs).stdout.strip()
     files = set(_names(worktree, "diff", "--cached", "--name-only", "HEAD", paths=["brain"]))
     for side in ("HEAD", theirs):
         files.update(_names(worktree, "diff", "--name-only", fork, side, paths=["brain"]))
-    out["errors"] = check(Brain(worktree / "brain"), worktree, sorted(f for f in files if not _generated(f)))
+    pages = sorted(f for f in files if not _generated(f, folders))
+    brain = Brain(worktree / "brain")
+    # The pages either side brought: their links and headings normalised before the checks; every page when a
+    # page file was deleted, renamed or moved, so the links to it are repaired.
+    gone = any(not (worktree / f).exists() for f in pages if links.is_page_path(brain, f[len("brain/"):]))
+    links.normalise(brain, None if gone else [f[len("brain/"):] for f in pages if f.startswith("brain/")])
+    generate(brain)
+    git(worktree, "add", "-A", "--", "brain")
+    out["errors"] = check(Brain(worktree / "brain"), worktree, pages)
     if out["errors"]:
         return out
     merging = git(worktree, "rev-parse", "-q", "--verify", "MERGE_HEAD", check=False).returncode == 0

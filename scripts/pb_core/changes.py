@@ -16,7 +16,8 @@ def _git(cwd, *args):
 
 
 def changed_pages(brain, base="HEAD"):
-    """{brain-relative path: {"change": create|update|delete, "old": meta on base or None}} for page files.
+    """{brain-relative path: {"change": create|update|delete, "old": meta on base or None, "old_body": body on base
+    or None}} for page files.
 
     Compares `base` with the working tree, untracked files included. None when git or the base is unavailable.
     """
@@ -36,20 +37,21 @@ def changed_pages(brain, base="HEAD"):
     out = {}
     for status, path in entries:
         rel = path[len(prefix) + 1:] if prefix else path
-        if not rel.endswith(".md") or not any(rel.startswith(f + "/") for f in folders):
+        if not rel.endswith(".md") or rel.split("/")[-1] == "README.md" \
+                or not any(rel.startswith(f + "/") for f in folders):
             continue
         change = {"A": "create", "D": "delete"}.get(status[0], "update")
-        old = None if change == "create" else _meta_at(repo, base, path)
-        out[rel] = {"change": change, "old": old}
+        old, body = (None, None) if change == "create" else _meta_at(repo, base, path)
+        out[rel] = {"change": change, "old": old, "old_body": body}
     return out
 
 
 def _meta_at(repo, base, path):
     text = _git(repo, "show", f"{base}:{path}")
     if text is None:
-        return {}
+        return {}, None
     try:
-        meta, _ = frontmatter.parse(text)
+        meta, body = frontmatter.parse(text)
     except FrontmatterError:
-        return {}
-    return meta or {}
+        return {}, None
+    return meta or {}, body

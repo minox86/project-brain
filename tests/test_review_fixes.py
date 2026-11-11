@@ -46,12 +46,12 @@ class CommitFixesTest(test_gitops.GitRepoCase):
     def test_routine_discard_keeps_only_digest(self):
         run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
         self.add_page("Invalid")
-        self.write("brain/schema/brain.md", "changed\n")
-        self.write("brain/digests/2026-10-31.md", "# Digest\n")
+        self.write("brain/.pb/schema/brain.md", "changed\n")
+        self.write("brain/.pb/digests/2026-10-31.md", "# Digest\n")
         code, data, err = run_cli("routine", "discard", cwd=self.repo)
         self.assertEqual(code, 0, err)
         status = git(self.repo, "status", "--porcelain", "--untracked-files=all", "brain")
-        self.assertEqual(status, "?? brain/digests/2026-10-31.md")
+        self.assertEqual(status, "?? brain/.pb/digests/2026-10-31.md")
 
 
 class ScaffoldBranchTest(unittest.TestCase):

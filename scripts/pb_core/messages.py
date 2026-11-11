@@ -1,4 +1,4 @@
-"""Commit messages and PR titles in the format the repo's commit rules accept (schema/brain.md)."""
+"""Commit messages and PR titles in the format the repo's commit rules accept (.pb/schema/brain.md)."""
 import re
 
 from .brain import DEFAULTS
@@ -29,7 +29,7 @@ def commit_message(brain, skill, summary):
     fmt = brain.config.get("commit_format")
     problem = format_problem(fmt)
     if problem:
-        raise UsageError(f"commit_format in schema/brain.md: {problem}")
+        raise UsageError(f"commit_format in .pb/schema/brain.md: {problem}")
     summary = _one_line(summary)
     if not summary:
         raise UsageError("the commit summary (-m) is empty")

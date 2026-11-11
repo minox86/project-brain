@@ -38,7 +38,7 @@ flowchart LR
     T[Teams threads] --> R
     M[Recurring meetings] --> R
     C[Confluence pages] --> R
-    J[Jira epics] --> R
+    J[Jira] --> R
     P[Merged PRs] --> R
     R([Scheduled routine]) --> B[(docs/brain)]
     B -- Brain updates PR · /pb:merge --> K
@@ -52,12 +52,27 @@ flowchart LR
 
 | Part | Pages | Holds |
 |---|---|---|
-| **Functional** | `concept` → `glossary.md` | The product's vocabulary, in the languages you choose, with the lifecycle of each entity |
-| | `feature` → `features.md` | The feature catalogue, grouped by capability, with status and roles |
+| **Functional** | `concept` → the glossary | The product's vocabulary, in the languages you choose, with the lifecycle of each entity |
+| | `feature` → the catalogue | The feature catalogue, grouped by capability, with status and roles |
 | | `role` | Who uses the product, their goals, what they may do and why |
-| | domain types | Chosen at init after a few questions on your domain: business `rule`s, `regulation`s, end-to-end `process`es, `edition`s, `metric`s, or types designed for it |
-| **Technical** | `module`, `interface`, `integration`, `environment` | **All and only** what the code cannot tell: boundaries and non-goals, invariants, pitfalls, direction, contract semantics, how external systems really behave |
-| **Across** | `epic`, `decision`, `open-question` | Work in progress, choices with their reasons, unanswered questions and contradictions |
+| | `process` | End-to-end flows across features and roles: steps, hand-offs, exceptions |
+| | domain types | Chosen at init after a few questions on your domain: business `rule`s, `regulation`s, `edition`s, `metric`s, or types designed for it |
+| **Technical** | `module`, `contract`, `integration`, `environment` | **All and only** what the code cannot tell: boundaries and non-goals, invariants, pitfalls, direction, contract semantics, how external systems really behave |
+| **Across** | `decision`, `open-question` | Choices with their reasons, unanswered questions and contradictions |
+
+On GitHub it reads like a small site: pages start with their title and link each other with ordinary Markdown links.
+
+```
+brain/
+  README.md        the index: one line per folder
+  AGENTS.md        rules for AI agents
+  functional/      features/ concepts/ roles/ processes/ (+ domain types), each with a README.md listing its pages
+  technical/       modules/ contracts/ integrations/ environments/
+  decisions/  open-questions/
+  .pb/             control: schema, vendored toolkit, sync state, context packs, digests, extracted raw text
+```
+
+`functional/concepts/README.md` is the glossary and `functional/features/README.md` the feature catalogue.
 
 ## 📦 Install
 
@@ -118,18 +133,18 @@ Once per product.
 1. Run **`/pb:routine-setup`** and pick:
    - the Teams channels and Confluence spaces to read;
    - the recurring meetings to follow (refinement, design review, demo…): they need transcription on and the routine owner invited;
-   - the Jira projects whose epics to follow;
+   - the Jira projects to read;
    - how often it runs: every night (default), weekdays only, a few times a day, every N hours, once a week, or a custom schedule. At most once an hour.
 2. Claude checks that `docs/brain` accepts the routine's pushes, creates the routine (or prints the steps) and writes the configuration in your working tree: commit it and merge its PR, like any brain change.
 3. Run **`/pb:routine-run`** for a first run, then `/pb:routine-run status` to see what was added and what was skipped.
 
 ## 💾 How saving works
 
-- **Pages are written in your branch.** Every `pb` skill writes in `brain/` of your checkout, on the branch you are on, checks the pages and rebuilds the generated files. pb never commits, pushes or switches branch: commit the pages with your code (or ask Claude to), and they reach the default branch with your PR, under the same review as the code. On the default branch pb writes anyway and reminds you that the pages need a branch and a PR.
-- **Watched points name their reviewers.** When a change touches a point listed in `brain/schema/review.md` (decisions, interfaces, feature status…), the schema or the toolkit, Claude tells you at save time, and CI's `review` job requests the area reviewers on the PR. It informs; your branch protection decides what blocks.
+- **Pages are written in your branch.** Every `pb` skill writes in `brain/` of your checkout, on the branch you are on, turns its `[[links]]` into Markdown links, checks the pages and rebuilds the generated files. pb never commits, pushes or switches branch: commit the pages with your code (or ask Claude to), and they reach the default branch with your PR, under the same review as the code. On the default branch pb writes anyway and reminds you that the pages need a branch and a PR.
+- **Watched points name their reviewers.** When a change touches a point listed in `brain/.pb/schema/review.md` (decisions, contracts, feature status…), the schema or the toolkit, Claude tells you at save time, and CI's `review` job requests the area reviewers on the PR. It informs; your branch protection decides what blocks.
 - **The routine has its own lane.** The routine, `/pb:sync` and `/pb:routine-run --local` write only on the branch `docs/brain`, never in your checkout, and keep one PR open: "Brain updates". Nothing merges by itself.
 - **`/pb:merge` brings the routine's knowledge in.** The maintainer runs it when they want it on the default branch: it brings the default branch into `docs/brain`, combines pages changed on both sides, settles inconsistencies (and asks when the sources do not), then merges "Brain updates". Their checkout is not touched.
-- **Generated-file conflicts are cheap.** Two PRs that both touch the brain often conflict on `index.md`, `glossary.md` and the other generated files: take either side, run `PB generate` (`python3 brain/.pb/toolkit/pb.py generate`), commit. CI fails a PR whose generated files are stale.
+- **Generated-file conflicts are cheap.** Two PRs that both touch the brain often conflict on the folders' `README.md` files and the other generated files: take either side, run `PB generate` (`python3 brain/.pb/toolkit/pb.py generate`), commit. CI fails a PR whose generated files are stale.
 
 ## 🎁 What you get for free
 
@@ -137,18 +152,18 @@ Once the brain and the routine are set up, these happen without anyone running a
 
 - 🔄 **Teams, Confluence and Jira flow in on schedule.** The routine keeps only what is worth remembering (decisions, requirement clarifications, domain explanations, open questions). It never copies messages verbatim and writes a digest of what it added and skipped.
 - 🎙️ **Recurring meetings are captured.** After each refinement or design review, the routine reads the transcript and keeps the decisions and open questions. The transcript itself is never stored.
-- 🎯 **Epics stay in sync.** Discussions that mention a Jira epic key are filed under that epic. When the epic is done, what still matters moves to the feature and decision pages.
+- 🎯 **Jira keys lead to features.** Discussions that mention a Jira key reach the feature that carries it. Scope and status of the work stay in Jira.
 - 🤖 **Every Claude session in the repo knows the brain**, even without the plugin. `CLAUDE.md` points to `brain/AGENTS.md`. Claude then:
   - uses the glossary terms;
-  - starts from the context of your feature or epic;
+  - starts from the context of your feature or Jira ticket;
   - follows accepted decisions;
   - flags code that contradicts the brain.
 - ✅ **The brain checks itself.** Every save checks the pages it touches: malformed pages, broken links (also to pages being deleted), anything that looks like a password or token. CI checks the changed pages again and that the generated files are fresh, and fails "Brain updates" if `docs/brain` carries code.
 - 🔇 **Noise is caught as it is written.** New pages that look like an existing one, pages nobody links, claims without a source, dated "update" sections, status talk ("this sprint", "TODO") and long verbatim quotes are flagged before the save.
-- 👀 **Sensitive changes reach the right reviewer.** `brain/schema/review.md`, written by `/pb:init` and changed with `/pb:schema`, lists the points that need a human and who reviews technical, functional and design changes; they are asked on the PR that carries the change.
+- 👀 **Sensitive changes reach the right reviewer.** `brain/.pb/schema/review.md`, written by `/pb:init` and changed with `/pb:schema`, lists the points that need a human and who reviews technical, functional and design changes; they are asked on the PR that carries the change.
 - 📏 **Your commit rules are followed.** `/pb:init` reads the repo's commitlint, hooks and PR checks and sets the format of every commit and PR title pb makes; a hook is never bypassed.
-- 📚 **Indexes stay fresh.** Every save rebuilds the index, the glossary (in the languages you chose), the feature catalogue and a context pack for every feature and active epic.
-- 🧹 **Old items step aside.** The routine marks superseded decisions, answered questions and closed epics as archived after a while, and they leave the index. Git keeps the history.
+- 📚 **Indexes stay fresh.** Every save rebuilds the README of every folder, the glossary (in the languages you chose), the feature catalogue and a context pack for every feature.
+- 🧹 **Old items step aside.** The routine marks superseded decisions and answered questions as archived after a while, and they leave their folder's README. Git keeps the history.
 - 💬 **No commands to remember.** Ask in plain words: *"what did we decide about approvals?"*, *"save this decision in the brain"*, *"give me the context for FIN-412"*.
 
 ## 🛠 Commands
@@ -158,12 +173,13 @@ Once the brain and the routine are set up, these happen without anyone running a
 | You want to… | Say it, or run |
 |---|---|
 | Prepare your computer | `/pb:setup [owner/repo]` |
-| Get context before a ticket | `/pb:context FIN-412` (or a feature, an epic, file paths) |
+| Get context before a ticket | `/pb:context FIN-412` (or a feature, file paths) |
 | Ask something | `/pb:ask why do invoices have a single approver?` |
 | Save what you learned in this session | `/pb:capture` |
 | Add a document, Confluence page, Jira ticket, PR or link | `/pb:put <text \| file \| confluence:… \| jira:KEY \| gh:pr/N \| url>` (`--as <type>`, `--plan` to preview) |
 | Save a one-off Teams meeting | `/pb:meeting last` (or `today`, a Teams link, a meeting name) |
 | Correct something wrong | `/pb:fix <what is wrong and what is right>` |
+| Answer the open questions, one at a time, in your language | `/pb:questions` (or a feature, a Jira key, an area) |
 | Bring in what changed in the sources now | `/pb:sync [teams] [confluence] [github] [jira] [meetings]` (`--check` to preview; writes on `docs/brain`) |
 | Clean up the brain | `/pb:lint --fix` |
 | Run the routine now | `/pb:routine-run` (`--local` to run it here, `--check` to preview, `status` for the last run) |
@@ -177,16 +193,16 @@ Once the brain and the routine are set up, these happen without anyone running a
 | You want to… | Say it, or run |
 |---|---|
 | Ask something | `/pb:ask what is still open on multi-level approval?` |
-| Get the full context | `/pb:context <feature, epic or Jira key>` |
+| Get the full context | `/pb:context <feature or Jira key>` |
 
 > [!TIP]
-> Cowork only reads the brain. To add knowledge, write where you already do: analyses on Confluence, discussions in the Teams channel. Mention the Jira epic key and the routine files the content under that epic.
+> Cowork only reads the brain. To add knowledge, write where you already do: analyses on Confluence, discussions in the Teams channel. Mention the Jira key and the routine brings the content to the feature that carries it.
 
 ## ⬆️ Upgrading
 
 - **The plugin:** `/plugin marketplace update project-brain`, then reinstall or update `pb`. Then ask Claude to run `pb toolkit-sync` and save it: CI and the cloud routine use the copy in `brain/.pb/toolkit/`. Commit it and merge its PR; the routine uses it once `docs/brain` has it (after `/pb:merge` if `docs/brain` is behind).
-- **The default schema** (0.4: roles, integrations, capabilities, a technical part limited to what the code cannot tell, domain types): an existing brain keeps its own schema in `brain/schema/`. To adopt any of it, ask `/pb:schema` (e.g. *"add the role and integration types"*, *"add business rules"*).
-- **From 0.4 or earlier:** merge the open "Brain updates" PR, update the plugin, then run `/pb:init`: through an ordinary PR it removes the workflow that merged the default branch back into `docs/brain`, updates `pb-validate` and the vendored toolkit. Once it is merged, run `/pb:routine-setup` again, so the routine follows the new prompt.
+- **A brain made before 0.6** has the format of an earlier pb version (wikilinks, generated files and the schema at the top of `brain/`): there is no migration. pb stops with "this brain has the format of an earlier pb version": remove `brain/` and create it again with `/pb:init`.
+- **A brain of the current format** gets the current `pb-validate` workflow, toolkit and `AGENTS.md` writing rule from `/pb:init` (its upgrade section); schema changes are adopted with `/pb:schema`.
 
 ## 🩺 Troubleshooting
 
@@ -200,7 +216,7 @@ Once the brain and the routine are set up, these happen without anyone running a
 | The brain PR is in conflict, or `docs/brain` is behind | `/pb:merge` |
 | CI says generated files are stale, or they conflict | Take either side, run `python3 brain/.pb/toolkit/pb.py generate`, commit |
 | A commit was rejected by the repo's rules | Claude rewrites the message to satisfy them and retries (the nightly routine reports it instead); fix the format for good with `/pb:schema` (`commit_format`, `commit_rules`) |
-| "Reviewers not requested" on a PR | Check the handles in `brain/schema/review.md` (`/pb:schema`); the review is in the job summary anyway |
+| "Reviewers not requested" on a PR | Check the handles in `brain/.pb/schema/review.md` (`/pb:schema`); the review is in the job summary anyway |
 | Nothing was added overnight | `/pb:routine-run status`, then "Problems" in the latest digest |
 | Wrong information | `/pb:fix` in Claude Code |
 

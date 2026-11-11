@@ -26,8 +26,8 @@ class RetentionTest(unittest.TestCase):
         self.assertEqual(result["archived"], ["decisions/Old.md"])
         self.assertIn("archived: true", (root / "decisions/Old.md").read_text())
         generate(Brain(root))
-        index = (root / "index.md").read_text()
-        self.assertNotIn("[[Old]]", index)
+        index = (root / "decisions/README.md").read_text()
+        self.assertNotIn("[Old]", index)
         self.assertIn("Archived: 1 pages (not listed).", index)
 
     def test_flag_goes_before_closing_fence_and_touches_nothing_else(self):
@@ -66,15 +66,15 @@ class RetentionTest(unittest.TestCase):
         self.assertEqual(text.count("archived: true"), 1)
 
     def test_old_digest_deleted_by_retention_not_by_generate(self):
-        root = self.brain({"digests/2026-01-01.md": "old", "digests/2026-11-01.md": "kept", "digests/notes.md": "x"})
-        digest = root / "digests/2026-01-01.md"
+        root = self.brain({".pb/digests/2026-01-01.md": "old", ".pb/digests/2026-11-01.md": "kept", ".pb/digests/notes.md": "x"})
+        digest = root / ".pb/digests/2026-01-01.md"
         generate(Brain(root))
         self.assertTrue(digest.exists())
         result = apply_retention(Brain(root), TODAY)
-        self.assertEqual(result["deleted"], ["digests/2026-01-01.md"])
+        self.assertEqual(result["deleted"], [".pb/digests/2026-01-01.md"])
         self.assertFalse(digest.exists())
-        self.assertTrue((root / "digests/2026-11-01.md").exists())
-        self.assertTrue((root / "digests/notes.md").exists())
+        self.assertTrue((root / ".pb/digests/2026-11-01.md").exists())
+        self.assertTrue((root / ".pb/digests/notes.md").exists())
 
     def test_cli_retention(self):
         repo = make_brain(self.tmp.name, files_of(page("decision", "Old", "area: ux\nstatus: superseded\nupdated: 2026-01-01")))

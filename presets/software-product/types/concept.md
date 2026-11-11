@@ -11,7 +11,7 @@ required: [term_en]
 ---
 # Concept
 
-A domain term of the product's ubiquitous language: an entity, a state, an event, a document, a measure that people and code refer to by name. Concepts make the glossary (`glossary.md`), the shared vocabulary of the team, the code and the agents.
+A domain term of the product's ubiquitous language: an entity, a state, an event, a document, a measure that people and code refer to by name. Concepts make the glossary (`functional/concepts/README.md`), the shared vocabulary of the team, the code and the agents.
 
 **Create** a page when a term is used with a specific meaning in this product, when people use different words for the same thing, or when the same word means different things.
 

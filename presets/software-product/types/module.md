@@ -26,4 +26,4 @@ A unit of the monorepo with its own responsibility: an app, a service, a library
 - `## Pitfalls` — non-obvious behaviour that has bitten people, each with its source (incident, PR, thread).
 - `## Direction` — known debt and where the team wants to take the module, linking the decisions.
 
-Dependencies and interfaces are not listed: the code says them. Keep it under 400 words.
+Dependencies and contracts are not listed: the code and the `contract` pages say them. Keep it under 400 words.

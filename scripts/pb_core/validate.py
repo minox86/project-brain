@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from . import frontmatter, links, policy
-from .brain import _as_list
+from .brain import DIGESTS, INDEX, RAW, SCHEMA, _as_list
 from .changes import changed_pages
 from .errors import FrontmatterError
 from .messages import format_problem
@@ -34,9 +34,9 @@ def validate(brain, paths=None, base="HEAD"):
         if not (brain.root / rel).exists():
             errors.append({"path": rel, "code": "unknown-path", "message": f"{rel} is not in the brain at {brain.root}"})
 
-    def report(bucket, rel, code, message):
+    def report(bucket, rel, code, message, **extra):
         if scope is None or rel in scope:
-            bucket.append({"path": rel, "code": code, "message": message})
+            bucket.append(dict({"path": rel, "code": code, "message": message}, **extra))
 
     brain.pages()
     for item in brain.load_errors:
@@ -58,8 +58,11 @@ def validate(brain, paths=None, base="HEAD"):
     for p in brain.pages():
         if scope is not None and p.rel not in scope:
             continue
-        _check_page(brain, p, lambda c, m, bucket=errors: report(bucket, p.rel, c, m),
+        _check_page(brain, p, lambda c, m, bucket=errors, **x: report(bucket, p.rel, c, m, **x),
                     lambda c, m: report(warnings, p.rel, c, m))
+    for rel in _readme_pages(brain):
+        report(errors, rel, "reserved-title", f"{INDEX} is the folder's generated index, never a page: "
+                                              "give the page another title")
 
     changed = changed_pages(brain, base) if base else None
     for p, code, message in noise(brain, changed):
@@ -72,7 +75,7 @@ def validate(brain, paths=None, base="HEAD"):
     for rel, text in _other_texts(brain):
         if scope is not None and rel not in scope:
             continue
-        if rel.startswith("raw/"):
+        if rel.startswith(RAW + "/"):
             try:
                 _, body = frontmatter.parse(text)
             except FrontmatterError as exc:
@@ -89,19 +92,19 @@ def validate(brain, paths=None, base="HEAD"):
     if isinstance(routine, dict) and routine.get("schedule") is not None:
         problem = schedule_problem(str(routine.get("schedule")))
         if problem:
-            report(errors, "schema/sources.md", "bad-schedule", problem)
+            report(errors, f"{SCHEMA}/sources.md", "bad-schedule", problem)
     if isinstance(routine, dict) and routine.get("branch") \
             and not (brain.root / ".pb" / "toolkit" / ROUTINE_SYNC_SKILL).is_file():
-        report(warnings, "schema/sources.md", "routine-instructions-missing",
+        report(warnings, f"{SCHEMA}/sources.md", "routine-instructions-missing",
                "the cloud routine reads its instructions from brain/.pb/toolkit, which has none: "
                "run `PB toolkit-sync` from the plugin and commit it to the routine's branch")
 
     problem = format_problem(brain.config.get("commit_format"))
     if problem:
-        report(errors, "schema/brain.md", "bad-commit-format", problem)
+        report(errors, f"{SCHEMA}/brain.md", "bad-commit-format", problem)
 
     for problem in policy.problems(brain):
-        report(errors, "schema/review.md", "bad-review-policy", problem)
+        report(errors, f"{SCHEMA}/review.md", "bad-review-policy", problem)
 
     errors.sort(key=lambda f: (f["path"], f["code"]))
     warnings.sort(key=lambda f: (f["path"], f["code"]))
@@ -128,12 +131,14 @@ def _check_page(brain, p, error, warn):
         return
     typedef = brain.types.get(p.type)
     if typedef is None:
-        error("unknown-type", f"type '{p.type}' is not defined in schema/types")
+        error("unknown-type", f"type '{p.type}' is not defined in {SCHEMA}/types")
         return
     if not p.meta.get("title"):
         error("missing-title", "frontmatter has no 'title'")
     elif p.path.stem != p.title:
         error("title-mismatch", f"file name '{p.path.stem}' differs from title '{p.title}'")
+    if p.title.lower() == INDEX[:-3].lower():
+        error("reserved-title", f"'{p.title}' is reserved: {INDEX} is the folder's generated index")
     if BAD_TITLE.search(p.title):
         error("bad-title-chars", 'titles cannot contain \\ / : * ? " < > | # ^ [ ]')
     folder = Path(p.rel).parent.as_posix()
@@ -159,18 +164,24 @@ def _check_page(brain, p, error, warn):
         if value is not None:
             _check_value(name, spec, value, error)
 
-    for field, target in [(None, t) for t in links.extract(p.body)] + links.meta_links(p.meta, typedef):
+    for ref in links.refs(brain, p.rel, p.body):
+        if ref.page is None:
+            error("broken-link", f"{ref.shown} in body matches no page", target=ref.name)
+        elif ref.how == "alias":
+            warn("alias-link", f"{ref.shown} in body is an alias of '{ref.page.title}'")
+        if links.broken_anchor(brain, ref):
+            warn("broken-anchor", f"{ref.shown} in body: '{ref.page.title}' has no heading '#{ref.anchor}'")
+    for field, target in links.meta_links(p.meta, typedef):
         found, how = brain.lookup(target)
-        where = f"field '{field}'" if field else "body"
         if found is None:
-            error("broken-link", f"[[{target}]] in {where} matches no page")
+            error("broken-link", f"'{target}' in field '{field}' matches no page", target=target)
             continue
         if how == "alias":
-            warn("alias-link", f"[[{target}]] in {where} is an alias of [[{found.title}]]")
-        spec = typedef.fields.get(field) if field else None
-        expected = spec.get("to") if spec else None
+            warn("alias-link", f"'{target}' in field '{field}' is an alias of '{found.title}'")
+        spec = typedef.fields.get(field) or {}
+        expected = spec.get("to")
         if expected and found.type != expected:
-            warn("link-type", f"field '{field}' expects a {expected}, [[{found.title}]] is a {found.type}")
+            warn("link-type", f"field '{field}' expects a {expected}, '{found.title}' is a {found.type}")
 
     if typedef.max_words and p.words > typedef.max_words:
         warn("over-budget", f"{p.words} words, budget {typedef.max_words}: condense the page")
@@ -239,13 +250,13 @@ def looks_duplicate(a, b):
 
 def page_targets(brain, page, skip_fields=()):
     """Distinct pages that `page` links to, from its body and its link fields."""
-    names = links.extract(page.body) + [t for field, t in links.meta_links(page.meta, brain.types.get(page.type))
-                                        if field not in skip_fields]
+    found = [r.page for r in links.refs(brain, page.rel, page.body)]
+    found += [brain.lookup(t)[0] for field, t in links.meta_links(page.meta, brain.types.get(page.type))
+              if field not in skip_fields]
     unique = {}
-    for name in names:
-        found, _ = brain.lookup(name)
-        if found is not None:
-            unique[found.rel] = found
+    for target in found:
+        if target is not None:
+            unique[target.rel] = target
     return list(unique.values())
 
 
@@ -263,8 +274,10 @@ def _check_value(name, spec, value, error):
         error("bad-enum", f"'{name}' must be one of {spec.get('values')}, got '{value}'")
     elif kind == "date" and not DATE.match(str(value)):
         error("bad-date", f"'{name}' must be YYYY-MM-DD")
-    elif kind == "link" and not (isinstance(value, str) and links.extract(value)):
-        error("bad-kind", f"'{name}' must be a [[wikilink]]")
+    elif kind == "link" and not (isinstance(value, str) and value.strip()):
+        error("bad-kind", f"'{name}' must be a page title")
+    elif kind == "link" and "[[" in value:
+        error("bad-kind", f"'{name}': write the page title ({value.strip('[] ')}), not a [[wikilink]]")
     elif kind == "number" and (isinstance(value, bool) or not isinstance(value, (int, float))):
         error("bad-kind", f"'{name}' must be a number")
     elif kind == "bool" and not isinstance(value, bool):
@@ -273,11 +286,26 @@ def _check_value(name, spec, value, error):
         error("bad-kind", f"'{name}' must be a single value")
 
 
+def _readme_pages(brain):
+    """Brain-relative README.md files in type folders written as pages (with a `type`)."""
+    out = []
+    for folder in sorted(brain.type_folders()):
+        base = brain.root / folder
+        for path in sorted(p for p in base.rglob("*.md") if p.name == INDEX) if base.is_dir() else []:
+            try:
+                meta, _ = frontmatter.parse(path.read_text(encoding="utf-8"))
+            except (FrontmatterError, UnicodeDecodeError):
+                meta = None
+            if meta and meta.get("type"):
+                out.append(path.relative_to(brain.root).as_posix())
+    return out
+
+
 def _other_texts(brain):
-    """(rel, text) of non-page brain files that must be scanned: raw/, digests/, AGENTS.md."""
+    """(rel, text) of non-page brain files that must be scanned: .pb/raw/, .pb/digests/, AGENTS.md."""
     root = brain.root
     candidates = [root / "AGENTS.md"]
-    for folder in ("raw", "digests"):
+    for folder in (RAW, DIGESTS):
         base = root / folder
         if base.is_dir():
             candidates.extend(sorted(base.rglob("*.md")))

@@ -38,7 +38,7 @@ class BrainRepoCase(GitRepoCase):
         return rel
 
     def policy(self, text):
-        self.write("brain/schema/review.md", f"---\n{text}\n---\n# Review policy\n")
+        self.write("brain/.pb/schema/review.md", f"---\n{text}\n---\n# Review policy\n")
 
     def review(self, *args):
         code, data, err = run_cli("review", *args, cwd=self.repo)
@@ -119,7 +119,7 @@ class PolicyValidationTest(BrainRepoCase):
 
 class ReviewTest(BrainRepoCase):
     def test_no_policy_sends_everything_direct(self):
-        (self.repo / "brain/schema/review.md").unlink()
+        (self.repo / "brain/.pb/schema/review.md").unlink()
         rel = self.put("decision", "Single approver", f"area: technical\n{SRC}")
         data = self.review("--confidence", f"brain/{rel}=low")
         self.assertEqual((data["route"], data["direct"]), ("direct", [rel]))
@@ -178,6 +178,15 @@ class ReviewTest(BrainRepoCase):
         self.put("open-question", "Who approves", SRC)
         self.assertEqual(self.review()["reviewers"]["users"], ["t", "f", "u"])
 
+    def test_a_change_that_only_rewrites_links_is_not_watched(self):
+        self.policy("watch:\n  - {type: concept, change: update}\n  - {type: module, change: update}")
+        run_cli("links", cwd=self.repo)  # [[Invoice]] -> [Invoice](...), and a heading
+        data = self.review()
+        self.assertEqual(data["review"], [])
+        self.write("brain/functional/concepts/Invoice.md",
+                   (self.repo / "brain/functional/concepts/Invoice.md").read_text() + "A real change.\n")
+        self.assertEqual([i["path"] for i in self.review()["review"]], ["functional/concepts/Invoice.md"])
+
     def test_page_linking_a_flagged_new_page_is_flagged_too(self):
         self.policy("watch: [{type: decision}]")
         decision = self.put("decision", "Single approver", f"area: functional\n{SRC}")
@@ -210,7 +219,7 @@ class RoutineSplitTest(BrainRepoCase):
         super().setUp()
         self.policy('reviewers: {technical: ["acme/backend"], functional: [pm]}\n'
                     "watch: [{type: decision}]\ndirect_min_confidence: high")
-        self.write("brain/schema/sources.md", "---\ngithub: {repo: o/r}\n---\n# Sources\n")
+        self.write("brain/.pb/schema/sources.md", "---\ngithub: {repo: o/r}\n---\n# Sources\n")
         git(self.repo, "commit", "-qam", "policy")
         git(self.repo, "push", "-q", "origin", "main")
         base = Path(self.tmp.name)
@@ -267,7 +276,7 @@ class TemplatesTest(unittest.TestCase):
             git(Path(tmp), "init", "-q", "-b", "main")
             code, data, err = run_cli("scaffold", "--product", "Acme", "--repo", tmp)
             self.assertEqual(code, 0, err)
-            self.assertTrue((Path(tmp) / "brain/schema/review.md").is_file())
+            self.assertTrue((Path(tmp) / "brain/.pb/schema/review.md").is_file())
             code, data, _ = run_cli("validate", cwd=tmp)
             self.assertEqual(code, 0, data)
 

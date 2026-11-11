@@ -83,11 +83,11 @@ class MergeStartTest(MergeCase):
         self.assertIsNone(out["alert"])
         self.assertEqual(out["files"], [])
         self.assertEqual(out["conflicts"]["pages"], [A])
-        self.assertIn("brain/index.md", out["conflicts"]["generated"])
+        self.assertIn("brain/functional/features/README.md", out["conflicts"]["generated"])
         self.assertEqual(out["conflicts"]["schema"], [])
         self.assertIn(R, out["changed"]["routine"])
         self.assertIn(A, out["changed"]["routine"])
-        self.assertNotIn("brain/index.md", out["changed"]["routine"])
+        self.assertNotIn("brain/functional/features/README.md", out["changed"]["routine"])
         self.assertIn(D, out["changed"]["default"])
         self.assertEqual((out["behind"], out["ahead"]), (1, 1))
         self.assertEqual(out["worktree"], str(self.worktree.resolve()))
@@ -138,7 +138,7 @@ class MergeStartTest(MergeCase):
         self.assertEqual(done["unresolved"], [])
 
     def test_schema_conflict_is_listed_never_resolved(self):
-        schema = "brain/schema/brain.md"
+        schema = "brain/.pb/schema/brain.md"
         text = (self.repo / schema).read_text()
         self.on_brain_branch(lambda: self.write(schema, text + "\nRoutine line.\n"))
         self.on_main(lambda: self.write(schema, text + "\nDeveloper line.\n"))
@@ -212,7 +212,7 @@ class MergeFinishTest(MergeCase):
     def test_finish_regenerates_validates_commits_merge_and_pushes(self):
         self.both_sides()
         self.start()
-        self.resolve_a()
+        self.resolve_a("Routine body, see [[R]].\n\nDeveloper body.\n")
         code, out, err = self.finish_cli()
         self.assertEqual(code, 0, (out, err))
         self.assertEqual((out["committed"], out["pushed"]), (True, True))
@@ -221,10 +221,13 @@ class MergeFinishTest(MergeCase):
         self.assertEqual(git(self.repo, "rev-list", "--count", "origin/docs/brain..origin/main"), "0")
         self.assertEqual(git(self.repo, "log", "-1", "--format=%s", "origin/docs/brain"),
                          "pb(merge): bring main into docs/brain")
-        index = git(self.repo, "show", "origin/docs/brain:brain/index.md")
-        for title in ("A", "R", "D"):
-            self.assertIn(f"[[{title}]]", index)
-        self.assertIn("Developer body.", git(self.repo, "show", f"origin/docs/brain:{A}"))
+        for title, folder in (("A", "functional/features"), ("R", "decisions"), ("D", "functional/concepts")):
+            readme = git(self.repo, "show", f"origin/docs/brain:brain/{folder}/README.md")
+            self.assertIn(f"[{title}]({title}.md)", readme)
+        merged = git(self.repo, "show", f"origin/docs/brain:{A}")
+        self.assertIn("Developer body.", merged)
+        # The merged page is normalised: a heading and a Markdown link.
+        self.assertIn("---\n# A\n\nRoutine body, see [R](../../decisions/R.md).", merged)
         self.assertEqual(git(self.repo, "branch", "--show-current"), "main")
         self.assertEqual(git(self.repo, "rev-parse", "HEAD"), git(self.repo, "rev-parse", "origin/main"))
 
@@ -304,7 +307,7 @@ class LandGh:
 class MergeLandTest(MergeCase):
     def setUp(self):
         super().setUp()
-        self.write("brain/schema/sources.md", "---\ngithub: {repo: o/r}\n---\n# Sources\n")
+        self.write("brain/.pb/schema/sources.md", "---\ngithub: {repo: o/r}\n---\n# Sources\n")
         self.commit_all("sources", "main")
         self.on_brain_branch(lambda: self.put("decision", "R", f"area: technical\n{SRC}"))
         self.sleeps = []

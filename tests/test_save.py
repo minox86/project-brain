@@ -28,9 +28,9 @@ class SaveTest(SaveCase):
         self.assertEqual(code, 0, err)
         self.assertTrue(out["saved"])
         self.assertEqual(out["errors"], [])
-        self.assertIn("brain/index.md", out["files"])
+        self.assertIn("brain/README.md", out["files"])
         self.assertIn(rel, out["files"])
-        self.assertTrue((self.repo / "brain/index.md").is_file())
+        self.assertTrue((self.repo / "brain/README.md").is_file())
         self.assertEqual(git(self.repo, "rev-parse", "HEAD"), head)
         self.assertEqual(git(self.repo, "branch", "--show-current"), "feat/x")
         self.assertEqual(out["branch"], "feat/x")
@@ -56,16 +56,72 @@ class SaveTest(SaveCase):
         self.assertEqual(code, 1)
         self.assertFalse(out["saved"])
         self.assertEqual(out["errors"][0]["code"], "missing-required")
-        self.assertFalse((self.repo / "brain/index.md").exists())
-        self.assertNotIn("brain/index.md", out["files"])
+        self.assertFalse((self.repo / "brain/README.md").exists())
+        self.assertNotIn("brain/README.md", out["files"])
 
     def test_secret_in_page_blocks(self):
-        self.write("brain/raw/2026/11/creds.txt", "password=hunter2hunter2hunter2\n")
+        self.write("brain/.pb/raw/2026/11/creds.txt", "password=hunter2hunter2hunter2\n")
         code, out, _ = self.save()
         self.assertEqual(code, 1)
         self.assertFalse(out["saved"])
         self.assertEqual(out["errors"][0]["code"], "secret")
-        self.assertEqual(out["errors"][0]["path"], "brain/raw/2026/11/creds.txt")
+        self.assertEqual(out["errors"][0]["path"], "brain/.pb/raw/2026/11/creds.txt")
+
+    def test_save_normalises_the_pages_it_handles(self):
+        self.put("module", "Billing", f"paths: [a/**]\n{SRC}")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-qm", "module")
+        other = self.put("concept", "Other", f"term_en: Other\n{SRC}", "See [[Billing]].\n")
+        rel = self.put("feature", "Approvals", SRC, "Built in [[Billing|the billing module]].\n")
+        code, out, err = self.save(rel)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out["normalised"], [rel])
+        self.assertTrue((self.repo / rel).read_text().endswith(
+            "---\n# Approvals\n\nBuilt in [the billing module](../../technical/modules/Billing.md).\n"))
+        self.assertIn("See [[Billing]].", (self.repo / other).read_text())  # not in this save
+        self.assertIn("[Approvals](Approvals.md)", (self.repo / "brain/functional/features/README.md").read_text())
+
+    def test_rename_with_alias_repairs_links_in_untouched_pages(self):
+        old = self.put("concept", "Association fact", f"term_en: Association fact\n{SRC}")
+        user = self.put("feature", "Approval", SRC, "# Approval\n\nSee [the fact](../concepts/Association%20fact.md).\n")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-qm", "pages")
+        (self.repo / old).unlink()
+        new = self.put("concept", "Association record", f"term_en: Association record\naliases: [Association fact]\n{SRC}")
+        code, out, err = self.save(new, old)
+        self.assertEqual(code, 0, (out, err))
+        self.assertIn(user, out["files"])
+        self.assertIn(user, out["normalised"])
+        self.assertIn("See [the fact](../concepts/Association%20record.md).", (self.repo / user).read_text())
+
+    def test_page_with_a_non_ascii_title(self):
+        rel = self.put("concept", "Società (S.r.l.)", f"term_en: Company\n{SRC}")
+        self.put("feature", "Approval", SRC, "By a [[Società (S.r.l.)]].\n")
+        code, out, err = self.save()
+        self.assertEqual(code, 0, (out, err))
+        self.assertIn(rel, out["files"])
+        self.assertIn("[Società (S.r.l.)](../concepts/Societ%C3%A0%20%28S.r.l.%29.md)",
+                      (self.repo / "brain/functional/features/Approval.md").read_text())
+        code, data, _ = run_cli("validate", rel, cwd=self.repo)
+        self.assertEqual(code, 0, data)
+
+    def test_readme_written_as_a_page_blocks(self):
+        self.write("brain/functional/features/README.md", "---\ntype: feature\ntitle: README\n---\nx\n")
+        code, out, _ = self.save()
+        self.assertEqual(code, 1)
+        self.assertEqual([(e["path"], e["code"]) for e in out["errors"]],
+                         [("functional/features/README.md", "reserved-title")])
+
+    def test_deleted_page_still_linked_with_a_markdown_link_blocks(self):
+        target = self.put("concept", "Target", f"term_en: Target\n{SRC}")
+        self.put("concept", "User", f"term_en: User\n{SRC}", "# User\n\nSee [the target](Target.md).\n")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-qm", "pages")
+        (self.repo / target).unlink()
+        code, out, _ = self.save()
+        self.assertEqual(code, 1)
+        self.assertEqual([(e["code"], e["target"]) for e in out["errors"]], [("broken-link", "Target")])
+        self.assertIn("the page was deleted by this save: fix the link or keep the page", out["errors"][0]["message"])
 
     def test_deleted_page_still_linked_blocks(self):
         target = self.put("concept", "Target", f"term_en: Target\n{SRC}")
@@ -125,7 +181,7 @@ class WatchedTest(SaveCase):
 
     def setUp(self):
         super().setUp()
-        self.write("brain/schema/review.md", "---\nreviewers: {technical: [\"@dev-lead\", \"acme/backend\"]}\n"
+        self.write("brain/.pb/schema/review.md", "---\nreviewers: {technical: [\"@dev-lead\", \"acme/backend\"]}\n"
                                              "watch: [{type: decision, why: \"decisions\"}]\n---\n# Review\n")
         git(self.repo, "commit", "-qam", "policy")
 
@@ -144,10 +200,10 @@ class WatchedTest(SaveCase):
         self.assertEqual(git(self.repo, "rev-parse", "HEAD"), head)
 
     def test_schema_change_is_always_watched(self):
-        self.write("brain/schema/brain.md", (self.repo / "brain/schema/brain.md").read_text() + "\nMore.\n")
+        self.write("brain/.pb/schema/brain.md", (self.repo / "brain/.pb/schema/brain.md").read_text() + "\nMore.\n")
         code, out, err = self.save()
         self.assertEqual(code, 0, err)
-        self.assertEqual(out["watched"], [{"path": "schema/brain.md",
+        self.assertEqual(out["watched"], [{"path": ".pb/schema/brain.md",
                                            "reason": "configuration or toolkit change: always reviewed"}])
 
 

@@ -41,7 +41,7 @@ class PrsTest(unittest.TestCase):
         self.repo = make_brain(base / "repo", {
             **files_of(page("module", "Billing", "paths: [services/billing/**]"),
                        page("module", "Web", "paths: [apps/web/**]")),
-            "schema/sources.md": "---\ngithub: {repo: o/r}\n---\n# Sources\n",
+            ".pb/schema/sources.md": "---\ngithub: {repo: o/r}\n---\n# Sources\n",
         })
         bindir = base / "bin"
         bindir.mkdir()
@@ -127,7 +127,7 @@ class PrsTest(unittest.TestCase):
         self.serve({})
         code, data, _ = run_cli("prs", "--since", "2026-10-29T00:00:00Z", cwd=self.repo)
         self.assertEqual((code, data["code"]), (2, "gh-failed"))
-        (self.repo / "brain/schema/sources.md").write_text("---\ngithub: null\n---\n")
+        (self.repo / "brain/.pb/schema/sources.md").write_text("---\ngithub: null\n---\n")
         code, data, _ = run_cli("prs", "--since", "2026-10-29T00:00:00Z", cwd=self.repo)
         self.assertEqual(code, 2)
         self.assertIn("repo", data["error"])

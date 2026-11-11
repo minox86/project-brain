@@ -62,7 +62,7 @@ Also check that the `pb` plugin is enabled for this clone: the monorepo's `.clau
 
 `PB version`.
 - `brain: null`: as **Modes** in the conventions says (a branch cut before the brain arrived, or no brain yet: a maintainer runs `/pb:init`).
-- Otherwise read `brain/index.md` and show the product name and how many pages it has.
+- Otherwise run `PB stats` and show the product name (`brain/README.md`) and how many pages it has (`pages`).
 
 ## 8. Done
 

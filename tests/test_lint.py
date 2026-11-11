@@ -21,7 +21,7 @@ class LintTest(unittest.TestCase):
 
     def linked_module(self):
         return [page("module", "Billing", "paths: [services/billing/**]"),
-                page("feature", "F", 'modules: ["[[Billing]]"]')]
+                page("feature", "F", 'modules: [Billing]')]
 
     def test_empty_brain_lint_clean(self):
         code, data, _ = self.lint({})
@@ -54,13 +54,13 @@ class LintTest(unittest.TestCase):
 
     def test_stale_open_question(self):
         _, data, _ = self.lint(files_of(*self.linked_module(),
-                                        page("open-question", "Q", 'area: ux\nstatus: open\nupdated: 2026-09-01\naffects: ["[[F]]"]')),
+                                        page("open-question", "Q", 'area: ux\nstatus: open\nupdated: 2026-09-01\naffects: [F]')),
                                ["services/billing/a.py"])
         self.assertEqual(self.codes(data), ["stale-open-question"])
 
     def test_archivable(self):
         _, data, _ = self.lint(files_of(*self.linked_module(),
-                                        page("decision", "D", 'area: ux\nstatus: superseded\nupdated: 2026-01-01\narchived: true\naffects: ["[[F]]"]')),
+                                        page("decision", "D", 'area: ux\nstatus: superseded\nupdated: 2026-01-01\narchived: true\naffects: [F]')),
                                ["services/billing/a.py"])
         self.assertEqual(self.codes(data), ["archivable"])
 
@@ -75,9 +75,9 @@ class LintTest(unittest.TestCase):
     def test_superseded_referenced(self):
         _, data, _ = self.lint(files_of(
             *self.linked_module(),
-            page("decision", "Old", 'area: ux\nstatus: superseded\nupdated: 2026-10-30\naffects: ["[[F]]"]'),
-            page("decision", "New", 'area: ux\nsupersedes: "[[Old]]"\naffects: ["[[F]]"]'),
-            page("open-question", "Q", 'area: ux\nupdated: 2026-10-30\naffects: ["[[Old]]"]'),
+            page("decision", "Old", 'area: ux\nstatus: superseded\nupdated: 2026-10-30\naffects: [F]'),
+            page("decision", "New", 'area: ux\nsupersedes: Old\naffects: [F]'),
+            page("open-question", "Q", 'area: ux\nupdated: 2026-10-30\naffects: [Old]'),
         ), ["services/billing/a.py"])
         hits = [f for f in data["findings"] if f["code"] == "superseded-referenced"]
         self.assertEqual([f["path"] for f in hits], ["open-questions/Q.md"])

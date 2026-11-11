@@ -12,13 +12,20 @@ class PluginLayoutTest(unittest.TestCase):
         self.assertEqual(market["name"], "project-brain")
         self.assertEqual(market["plugins"][0]["name"], "pb")
         self.assertEqual(market["plugins"][0]["source"], "./")
-        self.assertEqual(manifest["version"], "0.5.0")
+        self.assertEqual(manifest["version"], "0.6.0")
 
     def test_readme_describes_the_current_model(self):
         text = (ROOT / "README.md").read_text()
         self.assertIn("/pb:merge", text)
         for word in ("pb-brain-branch", "PB_BRAIN_TOKEN", "review PR"):
             self.assertNotIn(word, text)
+
+    def test_questions_skill_asks_one_at_a_time_and_writes_english(self):
+        text = (ROOT / "skills/questions/SKILL.md").read_text()
+        for needle in ("AskUserQuestion", "one question per call", "(Recommended)", "Other",
+                       "in their language", "in English", "delete the open-question page"):
+            self.assertIn(needle, text)
+        self.assertIn("/pb:questions", (ROOT / "README.md").read_text())
 
     def test_no_bin_dir(self):
         self.assertFalse((ROOT / "bin").exists())
@@ -39,7 +46,8 @@ class PluginLayoutTest(unittest.TestCase):
 
     def test_no_stale_model_in_shipped_text(self):
         banned = ("PB workspace sync", "pb workspace", "save --continue", "--force-review", "pb/review/",
-                  "pb-brain-branch", "PB_BRAIN_TOKEN", "managed copy", "review PR")
+                  "pb-brain-branch", "PB_BRAIN_TOKEN", "managed copy", "review PR",
+                  "`epic`", "epics/", "[epic-", "`interface`", "technical/interfaces", "[interface]")
         for path in [*ROOT.glob("skills/*/SKILL.md"), *ROOT.glob("references/*.md"), *ROOT.glob("templates/**/*.md")]:
             text = path.read_text()
             for word in banned:

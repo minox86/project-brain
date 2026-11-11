@@ -1,11 +1,12 @@
-"""Saving pages in the working tree: check them, regenerate the generated files, report the watched points.
+"""Saving pages in the working tree: normalise their links, check them, regenerate the generated files, report the
+watched points.
 
 The pages are ordinary files of the developer's branch: a save never commits, pushes, rebases or switches branch.
 """
 from pathlib import Path
 
-from . import frontmatter
-from .brain import GENERATED, MARKER, Brain
+from . import frontmatter, links
+from .brain import MARKER, OLD_FORMAT, SCHEMA, Brain, is_generated, is_old_format
 from .errors import UsageError
 from .generate import generate
 from .repo import default_branch, git
@@ -13,7 +14,7 @@ from .review import review
 from .secrets import scan
 from .validate import validate
 
-ALWAYS_REVIEWED = ("brain/schema/", "brain/.pb/toolkit/")
+ALWAYS_REVIEWED = (f"brain/{SCHEMA}/", "brain/.pb/toolkit/")
 ALWAYS_REVIEWED_REASON = "configuration or toolkit change: always reviewed"
 NO_BRAIN = "no brain/ in this checkout: bring the default branch into your branch, or create the brain with /pb:init"
 
@@ -22,20 +23,29 @@ def save(repo, paths=()):
     repo = Path(repo)
     root = repo / "brain"
     if not (root / MARKER).is_file():
+        if is_old_format(root):
+            raise UsageError(OLD_FORMAT, {"code": "old-format", "error": OLD_FORMAT})
         raise UsageError(NO_BRAIN, {"code": "no-brain", "error": NO_BRAIN})
     brain = Brain(root)
-    changed = [f for f in _status(repo) if not _generated(f)]
+    folders = brain.type_folders()
+    changed = [f for f in _status(repo) if not _generated(f, folders) or _written_as_page(repo / f)]
     if paths:
         wanted = sorted({_as_repo_path(repo, p) for p in paths})
         unknown = [w for w in wanted if w not in changed and not (repo / w).exists()
                    and git(repo, "cat-file", "-e", f"HEAD:{w}", check=False).returncode]
-        scope = [w for w in wanted if not _generated(w) and w not in unknown]
+        scope = [w for w in wanted if not _generated(w, folders) and w not in unknown]
         errors = [{"path": w, "code": "not-in-brain", "message": f"{w} is neither in the brain at {root} nor in "
                                                                  "HEAD: write pages under brain/"} for w in unknown]
     else:
         scope, errors = changed, []
+    anchors = []
+    normalised = normalise(brain, repo, scope, anchors)
+    if normalised:
+        brain = Brain(root)
     errors += check(brain, repo, scope)
-    out = {"saved": False, "errors": errors, "files": [], "watched": [], "reviewers": {"users": [], "teams": []},
+    out = {"saved": False, "errors": errors, "warnings": anchors, "normalised": normalised, "files": [],
+           "watched": [],
+           "reviewers": {"users": [], "teams": []},
            "markdown": "", "branch": git(repo, "branch", "--show-current").stdout.strip()}
     out["on_default"] = out["branch"] == default_branch(repo)
     if not errors:
@@ -50,6 +60,16 @@ def save(repo, paths=()):
         out["saved"] = True
     out["files"] = _status(repo)
     return out
+
+
+def normalise(brain, repo, files, warnings=None):
+    """Normalise the links and the heading of the pages among the repo-relative `files`; every page when one of
+    them is a page file deleted, renamed or moved (the links to it are repaired, a no-op elsewhere). Returns the
+    pages changed, repo-relative."""
+    prefix = Path(brain.root).resolve().relative_to(Path(repo).resolve()).as_posix()
+    rels = [f[len(prefix) + 1:] for f in files if f.startswith(prefix + "/")]
+    gone = any(links.is_page_path(brain, rel) and not (brain.root / rel).exists() for rel in rels)
+    return [f"{prefix}/{rel}" for rel in links.normalise(brain, None if gone else rels, warnings=warnings)]
 
 
 def check(brain, repo, files):
@@ -81,9 +101,12 @@ def check(brain, repo, files):
                     gone.append(str(meta["title"]))
     if gone:
         for e in validate(brain)["errors"]:
-            if e["code"] == "broken-link" and any(f"[[{t}]]" in e["message"] for t in gone):
-                errors.append(dict(e, message=e["message"] + " (the page was deleted by this save: fix the link "
-                                                             "or keep the page)"))
+            if e["code"] == "broken-link" and str(e.get("target", "")).lower() in {t.lower() for t in gone}:
+                if brain.lookup(str(e["target"]))[0] is not None:  # renamed or moved, still known by that name
+                    hint = "the page was renamed or moved by this save: run `PB links` to repair the link"
+                else:
+                    hint = "the page was deleted by this save: fix the link or keep the page"
+                errors.append(dict(e, message=f"{e['message']} ({hint})"))
     return errors
 
 
@@ -105,9 +128,19 @@ def _status(repo):
     return sorted(set(files))
 
 
-def _generated(path):
-    rel = path[len("brain/"):] if path.startswith("brain/") else path
-    return any(rel == g or (g.endswith("/") and rel.startswith(g)) for g in GENERATED)
+def _generated(path, folders):
+    return is_generated(path, folders)
+
+
+def _written_as_page(path):
+    """A README.md someone wrote as a page (with a `type`): the save checks it, and validation rejects it."""
+    if path.name != "README.md" or not path.is_file():
+        return False
+    try:
+        meta, _ = frontmatter.parse(path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    return bool(meta and meta.get("type"))
 
 
 def _as_repo_path(repo, raw):

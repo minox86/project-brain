@@ -12,28 +12,28 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 
 ## show (default)
 
-Table of types from `brain/schema/types/*.md`: name, area, folder, fields (with enum values), required, budget, system. Then the thresholds and the commit settings (`commit_format`, `pr_title_brain`, `pr_title_init`, `commit_rules`) in `brain/schema/brain.md`, the review policy in `brain/schema/review.md` (watched points, confidence threshold, noise, reviewers per area; "not configured: no change is flagged for review" when the file is missing) and open proposals in `brain/schema/proposals.md`.
+Table of types from `brain/.pb/schema/types/*.md`: name, area, folder, fields (with enum values), required, budget, system. Then the thresholds and the commit settings (`commit_format`, `pr_title_brain`, `pr_title_init`, `commit_rules`) in `brain/.pb/schema/brain.md`, the review policy in `brain/.pb/schema/review.md` (watched points, confidence threshold, noise, reviewers per area; "not configured: no change is flagged for review" when the file is missing) and open proposals in `brain/.pb/schema/proposals.md`.
 
 ## propose
 
 1. Collect signals: open lines in `proposals.md`; `PB validate` warnings (`unknown-field` recurring on a type, `link-type`); `PB stats` (types with many pages over budget, empty types); `PB lint` (`duplicate-candidate` clusters suggesting a missing type).
 2. Propose numbered changes, each with the reason, the pages affected and the migration needed. Append accepted-for-later ones to `proposals.md`.
-3. A domain need the schema lacks (rules restated in several features, norms, cross-feature processes, editions, KPIs): propose the matching type from `BASE/../../presets/domain-types/` (its README lists the signals), adapted to the product.
+3. A domain need the schema lacks (rules restated in several features, norms, editions, KPIs): propose the matching type from `BASE/../../presets/domain-types/` (its README lists the signals), adapted to the product; a dropped preset type (e.g. `process` for cross-feature flows) comes back from `BASE/../../presets/software-product/types/`.
 
 ## Review policy
 
-Changes like "send feature status changes to review", "design reviews go to @acme/design", "only low confidence needs a reviewer" edit `brain/schema/review.md`: `watch` rules, `direct_min_confidence`, `noise_to_review`, `reviewers`. The file's prose lists the fields. Missing file (brain created before the policy existed): copy `BASE/../../presets/software-product/review.md` and adapt it with the user. Show the rule before and after, confirm, then `PB validate` (it reports `bad-review-policy`) and save like any schema change. When a type is renamed or dropped, update the rules that name it.
+Changes like "send feature status changes to review", "design reviews go to @acme/design", "only low confidence needs a reviewer" edit `brain/.pb/schema/review.md`: `watch` rules, `direct_min_confidence`, `noise_to_review`, `reviewers`. The file's prose lists the fields. Missing file (brain created before the policy existed): copy `BASE/../../presets/software-product/review.md` and adapt it with the user. Show the rule before and after, confirm, then `PB validate` (it reports `bad-review-policy`) and save like any schema change. When a type is renamed or dropped, update the rules that name it.
 
 ## Commit settings
 
-Changes like "our commits must be `docs(brain): …`" or "subjects stay under 72 characters" edit those four settings of `brain/schema/brain.md` (its prose describes them; a brain without them uses the defaults it lists). `commit_format` is written quoted and takes only `{skill}` and `{summary}`, and `{summary}` is required: `PB validate` reports `bad-commit-format`. Show the setting before and after with an example (`PB message -m "add X"`), confirm, then validate and save like any schema change.
+Changes like "our commits must be `docs(brain): …`" or "subjects stay under 72 characters" edit those four settings of `brain/.pb/schema/brain.md` (its prose describes them; a brain without them uses the defaults it lists). `commit_format` is written quoted and takes only `{skill}` and `{summary}`, and `{summary}` is required: `PB validate` reports `bad-commit-format`. Show the setting before and after with an example (`PB message -m "add X"`), confirm, then validate and save like any schema change.
 
 ## apply <Pn> or a change in plain words
 
 1. Describe the exact change: type files edited, fields renamed/added/removed, folders moved, pages to migrate (list them).
 2. Refuse to remove `decision` or `open-question` or their base fields (`area`, `status`, `affects`, `supersedes`, `resolved_by`, `resolves`): the toolkit relies on them.
 3. Wait for explicit confirmation.
-4. Edit the type files (and the `watch` rules in `review.md` that name a renamed or removed type or field); migrate pages (rename fields, move files, fix every `[[link]]` when a title changes — search the whole brain).
+4. Edit the type files (and the `watch` rules in `review.md` that name a renamed or removed type or field); migrate pages (rename fields, move files; when a title changes, write the new title in link fields and `[[New title]]` over body links to the old one — search the whole brain), then `PB links`: it repoints body links at moved files.
 5. Mark the proposal `- [x]` in `proposals.md`.
 6. `PB validate` must pass with no new errors.
-7. Save on its own, following the closing flow: `PB save <files written>`. Changes under `schema/` are always watched: the PR that carries them asks the reviewers.
+7. Save on its own, following the closing flow: `PB save <files written>`. Changes under `.pb/schema/` are always watched: the PR that carries them asks the reviewers.

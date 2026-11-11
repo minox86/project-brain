@@ -1,6 +1,6 @@
 {
   "name": "pb",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "project-brain: a typed, linked product wiki in the monorepo (brain/), fed by developers in their branches and by a routine reading Teams, Confluence, Jira and GitHub, built for AI agents.",
   "author": { "name": "Mattia Minotti" },
   "license": "MIT",

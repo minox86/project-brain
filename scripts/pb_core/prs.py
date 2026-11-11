@@ -46,7 +46,7 @@ def _files(repo, number):
 def merged_prs(brain, since, repo=None):
     repo = repo or (brain.sources.get("github") or {}).get("repo")
     if not repo:
-        raise UsageError("no GitHub repo: pass --repo owner/name or set github.repo in brain/schema/sources.md")
+        raise UsageError("no GitHub repo: pass --repo owner/name or set github.repo in brain/.pb/schema/sources.md")
     result = {"repo": repo, "since": since, "cursor": since, "prs": [], "skipped": []}
     for pr in _merged_since(repo, since):
         result["cursor"] = max(result["cursor"], pr["merged_at"])

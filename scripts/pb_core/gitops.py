@@ -2,6 +2,9 @@
 import datetime
 from pathlib import Path
 
+from . import links
+from .brain import DIGESTS
+from .changes import changed_pages
 from .errors import GitError, UsageError
 from .generate import generate
 from .messages import pr_title
@@ -138,13 +141,18 @@ def routine_cleanup(repo, worktree):
 
 
 def routine_finish(brain, branch, message, confidence=()):
-    """Apply retention, regenerate, commit the run and push it to `branch`; on docs/brain, keep the one PR towards
-    the default branch open, with the watched changes in its description and the area reviewers requested.
+    """Normalise the run's pages, apply retention, regenerate, commit the run and push it to `branch`; on docs/brain,
+    keep the one PR towards the default branch open, with the watched changes in its description and the area
+    reviewers requested.
     Never merges: a branch that moved on origin is pushed over only when it holds nothing the default branch lacks."""
     repo = _repo_root(brain)
     base = default_branch(repo)
     _routine_branch(repo, branch)
     _in_routine_checkout(repo, "finish")
+    run = changed_pages(brain, "HEAD") or {}
+    # A page file deleted, renamed or moved: every page, so the links to it are repaired (a no-op elsewhere).
+    gone = any(info["change"] == "delete" for info in run.values())
+    links.normalise(brain, None if gone else [rel for rel, info in run.items() if info["change"] != "delete"])
     retention = apply_retention(brain, datetime.date.today())
     before = _git(repo, "rev-parse", "HEAD").stdout.strip()
     generate(brain)  # one commit carries the pages and the generated files
@@ -208,7 +216,7 @@ def routine_discard(brain):
     repo = _repo_root(brain)
     _in_routine_checkout(repo, "discard")
     prefix = _brain_prefix(brain, repo)
-    specs = [prefix, f":(exclude){prefix}/digests"]
+    specs = [prefix, f":(exclude){prefix}/{DIGESTS}"]
     _git(repo, "reset", "-q", "--", *specs)
     _git(repo, "checkout", "--", *specs, check=False)
     _git(repo, "clean", "-fdq", "--", *specs)

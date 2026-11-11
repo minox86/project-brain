@@ -20,8 +20,45 @@ DEFAULTS = {
     "commit_rules": None,
 }
 
-GENERATED = ["index.md", "glossary.md", "features.md", "context/", ".pb/backlinks.json"]
-MARKER = Path("schema") / "VERSION"
+CONTROL = ".pb"
+SCHEMA = f"{CONTROL}/schema"
+CONTEXT = f"{CONTROL}/context"
+DIGESTS = f"{CONTROL}/digests"
+RAW = f"{CONTROL}/raw"
+INDEX = "README.md"
+# The index, every type folder's README.md (`*/README.md`), the context packs and the backlinks.
+BACKLINKS = f"{CONTROL}/backlinks.json"
+GENERATED = [INDEX, "<type folder>/" + INDEX, CONTEXT + "/", BACKLINKS]
+MARKER = Path(SCHEMA) / "VERSION"
+OLD_MARKER = Path("schema") / "VERSION"  # the layout before 0.6
+OLD_FORMAT = "this brain has the format of an earlier pb version: remove `brain/` and create it again with /pb:init"
+
+
+def is_old_format(root):
+    """A brain/ in the layout of an earlier pb version: schema/VERSION at its top, no .pb/schema/VERSION."""
+    root = Path(root)
+    return (root / OLD_MARKER).is_file() and not (root / MARKER).is_file()
+
+
+def find_old_brain(start):
+    """The old-format brain/ walking up from start, or None."""
+    current = Path(start).resolve()
+    for folder in [current] + list(current.parents):
+        for option in ([folder] if folder.name == "brain" else []) + [folder / "brain"]:
+            if is_old_format(option):
+                return option
+    return None
+
+
+def is_generated(path, folders):
+    """Is a repo-relative path under brain/ a file `pb generate` writes: the index, the README.md of one of the type
+    `folders`, a context pack, the backlinks?"""
+    if not path.startswith("brain/"):
+        return False
+    rel = path[len("brain/"):]
+    if rel == INDEX or rel in {f"{folder}/{INDEX}" for folder in folders}:
+        return True
+    return rel == BACKLINKS or rel.startswith(CONTEXT + "/")
 
 
 def find_brain(start, explicit=None):
@@ -62,7 +99,7 @@ class Page:
         self.body = body
         self.title = str(self.meta.get("title") or path.stem)
         self.type = self.meta.get("type")
-        self.words = len(body.split())
+        self.words = len(_without_heading(body).split())
 
     def get(self, key, default=None):
         return self.meta.get(key, default)
@@ -76,20 +113,24 @@ class Brain:
         self.root = Path(root).resolve()
         self.repo_root = self.root.parent
         self.config = dict(DEFAULTS)
-        self.config.update(self._meta_of(self.root / "schema" / "brain.md"))
-        self.sources = self._meta_of(self.root / "schema" / "sources.md")
-        self.review = self._meta_of(self.root / "schema" / "review.md")
+        self.schema = self.root / SCHEMA
+        self.config.update(self._meta_of(self.schema / "brain.md"))
+        self.sources = self._meta_of(self.schema / "sources.md")
+        self.review = self._meta_of(self.schema / "review.md")
         self.types = self._load_types()
         self.load_errors = []
         self._pages = None
         self.by_title = {}
         self.by_alias = {}
+        self.by_rel = {}
 
     @classmethod
     def locate(cls, explicit=None, start=None):
         root = find_brain(Path(start or os.getcwd()), explicit)
+        if root is None and find_old_brain(Path(explicit or start or os.getcwd())) is not None:
+            raise NotInBrain(OLD_FORMAT, {"code": "old-format", "error": OLD_FORMAT})
         if root is None:
-            raise NotInBrain("no brain found: run inside a repo with brain/schema/VERSION, or pass --brain")
+            raise NotInBrain(f"no brain found: run inside a repo with brain/{MARKER.as_posix()}, or pass --brain")
         return cls(root)
 
     @staticmethod
@@ -101,7 +142,7 @@ class Brain:
 
     def _load_types(self):
         types = {}
-        folder = self.root / "schema" / "types"
+        folder = self.schema / "types"
         for path in sorted(folder.glob("*.md")) if folder.is_dir() else []:
             meta, body = frontmatter.parse(path.read_text(encoding="utf-8"))
             meta = meta or {}
@@ -124,7 +165,7 @@ class Brain:
             if not base.is_dir():
                 continue
             for path in sorted(base.rglob("*.md")):
-                if path in seen:
+                if path in seen or path.name == INDEX:  # a README.md is the folder's index, never a page
                     continue
                 seen.add(path)
                 rel = path.relative_to(self.root).as_posix()
@@ -136,11 +177,22 @@ class Brain:
                 pages.append(Page(path, rel, meta, body))
         self._pages, self.load_errors = pages, errors
         self.by_title, self.by_alias = {}, {}
+        self.by_rel = {p.rel: p for p in pages}
         for p in pages:
             self.by_title.setdefault(p.title.lower(), p)
         for p in pages:
             for alias in _as_list(p.get("aliases")):
                 self.by_alias.setdefault(str(alias).lower(), p)
+
+    def reload(self):
+        """Read the pages again (after a change on disk, e.g. normalisation)."""
+        self._pages = None
+        self.__dict__.pop("_heading_ids", None)
+
+    def page_at(self, rel):
+        """The page at a brain-relative path, or None."""
+        self.pages()
+        return self.by_rel.get(rel)
 
     def lookup(self, name):
         self.pages()
@@ -150,6 +202,14 @@ class Brain:
         if key in self.by_alias:
             return self.by_alias[key], "alias"
         return None, None
+
+
+def _without_heading(body):
+    """The body without its leading `# <title>` line: the heading does not count towards the word budget."""
+    stripped = body.lstrip()
+    if stripped.startswith("# "):
+        return stripped.split("\n", 1)[1] if "\n" in stripped else ""
+    return body
 
 
 def _as_list(value):

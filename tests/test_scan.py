@@ -47,7 +47,7 @@ class ScanTest(unittest.TestCase):
             touch(tmp, "apps/web/src/notes.md", "loose note")
             for rel in ("docs/adr/0001-use-rest.md", "CHANGELOG.md", "LICENSE.md", "CLAUDE.md", "AGENTS.md",
                         ".github/PULL_REQUEST_TEMPLATE.md", "apps/web/tests/fixtures/sample.md",
-                        "node_modules/x/README.md", "brain/index.md", "docs/image.png"):
+                        "node_modules/x/README.md", "brain/README.md", "docs/image.png"):
                 touch(tmp, rel)
             code, data, err = run_cli("scan", "--repo", tmp)
             self.assertEqual(code, 0, err)

@@ -29,8 +29,8 @@ def touch(root, rel, text="x"):
 
 
 def set_setting(repo, key, value):
-    """Replace one setting of brain/schema/brain.md."""
-    path = Path(repo) / "brain/schema/brain.md"
+    """Replace one setting of brain/.pb/schema/brain.md."""
+    path = Path(repo) / "brain/.pb/schema/brain.md"
     lines = [f"{key}: {json.dumps(value)}" if line.startswith(f"{key}:") else line
              for line in path.read_text().splitlines()]
     path.write_text("\n".join(lines) + "\n")
@@ -134,7 +134,7 @@ class MessagesTest(unittest.TestCase):
                 _, repo = self.brain(fmt)
                 code, data, _ = run_cli("validate", cwd=repo)
                 self.assertEqual(code, 1, data)
-                self.assertIn(("schema/brain.md", "bad-commit-format"),
+                self.assertIn((".pb/schema/brain.md", "bad-commit-format"),
                               [(e["path"], e["code"]) for e in data["errors"]])
                 code, data, _ = run_cli("lint", cwd=repo)
                 self.assertIn("bad-commit-format", [f["code"] for f in data["findings"]])

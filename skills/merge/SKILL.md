@@ -25,8 +25,8 @@ On `"alert": "outside-brain"` stop: nothing was merged or pushed and there is no
 
 - `conflicts.generated`: leave them alone. The next step regenerates them once the pages are settled.
 - `conflicts.state`: already resolved by `PB merge start`: `docs/brain`'s cursors, the union of both sides' suppressions. Nothing to do.
-- `conflicts.pages`: combine both versions into one page that follows the type's writing rules in `references/writing.md` and `brain/schema/types/<type>.md`. Keep every fact from both sides, drop duplicates, and remove the conflict markers. When the two sides disagree, the source or the date settles it as in step 3; otherwise ask about it there. Write the page in the worktree, then `git -C <worktree> add <path>`. Note what you kept from each side for the report.
-- `conflicts.schema` (`brain/schema/`, `brain/.pb/toolkit/`): the one kind you never settle alone. Ask the person, one question per file, showing both versions (`git -C <worktree> show :2:<path>` is the `docs/brain` side, `:3:<path>` the default branch side). Write what they choose, then `git -C <worktree> add <path>`.
+- `conflicts.pages`: combine both versions into one page that follows the type's writing rules in `references/writing.md` and `brain/.pb/schema/types/<type>.md`. Keep every fact from both sides, drop duplicates, and remove the conflict markers. When the two sides disagree, the source or the date settles it as in step 3; otherwise ask about it there. Write the page in the worktree, then `git -C <worktree> add <path>`. Note what you kept from each side for the report.
+- `conflicts.schema` (`brain/.pb/schema/`, `brain/.pb/toolkit/`): the one kind you never settle alone. Ask the person, one question per file, showing both versions (`git -C <worktree> show :2:<path>` is the `docs/brain` side, `:3:<path>` the default branch side). Write what they choose, then `git -C <worktree> add <path>`.
 
 ## 3. Inconsistencies
 
@@ -34,14 +34,14 @@ A merge that git considers clean can still leave the brain contradicting itself,
 
 - the same concept, feature or decision created as two different pages, one per side (`PB --brain <brain> resolve "<name>"` helps);
 - a page one side changed and the other deleted, renamed or superseded;
-- statements that disagree: a glossary term defined two ways, a feature status, a decision accepted on one side and contradicted or superseded on the other, an interface contract described differently;
+- statements that disagree: a glossary term defined two ways, a feature status, a decision accepted on one side and contradicted or superseded on the other, a contract described differently;
 - links to pages the other side removed or renamed.
 
 What the sources or the dates settle, fix in the worktree and note for the report: merge duplicate pages into one and fix the links to it, follow a supersession, keep the newer source on a contradiction. What they do not settle, ask the person, one question per inconsistency, with both versions and where each came from (the `sources` of each page, the commit on each side). If they do not know, record the disagreement as an `open-question` page citing both sources and link it from the affected pages, as everywhere else in pb.
 
 ## 4. Validate, commit, push `docs/brain`
 
-`PB merge finish --worktree <worktree> -m "bring <default> into docs/brain"` (`-m` is the summary `commit_format` wraps). It regenerates the generated files, runs the same checks as a save on every page either side changed and on the ones you resolved, commits the merge and pushes `docs/brain`.
+`PB merge finish --worktree <worktree> -m "bring <default> into docs/brain"` (`-m` is the summary `commit_format` wraps). It normalises the links and headings of the pages either side changed, regenerates the generated files, runs the same checks as a save on every page either side changed and on the ones you resolved, commits the merge and pushes `docs/brain`.
 
 - `unresolved`: paths still in conflict. Settle them (step 2) and run it again.
 - `errors`: fix each page in the worktree, `git -C <worktree> add` it, and run it again.

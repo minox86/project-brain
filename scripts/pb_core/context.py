@@ -1,15 +1,17 @@
-"""Context packs: from a Jira key, a feature or epic, or code paths to the relevant brain pages."""
+"""Context packs: from a Jira key, a feature, or code paths to the relevant brain pages."""
 import fnmatch
+import posixpath
 
 from . import links
+from .brain import CONTEXT, _without_heading
 
 SECTIONS = [
-    ("epic", "Epics"),
     ("feature", "Features"),
     ("role", "Roles"),
+    ("process", "Processes"),
     ("concept", "Concepts"),
     ("module", "Modules"),
-    ("interface", "Interfaces"),
+    ("contract", "Contracts"),
     ("integration", "Integrations"),
     ("decision", "Decisions"),
     ("open-question", "Open questions"),
@@ -58,7 +60,12 @@ def summary_of(page, max_words=40):
     return ""
 
 
-def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
+REPO_ROOT = ".."  # brain-relative: links in a pack shown in chat are valid from the repo root (`brain/…`)
+
+
+def build_context(brain, jira=None, feature=None, paths=None, max_words=None, links_from=CONTEXT):
+    """The pack for a seed. Its links are valid from the brain-relative folder `links_from`: `.pb/context/`, where
+    generate writes packs, or REPO_ROOT for a pack shown in chat."""
     seeds = _seeds(brain, jira, feature, paths)
     collected = {p.rel: p for p in seeds}
 
@@ -66,15 +73,12 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
         for p in pages:
             collected.setdefault(p.rel, p)
 
-    for p in [p for p in collected.values() if p.type == "epic"]:
-        add(_targets(brain, p, "features") + _targets(brain, p, "modules"))
     for p in list(collected.values()):
         if p.type == "feature":
             add(_targets(brain, p, "modules") + _targets(brain, p, "concepts") + _targets(brain, p, "roles"))
     for m in [p for p in collected.values() if p.type == "module"]:
-        add(_targets(brain, m, "interfaces"))  # field of brains created before 0.4
         for other in brain.pages():
-            if other.type == "interface" and m.title in _link_titles(brain, other, ("provided_by", "consumed_by")):
+            if other.type == "contract" and m.title in _link_titles(brain, other, ("provided_by", "consumed_by")):
                 add([other])
             if other.type == "integration" and m.title in _link_titles(brain, other, ("used_by",)):
                 add([other])
@@ -82,13 +86,8 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
                 add([other] + _targets(brain, other, "concepts"))
     hit = {p.title for p in collected.values()}
     for other in brain.pages():
-        if other.type == "epic" and other.get("status", "active") == "active" \
-                and set(_link_titles(brain, other, ("features", "modules"))) & hit:
-            add([other])
-    hit = {p.title for p in collected.values()}
-    for other in brain.pages():
         if set(_link_titles(brain, other, ("applies_to",))) & hit and other.get("status") not in CLOSED:
-            add([other])  # domain types (rules, processes, regulations…) point at what they govern
+            add([other])  # processes and domain types (rules, regulations…) point at what they govern
         affects = set(_link_titles(brain, other, ("affects",)))
         if not affects & hit:
             continue
@@ -100,12 +99,12 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
     pages = sorted(collected.values(), key=lambda p: (_ORDER.get(p.type, 99), p.type, p.title.lower()))
     limit = max_words or brain.config.get("context_pack_max_words") or 4000
     mode = {p.rel: "full" for p in pages}
-    markdown = _render(seeds, pages, mode)
+    markdown = _render(brain, seeds, pages, mode, links_from)
     for p in sorted(pages, key=lambda p: -p.words):
         if _count(markdown) <= limit:
             break
         mode[p.rel] = "summary"
-        markdown = _render(seeds, pages, mode)
+        markdown = _render(brain, seeds, pages, mode, links_from)
     return {
         "seeds": [p.title for p in seeds],
         "pages": [{"title": p.title, "type": p.type, "path": p.rel, "included": mode[p.rel]} for p in pages],
@@ -117,7 +116,7 @@ def build_context(brain, jira=None, feature=None, paths=None, max_words=None):
 def _seeds(brain, jira, feature, paths):
     if jira:
         key = jira.strip().upper()
-        return [p for p in brain.pages() if p.type in ("feature", "epic") and (
+        return [p for p in brain.pages() if p.type == "feature" and (
             key in [str(j).upper() for j in _list(p.get("jira"))]
             or f"JIRA:{key}" in [str(s).upper() for s in _list(p.get("sources"))])]
     if feature:
@@ -126,7 +125,8 @@ def _seeds(brain, jira, feature, paths):
     return modules_for_paths(brain, paths or [])
 
 
-def _render(seeds, pages, mode):
+def _render(brain, seeds, pages, mode, dst):
+    """The pack, its links valid from the brain-relative folder `dst`: the links of the embedded text are rebased."""
     if not pages:
         return ""
     out = [f"# Context: {', '.join(p.title for p in seeds)}", ""]
@@ -139,10 +139,12 @@ def _render(seeds, pages, mode):
         out += [f"## {heading}", ""]
         for p in group:
             out.append(f"### {p.title}")
+            here = posixpath.dirname(p.rel)
             if mode[p.rel] == "full":
-                out += [p.body.strip(), ""]
+                out += [links.rewrite(brain, _without_heading(p.body).strip(), here, dst), ""]
             else:
-                out += [f"{summary_of(p)} (see brain/{p.rel})", ""]
+                out += [f"{links.rewrite(brain, summary_of(p), here, dst)} "
+                        f"([{p.title}]({links.href(p.rel, dst)}))", ""]
     return "\n".join(out).rstrip() + "\n"
 
 
@@ -168,7 +170,7 @@ def _link_titles_raw(page, fields):
     for field in fields:
         for item in _list(page.get(field)):
             if isinstance(item, str):
-                out.extend(links.extract(item))
+                out.extend(links.extract(item) if "[[" in item else [item.strip()] if item.strip() else [])
     return out
 
 

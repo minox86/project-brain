@@ -1,7 +1,8 @@
-"""Flags the brain changes that are watched, and their area reviewers, by the policy in schema/review.md."""
+"""Flags the brain changes that are watched, and their area reviewers, by the policy in .pb/schema/review.md."""
 from pathlib import Path
 
-from . import policy
+from . import links, policy
+from .brain import _without_heading
 from .changes import changed_pages
 from .errors import UsageError
 from .validate import brain_rel, noise, page_targets
@@ -15,8 +16,11 @@ def review(brain, base="HEAD", confidence=(), noise_holds=True):
     changed = changed_pages(brain, base)
     if changed is None:
         raise UsageError(f"cannot compare the brain with '{base}': run inside its git repo, with that commit present")
-    levels, ignored = _levels(brain, confidence, changed)
     pages = {p.rel: p for p in brain.pages() if p.type in brain.types}
+    # An update that only rewrites links (normalisation, a link repaired after a rename) is no change to review.
+    changed = {rel: info for rel, info in changed.items()
+               if not (info["change"] == "update" and rel in pages and _only_links(pages[rel], info))}
+    levels, ignored = _levels(brain, confidence, changed)
     flagged = {}
 
     def flag(rel, reason):
@@ -61,15 +65,31 @@ def review(brain, base="HEAD", confidence=(), noise_holds=True):
                       "reasons": flagged[rel]})
     return {
         "route": "pr" if items else "direct",
-        "policy": "schema/review.md" if rules["configured"] else "default (no schema/review.md: everything direct)",
+        "policy": ".pb/schema/review.md" if rules["configured"]
+        else "default (no .pb/schema/review.md: everything direct)",
         "direct": sorted(rel for rel in changed if rel not in flagged),
         "review": items,
         "reviewers": reviewers_for(rules, items),
-        # Per area, whatever is flagged: CI asks the technical ones when brain/schema or the toolkit changes.
+        # Per area, whatever is flagged: CI asks the technical ones when brain/.pb/schema or the toolkit changes.
         "area_reviewers": {area: reviewers_for(rules, [{"area": area}]) for area in policy.AREAS},
         "ignored_confidence": ignored,
         "markdown": _markdown(items),
     }
+
+
+def _plain(body):
+    """The body as it reads: links replaced by the text they show, without the leading heading."""
+    def shown(m):
+        if m.group("wtarget") is not None:
+            target, _, label = links._wiki_parts(m)
+            return label or target
+        return m.group("label")
+    return links.TOKEN.sub(shown, _without_heading(body or "")).strip()
+
+
+def _only_links(page, info):
+    return info.get("old_body") is not None and page.meta == (info["old"] or {}) \
+        and _plain(page.body) == _plain(info["old_body"])
 
 
 def page_area(brain, type_, meta):
@@ -146,7 +166,7 @@ def _levels(brain, items, changed):
 def _markdown(items):
     if not items:
         return ""
-    lines = ["Brain changes that need a human look before they count (policy: `brain/schema/review.md`).", "",
+    lines = ["Brain changes that need a human look before they count (policy: `brain/.pb/schema/review.md`).", "",
              "| Page | Change | Area | Why |", "|---|---|---|---|"]
     for item in items:
         lines.append(f"| `{item['path']}` | {item['change']} | {item['area'] or 'cross'} | "

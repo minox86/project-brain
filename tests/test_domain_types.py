@@ -17,11 +17,11 @@ class DomainTypesTest(unittest.TestCase):
             repo = make_brain(tmp, files_of(page("feature", "Approval", "capability: Invoicing")))
             types = sorted(DOMAIN.glob("*.md"))
             types = [t for t in types if t.name != "README.md"]
-            self.assertEqual([t.stem for t in types], ["edition", "metric", "process", "regulation", "rule"])
+            self.assertEqual([t.stem for t in types], ["edition", "metric", "regulation", "rule"])
             for t in types:
-                shutil.copy(str(t), str(repo / "brain/schema/types" / t.name))
+                shutil.copy(str(t), str(repo / "brain/.pb/schema/types" / t.name))
             pages = {
-                "rule": ("functional/rules", "basis: law\nregulation: \"[[E-invoicing]]\""),
+                "rule": ("functional/rules", "basis: law\nregulation: E-invoicing"),
                 "regulation": ("functional/regulations", "authority: Agenzia delle Entrate"),
                 "process": ("functional/processes", ""),
                 "metric": ("functional/metrics", "unit: \"%\""),
@@ -33,7 +33,7 @@ class DomainTypesTest(unittest.TestCase):
                 path = repo / "brain" / folder / f"{titles[name]}.md"
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(f'---\ntype: {name}\ntitle: "{titles[name]}"\n{meta}\n'
-                                f'applies_to: ["[[Approval]]"]\nsources: ["url:https://example.com"]\n---\nBody.\n')
+                                f'applies_to: [Approval]\nsources: ["url:https://example.com"]\n---\nBody.\n')
             code, data, err = run_cli("validate", cwd=repo)
             self.assertEqual(code, 0, (data, err))
             self.assertEqual(data["errors"], [])

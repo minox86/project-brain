@@ -30,7 +30,11 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          pages=$(git diff --name-only --diff-filter=AMR "$BASE"...HEAD -- 'brain/*.md' | grep -v -E '^brain/(index|glossary|features)\.md$|^brain/context/' || true)
+          # Pages: every .md under brain/ but the generated README.md files and brain/.pb/ (the control). From
+          # brain/.pb/, only the texts the checks read: the schema, the routine digests, the extracted raw text.
+          pages=$(git -c core.quotePath=false diff --name-only --diff-filter=AMR "$BASE"...HEAD -- 'brain/*.md' | grep -v -E '^brain/\.pb/|(^|/)README\.md$' || true)
+          control=$(git -c core.quotePath=false diff --name-only --diff-filter=AMR "$BASE"...HEAD -- 'brain/.pb/schema/*.md' 'brain/.pb/digests/*.md' 'brain/.pb/raw/*.md' || true)
+          pages=$(printf '%s\n%s\n' "$pages" "$control" | sed '/^$/d')
           if [ -z "$pages" ]; then
             echo "No brain page changed."
             exit 0
@@ -56,10 +60,32 @@ jobs:
             toolkit=brain/.pb/toolkit/pb.py
           fi
           python3 -B "$toolkit" --brain brain generate
-          if [ -n "$(git status --porcelain -- brain)" ]; then
-            git status --short -- brain
+          if [ -n "$(git -c core.quotePath=false status --porcelain -- brain)" ]; then
+            git -c core.quotePath=false status --short -- brain
             echo 'Generated files are stale: run `PB generate` and commit'
             exit 1
+          fi
+      - name: Links are normalised
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE"...HEAD -- brain; then
+            echo "No file under brain/ changed."
+            exit 0
+          fi
+          toolkit=.pb-base/brain/.pb/toolkit/pb.py
+          [ -f "$toolkit" ] || toolkit=brain/.pb/toolkit/pb.py
+          if ! git diff --quiet "$BASE"...HEAD -- brain/.pb/toolkit; then
+            toolkit=brain/.pb/toolkit/pb.py
+          fi
+          status=0
+          python3 -B "$toolkit" --brain brain links --check > "$RUNNER_TEMP/links.json" || status=$?
+          if [ "$status" -eq 1 ]; then
+            cat "$RUNNER_TEMP/links.json"
+            echo 'Links are not normalised: run `PB links` and commit'
+            exit 1
+          elif [ "$status" -ne 0 ]; then
+            echo "::warning::The toolkit could not check the links (a toolkit without links --check): skipped."
           fi
 
   review:
@@ -98,7 +124,7 @@ jobs:
             echo "::warning::The review could not be evaluated."
             exit 0
           }
-          touched=$(git diff --name-only "$BASE"...HEAD -- brain/schema brain/.pb/toolkit)
+          touched=$(git -c core.quotePath=false diff --name-only "$BASE"...HEAD -- brain/.pb/schema brain/.pb/toolkit)
           users=$(jq -r '.reviewers.users[]' "$RUNNER_TEMP/review.json")
           teams=$(jq -r '.reviewers.teams[]' "$RUNNER_TEMP/review.json")
           if [ -n "$touched" ]; then
@@ -121,7 +147,7 @@ jobs:
               printf '%s\n' "$touched" | sed 's/^/- `/; s/$/`/'
               if [ "${#args[@]}" -eq 0 ]; then
                 echo
-                echo "Configuration or toolkit files changed and no reviewer could be derived: brain/schema/review.md names no technical reviewer besides the PR's author."
+                echo "Configuration or toolkit files changed and no reviewer could be derived: brain/.pb/schema/review.md names no technical reviewer besides the PR's author."
               fi
             fi
           } >> "$GITHUB_STEP_SUMMARY"

@@ -21,14 +21,14 @@ Find every page asserting the wrong fact:
 - a search across `brain/` for the claim, its key terms, the concept's aliases (`grep -ril`);
 - pages linked from those (`PB context --feature`/`--paths` when relevant).
 
-Ignore generated files (`index.md`, `glossary.md`, `features.md`, `context/`): every save rebuilds them.
+Ignore generated files (the `README.md` files, `.pb/context/`): every save rebuilds them.
 
 ## 3. Classify
 
 - **Misrecorded** — the brain never matched reality: correct in place.
 - **Outdated** — it was true and changed:
-  - a `decision` is never rewritten: create a new decision with `supersedes: "[[Old]]"`, set the old one to `status: superseded`, update `affects` pages to link the new one;
-  - knowledge pages (feature, epic, concept, module, interface, environment): update the content.
+  - a `decision` is never rewritten: create a new decision with `supersedes: <old title>`, set the old one to `status: superseded`, update `affects` pages to link the new one;
+  - knowledge pages (feature, process, concept, module, contract, environment): update the content.
 - **Contested** — the evidence conflicts with an external source of truth (Confluence PRD, Jira acceptance criteria): do not pick a side; create an `open-question` citing both and link it from the affected pages.
 
 ## 4. Trace the origin

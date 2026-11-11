@@ -7,7 +7,7 @@ from test_gitops import GitRepoCase, git
 
 
 def sources(schedule):
-    return {"schema/sources.md": f'---\nroutine: {{branch: main, schedule: "{schedule}"}}\n---\n# Sources\n'}
+    return {".pb/schema/sources.md": f'---\nroutine: {{branch: main, schedule: "{schedule}"}}\n---\n# Sources\n'}
 
 
 class ScheduleValidationTest(unittest.TestCase):
@@ -32,13 +32,13 @@ class ScheduleValidationTest(unittest.TestCase):
                 code, data, _ = self.check(cron)
                 self.assertEqual(code, 1, data)
                 self.assertEqual([(e["path"], e["code"]) for e in data["errors"]],
-                                 [("schema/sources.md", "bad-schedule")])
+                                 [(".pb/schema/sources.md", "bad-schedule")])
 
     def test_routine_without_vendored_instructions_warns(self):
         code, data, _ = self.check("0 2 * * *")
         self.assertEqual(code, 0, data)
         self.assertEqual([(w["path"], w["code"]) for w in data["warnings"]],
-                         [("schema/sources.md", "routine-instructions-missing")])
+                         [(".pb/schema/sources.md", "routine-instructions-missing")])
 
     def test_no_routine_configured_is_fine(self):
         repo = make_brain(self.tmp.name)
@@ -67,7 +67,7 @@ class LocalRunTest(GitRepoCase):
                                        "docs/brain to main was not opened"]})
         self.assertEqual(git(self.remote, "log", "--format=%s", "-2", "docs/brain").splitlines(),
                          ["pb(routine): manual", "init"])
-        self.assertIn("brain/index.md",
+        self.assertIn("brain/README.md",
                       git(self.remote, "show", "--name-only", "--format=", "docs/brain").splitlines())
 
         code, data, err = run_cli("routine", "cleanup", "--worktree", wt, cwd=self.repo)

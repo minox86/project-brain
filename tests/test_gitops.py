@@ -34,7 +34,7 @@ class GitRepoCase(unittest.TestCase):
         git(base, "init", "-q", "--bare", "-b", "main", str(self.remote))
         self.repo = make_brain(base / "repo")
         if not self.review_policy:
-            (self.repo / "brain/schema/review.md").unlink()  # no policy: every change goes straight to the branch
+            (self.repo / "brain/.pb/schema/review.md").unlink()  # no policy: every change goes straight to the branch
         git(self.repo, "init", "-q", "-b", "main")
         git(self.repo, "remote", "add", "origin", str(self.remote))
         git(self.repo, "add", "-A")
@@ -63,14 +63,14 @@ class GitopsTest(GitRepoCase):
     def test_commit_only_brain_and_carries_generated_files(self):
         git(self.repo, "checkout", "-qb", "feat/x")
         self.add_page("Approval")
-        self.write("brain/index.md", "generated\n")
+        self.write("brain/README.md", "generated\n")
         self.write("apps/web/a.ts", "code\n")
         git(self.repo, "add", "apps/web/a.ts")
         code, data, err = run_cli("commit", "--skill", "put", "-m", "add approval", cwd=self.repo)
         self.assertEqual(code, 0, err)
         self.assertTrue(data["committed"])
         self.assertEqual(data["branch"], "feat/x")
-        expected = ["brain/functional/features/Approval.md", "brain/index.md"]
+        expected = ["brain/README.md", "brain/functional/features/Approval.md"]
         self.assertEqual(sorted(data["files"]), expected)
         shown = git(self.repo, "show", "--name-only", "--format=%s", "HEAD").splitlines()
         self.assertEqual(shown[0], "pb(put): add approval")
@@ -113,7 +113,7 @@ class GitopsTest(GitRepoCase):
         self.assertEqual(log.splitlines()[:2], ["pb(routine): sync", "init"])
         shown = git(self.remote, "show", "--name-only", "--format=", "docs/brain").splitlines()
         self.assertIn("brain/functional/features/Approval.md", shown)
-        self.assertIn("brain/index.md", shown)  # one commit carries pages and generated files
+        self.assertIn("brain/README.md", shown)  # one commit carries pages and generated files
         self.assertEqual(git(self.repo, "status", "--porcelain", "--", "brain"), "")
         code, data, _ = run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
         self.assertFalse(data["created"])
@@ -190,7 +190,7 @@ class BrainBranchCase(GitRepoCase):
 
     def setUp(self):
         super().setUp()
-        self.write("brain/schema/sources.md", "---\ngithub: {repo: o/r}\n---\n# Sources\n")
+        self.write("brain/.pb/schema/sources.md", "---\ngithub: {repo: o/r}\n---\n# Sources\n")
         git(self.repo, "commit", "-qam", "sources")
         git(self.repo, "push", "-q", "origin", "main")
         self.gh = FakeGh()
@@ -309,6 +309,38 @@ class RoutineFinishTest(BrainBranchCase):
         self.assertEqual(self.gh.fields("open")[:3], ["title=Brain updates", "head=docs/brain", "base=main"])
         self.assertIn("decisions/X.md", self.gh.fields("open")[3])
 
+    def test_finish_normalises_the_pages_of_the_run(self):
+        self.start()
+        rel, text = page("decision", "X", "area: technical", "Built in [[Approval]].\n")
+        self.write("brain/" + rel, text)
+        self.add_page("Approval")
+        self.finish()
+        shown = git(self.repo, "show", "origin/docs/brain:brain/decisions/X.md")
+        self.assertTrue(shown.endswith("---\n# X\n\nBuilt in [Approval](../functional/features/Approval.md)."), shown)
+
+    def test_finish_repairs_links_after_a_rename_with_alias(self):
+        old = "brain/functional/concepts/Association fact.md"
+        self.write(old, page("concept", "Association fact", "term_en: Association fact")[1])
+        self.write("brain/functional/features/Approval.md",
+                   page("feature", "Approval", "", "# Approval\n\nSee [it](../concepts/Association%20fact.md).\n")[1])
+        self.commit_all("pages", "main")
+        self.start()
+        (self.repo / old).unlink()
+        rel, text = page("concept", "Association record", "term_en: Association record\naliases: [Association fact]")
+        self.write("brain/" + rel, text)
+        self.finish()
+        shown = git(self.repo, "show", "origin/docs/brain:brain/functional/features/Approval.md")
+        self.assertIn("See [it](../concepts/Association%20record.md).", shown)
+
+    def test_finish_with_a_non_ascii_title(self):
+        self.start()
+        rel, text = page("concept", "Società (S.r.l.)", "term_en: Company", "A company.\n")
+        self.write("brain/" + rel, text)
+        out = self.finish()
+        self.assertTrue(out["pushed"])
+        shown = git(self.repo, "show", f"origin/docs/brain:brain/{rel}")
+        self.assertIn("# Società (S.r.l.)", shown)
+
     def test_finish_body_keeps_watched_changes_of_earlier_runs(self):
         self.start()
         rel, text = page("decision", "X")
@@ -331,7 +363,7 @@ class RoutineFinishTest(BrainBranchCase):
         self.assertIn("functional/features/Approval.md", self.gh.fields("open")[3])
 
     def test_finish_updates_open_pr_and_requests_reviewers(self):
-        self.write("brain/schema/review.md",
+        self.write("brain/.pb/schema/review.md",
                    '---\nreviewers: {technical: ["acme/backend"], functional: [pm]}\n'
                    "watch: [{type: decision}]\n---\n# Review policy\n")
         self.commit_all("policy", "main")
@@ -348,7 +380,7 @@ class RoutineFinishTest(BrainBranchCase):
         self.assertEqual(out["problems"], [])
 
     def test_finish_never_requests_the_pr_author(self):
-        self.write("brain/schema/review.md",
+        self.write("brain/.pb/schema/review.md",
                    '---\nreviewers: {functional: [owner]}\nwatch: [{type: decision}]\n---\n# Review policy\n')
         self.commit_all("policy", "main")
         self.gh.open_prs = [{"number": 12, "html_url": "https://github.com/o/r/pull/12", "user": {"login": "owner"}}]
@@ -415,12 +447,12 @@ class RoutineFinishTest(BrainBranchCase):
         self.assertEqual(git(self.remote, "rev-parse", "docs/brain"), before)
 
     def test_finish_runs_retention(self):
-        self.write("brain/digests/2020-01-01.md", "# Old digest\n")
+        self.write("brain/.pb/digests/2020-01-01.md", "# Old digest\n")
         self.commit_all("old digest", "main")
         self.start()
         out = self.finish()
-        self.assertEqual(out["retention"]["deleted"], ["digests/2020-01-01.md"])
-        self.assertNotIn("brain/digests/2020-01-01.md",
+        self.assertEqual(out["retention"]["deleted"], [".pb/digests/2020-01-01.md"])
+        self.assertNotIn("brain/.pb/digests/2020-01-01.md",
                          git(self.repo, "ls-tree", "-r", "--name-only", "origin/docs/brain").splitlines())
 
     def test_run_after_github_deleted_docs_brain(self):

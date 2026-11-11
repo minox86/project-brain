@@ -10,7 +10,7 @@ Arguments: `$ARGUMENTS`
 
 Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only.
 
-Recurring meetings configured in `/pb:routine-setup` (the `meetings:` list in `brain/schema/sources.md`) are ingested by the routine after each occurrence: use this skill for one-off meetings, or to ingest an occurrence right away. If the meeting is an occurrence of a configured series, after writing, move that series' cursor past it (`PB state set meetings <id> …`) only if it is the oldest unprocessed one, so the routine does not ingest it twice.
+Recurring meetings configured in `/pb:routine-setup` (the `meetings:` list in `brain/.pb/schema/sources.md`) are ingested by the routine after each occurrence: use this skill for one-off meetings, or to ingest an occurrence right away. If the meeting is an occurrence of a configured series, after writing, move that series' cursor past it (`PB state set meetings <id> …`) only if it is the oldest unprocessed one, so the routine does not ingest it twice.
 
 ## 1. Find the meeting
 
@@ -31,7 +31,7 @@ Read the transcript and the meeting chat with `read_resource` (resources linked 
 From the transcript and chat, keep only what passes the **significance gate**:
 - decisions (functional, UX, technical) with options considered and reasons;
 - open questions left unresolved, and action-blocking doubts;
-- scope agreements, constraints and risks of an epic in progress (on its `epic` page), changes to expected behaviour of features, new or clarified domain concepts, discoveries about modules and interfaces.
+- changes to expected behaviour of features and processes, new or clarified domain concepts, discoveries about modules and contracts.
 
 Drop: status updates, scheduling, small talk, who-will-do-what (that belongs to Jira), opinions about people.
 

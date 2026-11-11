@@ -2,6 +2,7 @@
 import datetime
 import re
 
+from .brain import DIGESTS
 from .generate import CLOSED, is_archived
 
 DIGEST = re.compile(r"(\d{4}-\d{2}-\d{2})\.md$")
@@ -21,7 +22,7 @@ def apply_retention(brain, today):
             archived.append(p.rel)
 
     keep = brain.config.get("digest_retention_days") or 30
-    digests = brain.root / "digests"
+    digests = brain.root / DIGESTS
     for path in sorted(digests.glob("*.md")) if digests.is_dir() else []:
         match = DIGEST.match(path.name)
         if not match:
@@ -32,7 +33,7 @@ def apply_retention(brain, today):
             continue
         if (today - day).days > keep:
             path.unlink()
-            deleted.append(f"digests/{path.name}")
+            deleted.append(f"{DIGESTS}/{path.name}")
     return {"archived": sorted(archived), "deleted": deleted}
 
 

@@ -12,9 +12,9 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 
 **Connectors:** check those this run needs before starting (see **Connectors** in the conventions) and guide the user to connect what is missing. Setup needs Microsoft 365 (Teams), Atlassian (Confluence, Jira), `gh` and, to create the routine, the `schedule` skill. The routine itself runs with the connectors of the account that creates it: the same ones must be connected there.
 
-`schedule <frequency>`: change only how often the routine runs — go to **6. Schedule** with the given frequency, then update `routine.schedule` in `brain/schema/sources.md`, update the cloud routine (step 8, update instead of create) and save (step 9). Stop there.
+`schedule <frequency>`: change only how often the routine runs — go to **6. Schedule** with the given frequency, then update `routine.schedule` in `brain/.pb/schema/sources.md`, update the cloud routine (step 8, update instead of create) and save (step 9). Stop there.
 
-`show`: print the current `routine`, `teams`, `meetings`, `confluence`, `jira`, `github` configuration from `brain/schema/sources.md` and the cursors (`PB state get teams|meetings|confluence|jira|github`), then stop.
+`show`: print the current `routine`, `teams`, `meetings`, `confluence`, `jira`, `github` configuration from `brain/.pb/schema/sources.md` and the cursors (`PB state get teams|meetings|confluence|jira|github`), then stop.
 
 ## 1. Owner
 
@@ -40,7 +40,7 @@ With the Atlassian connector: `getConfluenceSpaces`. Let the user pick the space
 
 ## 3b. Jira projects
 
-With the Atlassian connector: `getVisibleJiraProjects`. Let the user pick the projects whose epics the brain should follow: the routine keeps their `epic` pages aligned with Jira and closes them when the epic is done. Check read access with one JQL search per project (`project = <KEY> AND issuetype = Epic`).
+With the Atlassian connector: `getVisibleJiraProjects`. Let the user pick the projects whose epics and issues the brain reads as a source: the routine keeps what lasts on the features they deliver and their keys in the features' `jira`. Check read access with one JQL search per project (`project = <KEY>`).
 
 ## 4. GitHub repo
 
@@ -67,7 +67,7 @@ Routines run at most once an hour: the minute field must be a single number. `PB
 
 ## 7. Write the configuration
 
-Edit the frontmatter of `brain/schema/sources.md`:
+Edit the frontmatter of `brain/.pb/schema/sources.md`:
 
     routine: {branch: docs/brain, schedule: "<cron>", owner_role: Engineering Manager, trigger_id: <id, after step 8>}
     teams:
@@ -80,7 +80,7 @@ Edit the frontmatter of `brain/schema/sources.md`:
       - {id: <slug>, subject: "<series subject>", organizer: <organizer email>}
     github: {repo: <owner/name>}
 
-Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule, the list of channels, recurring meetings, spaces and Jira projects, and "digests in `brain/digests/`".
+Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule, the list of channels, recurring meetings, spaces and Jira projects, and "digests in `brain/.pb/digests/`".
 
 Cloud routines do not load plugins: the routine follows the copy of the toolkit and of its instructions (sync, put, meeting skills and the references) vendored in `brain/.pb/toolkit/`. Refresh it from this plugin with `PB toolkit-sync`, so the routine runs the same version as the plugin.
 
@@ -100,4 +100,4 @@ Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo
 
 ## 9. Save
 
-Validate, then the closing flow: `PB save brain/schema/sources.md brain/AGENTS.md <every changed file under brain/.pb/toolkit/>`. Changes under `schema/` and `.pb/toolkit/` are always watched, so the PR that carries them asks the reviewers. The routine reads configuration and instructions from `docs/brain`, which starts from the default branch: it works once that PR is merged (if `docs/brain` is behind, after `/pb:merge`). Say: "Commit these files and merge their PR (or ask <reviewers>), then run `/pb:routine-run` for a first run." After every plugin upgrade, `PB toolkit-sync` and save again, or the routine keeps following the old instructions.
+Validate, then the closing flow: `PB save brain/.pb/schema/sources.md brain/AGENTS.md <every changed file under brain/.pb/toolkit/>`. Changes under `.pb/schema/` and `.pb/toolkit/` are always watched, so the PR that carries them asks the reviewers. The routine reads configuration and instructions from `docs/brain`, which starts from the default branch: it works once that PR is merged (if `docs/brain` is behind, after `/pb:merge`). Say: "Commit these files and merge their PR (or ask <reviewers>), then run `/pb:routine-run` for a first run." After every plugin upgrade, `PB toolkit-sync` and save again, or the routine keeps following the old instructions.

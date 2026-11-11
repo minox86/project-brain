@@ -45,7 +45,8 @@ def lint(brain, today):
             if age is not None and age > limit:
                 add("stale-open-question", p, f"open and untouched for {age} days")
         if is_archived(p):
-            add("archivable", p, "archived by retention: it is left out of index.md; consider deleting it")
+            add("archivable", p, "archived by retention: it is left out of its folder's README.md; "
+                                 "consider deleting it")
 
     _duplicates(pages, add)
     _dead_paths(brain, pages, add)

@@ -15,10 +15,10 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 3. With `--fix`, propose per group, as a numbered list with previews:
    - **schema errors / broken links** — the corrected field or link;
    - **over-budget** — a condensed version of the page (keep facts, drop repetition and detail that fails the significance gate, move detail to links);
-   - **duplicate-candidate** — merge into one page: keep the better title, move the other title to `aliases`, rewrite every `[[link]]` to the kept title across the brain, delete the other file;
+   - **duplicate-candidate** — merge into one page: keep the better title, move the other title to `aliases`, delete the other file, write the kept title in the link fields that held the other one, then `PB links`: it repoints every body link to the deleted file at the kept page (through the alias); save its `changed` pages too;
    - **orphan** — link it from the right page, or delete it if it fails the significance gate;
-   - **stale-open-question** — ask whether it is resolved (→ decision), dropped, or still open (refresh `updated`);
-   - **archivable** — delete it (history stays in git) or keep it; for an epic, first check that what is still true lives on feature, concept, module or decision pages;
+   - **stale-open-question** — ask it as `/pb:questions` does: an answer is written to the brain and the question deleted, or it is no longer relevant (deleted), or still open (refresh `updated`);
+   - **archivable** — delete it (history stays in git) or keep it;
    - **dead-module-paths** — update `paths` from the current repo layout, or delete the module;
    - **superseded-referenced** — relink to the successor decision.
 4. Apply what the user confirms. Deletions and merges are destructive: list them explicitly before applying.

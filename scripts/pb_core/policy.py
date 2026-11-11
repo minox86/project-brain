@@ -1,4 +1,4 @@
-"""Review policy (brain/schema/review.md): which brain changes go straight to the branch and which need a PR."""
+"""Review policy (brain/.pb/schema/review.md): which brain changes go straight to the branch and which need a PR."""
 LEVELS = ("low", "medium", "high")
 AREAS = ("technical", "functional", "ux")
 CHANGES = ("create", "update", "delete")
@@ -47,7 +47,7 @@ def problems(brain):
             out.append(f"watch rule {i}: unknown key '{key}', use {sorted(RULE_KEYS)}")
         for name in as_list(rule["type"]):
             if name != "*" and name not in brain.types:
-                out.append(f"watch rule {i}: type '{name}' is not defined in schema/types")
+                out.append(f"watch rule {i}: type '{name}' is not defined in .pb/schema/types")
         for change in as_list(rule.get("change")):
             if change not in CHANGES:
                 out.append(f"watch rule {i}: change must be one of {list(CHANGES)}, got '{change}'")

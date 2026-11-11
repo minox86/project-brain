@@ -24,9 +24,9 @@ class ValidateTest(unittest.TestCase):
 
     def test_clean(self):
         code, data, _ = self.run_on(files_of(
-            page("module", "Billing", "paths: [services/billing/**]\ninterfaces: [\"[[Billing API]]\"]"),
-            page("interface", "Billing API", 'kind: rest\nprovided_by: "[[Billing]]"'),
-            page("decision", "Use REST", 'area: technical\ndate: 2026-10-31\naffects: ["[[Billing]]"]', "See [[Billing API#Semantics|the API]].\n"),
+            page("module", "Billing", "paths: [services/billing/**]"),
+            page("contract", "Billing API", 'kind: api\nprovided_by: Billing'),
+            page("decision", "Use REST", 'area: technical\ndate: 2026-10-31\naffects: [Billing]', "See [[Billing API#Semantics|the API]].\n"),
         ))
         self.assertEqual(code, 0, data)
         self.assertEqual(data["errors"], [])
@@ -82,7 +82,7 @@ class ValidateTest(unittest.TestCase):
 
     def test_broken_link_in_body_and_field(self):
         exit_code, data, _ = self.run_on(files_of(
-            page("decision", "X", 'area: ux\naffects: ["[[Ghost]]"]', "See [[Phantom]].\n"),
+            page("decision", "X", 'area: ux\naffects: [Ghost]', "See [[Phantom]].\n"),
         ))
         self.assertEqual(exit_code, 1)
         broken = [f for f in data["errors"] if f["code"] == "broken-link"]
@@ -92,15 +92,15 @@ class ValidateTest(unittest.TestCase):
         self.assertError(files_of(page("environment", "Prod", "kind: prod", "password: Sup3rS3cretValue\n")), "secret")
 
     def test_secret_in_raw_and_digest(self):
-        self.assertError({"raw/2026/10/x.md": "---\nkind: file\n---\nAKIAABCDEFGHIJKLMNOP\n"}, "secret")
+        self.assertError({".pb/raw/2026/10/x.md": "---\nkind: file\n---\nAKIAABCDEFGHIJKLMNOP\n"}, "secret")
         self.tmp.cleanup()
         self.tmp = tempfile.TemporaryDirectory()
-        self.assertError({"digests/2026-10-31.md": "ghp_" + "b" * 36 + "\n"}, "secret")
+        self.assertError({".pb/digests/2026-10-31.md": "ghp_" + "b" * 36 + "\n"}, "secret")
 
     def test_alias_link_is_warning(self):
         code, data, _ = self.run_on(files_of(
             page("concept", "Invoice", "term_en: Invoice\naliases: [Bill]"),
-            page("decision", "X", 'area: functional\naffects: ["[[Bill]]"]'),
+            page("decision", "X", 'area: functional\naffects: [Bill]'),
         ))
         self.assertEqual(code, 0, data)
         self.assertIn("alias-link", codes(data, "warnings"))
@@ -108,7 +108,7 @@ class ValidateTest(unittest.TestCase):
     def test_unknown_field_and_link_type_warnings(self):
         code, data, _ = self.run_on(files_of(
             page("concept", "Invoice", "term_en: Invoice\ncolour: red"),
-            page("feature", "Approval", 'modules: ["[[Invoice]]"]'),
+            page("feature", "Approval", 'modules: [Invoice]'),
         ))
         self.assertEqual(code, 0, data)
         self.assertEqual(codes(data, "warnings"), ["link-type", "unknown-field"])
@@ -121,7 +121,7 @@ class ValidateTest(unittest.TestCase):
         self.assertIn("250", warning["message"])
 
     def test_raw_too_long_warning(self):
-        code, data, _ = self.run_on({"raw/2026/10/x.md": "---\nkind: file\n---\n" + "w " * 3001})
+        code, data, _ = self.run_on({".pb/raw/2026/10/x.md": "---\nkind: file\n---\n" + "w " * 3001})
         self.assertEqual(code, 0)
         self.assertIn("raw-too-long", codes(data, "warnings"))
 

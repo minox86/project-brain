@@ -9,10 +9,11 @@ from pathlib import Path
 
 from . import FORMAT_VERSION, __version__
 from .brain import Brain, find_brain
-from .context import build_context
+from .context import REPO_ROOT, build_context
 from .generate import generate
 from .retention import apply_retention
 from .lint import lint
+from .links import normalise
 from .messages import commit_message, compose, pr_title
 from .stats import stats
 from . import gitops, merge, state
@@ -24,7 +25,7 @@ from .prs import merged_prs
 from .resolve import resolve
 from .review import review
 from .save import save
-from .validate import validate
+from .validate import brain_rel, validate
 
 
 class _Parser(argparse.ArgumentParser):
@@ -85,7 +86,7 @@ def _cmd_review(args):
 
 def _cmd_context(args):
     return build_context(_brain(args), jira=args.jira, feature=args.feature,
-                         paths=args.paths, max_words=args.max_words), 0
+                         paths=args.paths, max_words=args.max_words, links_from=REPO_ROOT), 0
 
 
 def _today(args):
@@ -96,6 +97,13 @@ def _today(args):
         return datetime.date.fromisoformat(value)
     except ValueError:
         raise UsageError("--today must be YYYY-MM-DD")
+
+
+def _cmd_links(args):
+    brain = _brain(args)
+    rels = [brain_rel(brain, raw) for raw in args.paths] if args.paths else None
+    changed = normalise(brain, rels, check=args.check)
+    return {"changed": changed}, 1 if args.check and changed else 0
 
 
 def _cmd_generate(args):
@@ -218,7 +226,7 @@ def _cmd_stats(args):
     return stats(_brain(args)), 0
 
 
-SUMMARY_HELP = "the summary the commit_format of schema/brain.md wraps (with --raw: the whole message)"
+SUMMARY_HELP = "the summary the commit_format of .pb/schema/brain.md wraps (with --raw: the whole message)"
 
 
 def build_parser():
@@ -242,6 +250,11 @@ def build_parser():
     p.add_argument("--repo", help="owner/name; default: github.repo in sources.md")
     p.set_defaults(handler=_cmd_prs)
     sub.add_parser("generate").set_defaults(handler=_cmd_generate)
+    p = sub.add_parser("links", help="turn the [[wikilinks]] of page bodies into Markdown links, repair stale "
+                                     "links and add the missing headings")
+    p.add_argument("paths", nargs="*", help="the pages to normalise (default: every page)")
+    p.add_argument("--check", action="store_true", help="change nothing; exit 1 when a page would change")
+    p.set_defaults(handler=_cmd_links)
     p = sub.add_parser("retention")
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_retention)

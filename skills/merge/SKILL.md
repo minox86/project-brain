@@ -41,10 +41,11 @@ What the sources or the dates settle, fix in the worktree and note for the repor
 
 ## 4. Validate, commit, push `docs/brain`
 
-`PB merge finish --worktree <worktree> -m "pb(merge): bring <default> into docs/brain"`. It regenerates the generated files, runs the same checks as a save on every page either side changed and on the ones you resolved, commits the merge and pushes `docs/brain`.
+`PB merge finish --worktree <worktree> -m "bring <default> into docs/brain"` (`-m` is the summary `commit_format` wraps). It regenerates the generated files, runs the same checks as a save on every page either side changed and on the ones you resolved, commits the merge and pushes `docs/brain`.
 
 - `unresolved`: paths still in conflict. Settle them (step 2) and run it again.
 - `errors`: fix each page in the worktree, `git -C <worktree> add` it, and run it again.
+- `rejected`: the repo's commit rules refused the commit; the merge is still in progress. Read `output`, rewrite the whole message so it satisfies them and run it again with `--raw -m "<message>"`; never bypass a hook.
 - `"pushed": false` with a problem: `docs/brain` moved on origin meanwhile (a routine run). Clean up (step 6) and start `/pb:merge` again.
 
 ## 5. `docs/brain` into the default branch
@@ -53,6 +54,7 @@ What the sources or the dates settle, fix in the worktree and note for the repor
 
 - `"merged": true`: the default branch has the changes.
 - `missing`: the repository asks for something you cannot give (an approval, a failing or still-running check). Say exactly what is missing and from whom, give the PR link from `pr`, and say that running `/pb:merge` again once it is there finishes the job: it only has to merge.
+- a failed check that lints commit messages or the PR title (commitlint, semantic PR): the commits on `docs/brain` do not satisfy the repo's rules. Say so, and that `commit_format` must be corrected with `/pb:schema`; the commits already made need a person.
 - `problems`: report them as they are.
 
 ## 6. Clean up and report

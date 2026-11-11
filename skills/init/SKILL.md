@@ -65,6 +65,7 @@ The decisions that define the schema, each with the decisions that hang off it:
   - Reviewers per area: who reviews **technical** changes (modules, interfaces, environments, technical decisions), **functional** ones (features, concepts, functional decisions) and **design** ones (`ux` decisions); GitHub users or `org/team`. Recommend from the reviewer candidates. Cross-cutting pages (epics, open questions without area) ask every area.
 - Sources to register now or later via `/pb:routine-setup` (Teams channels, Confluence spaces, Jira projects whose epics the brain follows).
 - **GitHub** (section G).
+- **Commit rules** (section C).
 - Bootstrap scope: which modules, specs and ADRs to turn into pages now.
 - Existing documentation (section 6b): ingest all of it (recommended), only some groups, or none. Asked once the types are settled, since it is ingested into the chosen schema.
 
@@ -94,6 +95,10 @@ Collect the facts first, never ask what `gh` can tell: the product's CI (`PB sca
 
 The checks about `docs/brain` (who may push to it) belong to `/pb:routine-setup`.
 
+## C. Commit rules
+
+Every commit pb makes and the titles of its PRs must pass the repo's commit rules. Read what `PB scan` reports under `commit_rules`: open the commitlint configs, hooks and PR checks it lists, and look at `recent_subjects`. Nothing listed and nothing in the subjects: keep the defaults and do not ask. Otherwise propose, in one round, `commit_format` (only `{skill}` and `{summary}`, e.g. `docs(brain): {summary}`), `pr_title_brain`, `pr_title_init` and, when the rules ask what a format cannot say (maximum length, ticket reference, sign-off), `commit_rules`; each with an example message.
+
 ## 4. Confirm
 
 Show the final schema in one block in the chat: types table (area, folder, fields, budget; domain types marked as such), thresholds, glossary languages, review policy (watched points, confidence threshold, reviewers per area), module map, bootstrap scope, documentation to ingest (groups, files, words), GitHub changes (applied now or for an admin) and workflow edits. Then one `AskUserQuestion`: confirm / change something / stop. Do not write anything before it.
@@ -102,7 +107,7 @@ Show the final schema in one block in the chat: types table (area, folder, field
 
 1. Temporary worktree from the default branch, so the user's checkout is never touched: `git fetch -q origin`, then `git worktree add -q --detach <tmp> origin/<default>`. Run every following command and edit every file there.
 2. `PB scaffold --repo <tmp> --product "<name>"` (creates `brain/`, the `pb-validate` workflow, `brain/.gitattributes`, the CLAUDE.md pointer, the shared `.claude/settings.json` that enables the plugin for every clone, vendored toolkit). Report `skipped` workflows if any already existed, and check them against the templates.
-3. Apply the interview results by editing `<tmp>/brain/schema/brain.md`, `review.md` and `types/*.md`. In `review.md` set `watch`, `direct_min_confidence`, `noise_to_review` and `reviewers`; check each handle with `gh api users/<login>` or `gh api orgs/<org>/teams/<slug>`, and keep the prose in sync with the rules. For the types: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; copy the domain types chosen in section D from `BASE/../../presets/domain-types/<type>.md` and adapt them; add new type files in the same format.
+3. Apply the interview results by editing `<tmp>/brain/schema/brain.md` (with the commit settings of section C), `review.md` and `types/*.md`. In `review.md` set `watch`, `direct_min_confidence`, `noise_to_review` and `reviewers`; check each handle with `gh api users/<login>` or `gh api orgs/<org>/teams/<slug>`, and keep the prose in sync with the rules. For the types: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; copy the domain types chosen in section D from `BASE/../../presets/domain-types/<type>.md` and adapt them; add new type files in the same format.
 4. `PB --brain <tmp>/brain validate` must pass on the empty brain.
 
 ## 6. Bootstrap content
@@ -135,9 +140,9 @@ Skip when the discovery of section 1 found nothing worth ingesting; say so in on
 
 ## 7. Close
 
-1. Commit in the temporary worktree: `PB --brain <tmp>/brain commit -m "pb(init): create brain for <product>" --allow-default --include CLAUDE.md .claude/settings.json .github/workflows/pb-validate.yml` (leave out the workflow if it was reported as `skipped`). Then the generated files: `PB --brain <tmp>/brain generate`, `git -C <tmp> add brain`, `git -C <tmp> commit -qm "pb(generate): refresh generated files"`.
+1. `PB --brain <tmp>/brain message --skill init -m "create brain for <product>"`: its `message` is the init commit, its `pr_title_init` the PR title. Commit in the temporary worktree: `PB --brain <tmp>/brain commit --raw -m "<message>" --allow-default --include CLAUDE.md .claude/settings.json .github/workflows/pb-validate.yml` (leave out the workflow if it was reported as `skipped`). Then the generated files: `PB --brain <tmp>/brain generate`, `PB --brain <tmp>/brain commit --skill generate -m "refresh generated files" --allow-default`. With `rejected`, as in the closing flow of `writing.md`: rewrite, retry with `--raw`, and correct the settings of section C.
 2. Push the branch: `git -C <tmp> push -q origin HEAD:refs/heads/pb/init`.
-3. Open the PR: `gh pr create --head pb/init --base <default> --title "Create the project brain" --body <what it brings: the brain, the pb workflow, the CLAUDE.md pointer and the plugin settings; merging it turns the workflow on for every later PR>`. The product pipeline edits of section G are code: put them in a separate branch and PR towards the default branch, never in this PR.
+3. Open the PR: `gh pr create --head pb/init --base <default> --title "<pr_title_init>" --body <what it brings: the brain, the pb workflow, the CLAUDE.md pointer and the plugin settings; merging it turns the workflow on for every later PR>`. The product pipeline edits of section G are code: put them in a separate branch and PR towards the default branch, never in this PR.
 4. `git worktree remove --force <tmp>`. The user's checkout is untouched; the brain reaches it once the PR is merged and they bring the default branch into their branch (`git pull`, or merge the default branch). Check then that it reads: `PB version` returns the brain.
 
 Then explain the next steps, in a few lines:
@@ -152,7 +157,7 @@ Then explain the next steps, in a few lines:
 
 A brain from an earlier pb version (0.4) gets the new workflow and toolkit through an ordinary PR. Explain in plain words what changes (pages are written in the working branch and reach the default branch with the code PR; the routine writes on `docs/brain`; the workflow that merged the default branch back into `docs/brain` is removed) and ask to confirm. Before it, the open brain PR from `docs/brain` should be merged: say so if one is open. Then:
 
-1. Run section G (GitHub).
-2. Temporary worktree from the default branch (as in section 5), `PB scaffold --repo <tmp> --upgrade` (rewrites `pb-validate`, writes `brain/.gitattributes`, deletes the retired workflows (the merge-back one and `pb-generate`), enables the plugin, refreshes the toolkit and the writing rule in `brain/AGENTS.md`; the result lists what it removed in `deleted`). Commit with `PB --brain <tmp>/brain commit -m "pb(init): upgrade the brain to the new git model" --allow-default --include .claude/settings.json .github/workflows/pb-validate.yml`, adding every path of `deleted`; then `PB --brain <tmp>/brain generate`, add and commit `brain`, and steps 2–4 of section 7 (branch `pb/init`, title "Upgrade the project brain").
+1. Run sections G (GitHub) and C (commit rules).
+2. Temporary worktree from the default branch (as in section 5), `PB scaffold --repo <tmp> --upgrade` (rewrites `pb-validate`, writes `brain/.gitattributes`, deletes the retired workflows (the merge-back one and `pb-generate`), enables the plugin, refreshes the toolkit and the writing rule in `brain/AGENTS.md`; the result lists what it removed in `deleted`); write the settings of section C to `<tmp>/brain/schema/brain.md`. Commit with `PB --brain <tmp>/brain commit --skill init -m "upgrade the brain to the new git model" --allow-default --include .claude/settings.json .github/workflows/pb-validate.yml`, adding every path of `deleted`; then `PB --brain <tmp>/brain generate`, `PB --brain <tmp>/brain commit --skill generate -m "refresh generated files" --allow-default`, and steps 2–4 of section 7 (branch `pb/init`, title "Upgrade the project brain", in the form of `pr_title_init`).
 3. Tell the user to run `/pb:routine-setup` again once the PR is merged: it updates the routine's prompt.
 4. Tell developers: from now on, write pages in the working branch with the `pb` skills and commit them with the code.

@@ -146,6 +146,7 @@ Once the brain and the routine are set up, these happen without anyone running a
 - ✅ **The brain checks itself.** Every save checks the pages it touches: malformed pages, broken links (also to pages being deleted), anything that looks like a password or token. CI checks the changed pages again and that the generated files are fresh, and fails "Brain updates" if `docs/brain` carries code.
 - 🔇 **Noise is caught as it is written.** New pages that look like an existing one, pages nobody links, claims without a source, dated "update" sections, status talk ("this sprint", "TODO") and long verbatim quotes are flagged before the save.
 - 👀 **Sensitive changes reach the right reviewer.** `brain/schema/review.md`, written by `/pb:init` and changed with `/pb:schema`, lists the points that need a human and who reviews technical, functional and design changes; they are asked on the PR that carries the change.
+- 📏 **Your commit rules are followed.** `/pb:init` reads the repo's commitlint, hooks and PR checks and sets the format of every commit and PR title pb makes; a hook is never bypassed.
 - 📚 **Indexes stay fresh.** Every save rebuilds the index, the glossary (in the languages you chose), the feature catalogue and a context pack for every feature and active epic.
 - 🧹 **Old items step aside.** The routine marks superseded decisions, answered questions and closed epics as archived after a while, and they leave the index. Git keeps the history.
 - 💬 **No commands to remember.** Ask in plain words: *"what did we decide about approvals?"*, *"save this decision in the brain"*, *"give me the context for FIN-412"*.
@@ -198,6 +199,7 @@ Once the brain and the routine are set up, these happen without anyone running a
 | The brain in my code branch is old | It is the brain as of your branch: bring the default branch in to get what others merged |
 | The brain PR is in conflict, or `docs/brain` is behind | `/pb:merge` |
 | CI says generated files are stale, or they conflict | Take either side, run `python3 brain/.pb/toolkit/pb.py generate`, commit |
+| A commit was rejected by the repo's rules | Claude rewrites the message to satisfy them and retries; fix the format for good with `/pb:schema` (`commit_format`, `commit_rules`) |
 | "Reviewers not requested" on a PR | Check the handles in `brain/schema/review.md` (`/pb:schema`); the review is in the job summary anyway |
 | Nothing was added overnight | `/pb:routine-run status`, then "Problems" in the latest digest |
 | Wrong information | `/pb:fix` in Claude Code |

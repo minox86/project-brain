@@ -12,7 +12,7 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 
 ## show (default)
 
-Table of types from `brain/schema/types/*.md`: name, area, folder, fields (with enum values), required, budget, system. Then the thresholds in `brain/schema/brain.md`, the review policy in `brain/schema/review.md` (watched points, confidence threshold, noise, reviewers per area; "not configured: no change is flagged for review" when the file is missing) and open proposals in `brain/schema/proposals.md`.
+Table of types from `brain/schema/types/*.md`: name, area, folder, fields (with enum values), required, budget, system. Then the thresholds and the commit settings (`commit_format`, `pr_title_brain`, `pr_title_init`, `commit_rules`) in `brain/schema/brain.md`, the review policy in `brain/schema/review.md` (watched points, confidence threshold, noise, reviewers per area; "not configured: no change is flagged for review" when the file is missing) and open proposals in `brain/schema/proposals.md`.
 
 ## propose
 
@@ -23,6 +23,10 @@ Table of types from `brain/schema/types/*.md`: name, area, folder, fields (with 
 ## Review policy
 
 Changes like "send feature status changes to review", "design reviews go to @acme/design", "only low confidence needs a reviewer" edit `brain/schema/review.md`: `watch` rules, `direct_min_confidence`, `noise_to_review`, `reviewers`. The file's prose lists the fields. Missing file (brain created before the policy existed): copy `BASE/../../presets/software-product/review.md` and adapt it with the user. Show the rule before and after, confirm, then `PB validate` (it reports `bad-review-policy`) and save like any schema change. When a type is renamed or dropped, update the rules that name it.
+
+## Commit settings
+
+Changes like "our commits must be `docs(brain): …`" or "subjects stay under 72 characters" edit those four settings of `brain/schema/brain.md` (its prose describes them; a brain without them uses the defaults it lists). `commit_format` takes only `{skill}` and `{summary}`, and `{summary}` is required: `PB validate` reports `bad-commit-format`. Show the setting before and after with an example (`PB message -m "add X"`), confirm, then validate and save like any schema change.
 
 ## apply <Pn> or a change in plain words
 

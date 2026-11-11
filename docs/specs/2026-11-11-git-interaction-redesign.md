@@ -213,6 +213,24 @@ their shape is left to the builder. The routine's "behind" notice names `/pb:mer
   this model.
 - Version **0.5.0**.
 
+## 8b. Commit rules of the repo
+
+(added 2026-11-11 after the first implementation, approved by the product owner)
+
+A repo that enforces commit rules (commitlint, a `commit-msg` hook, a CI check on commits or PR titles)
+rejects `pb(<skill>): …`. So:
+
+- **Detect.** `PB scan` reports `commit_rules`: the commitlint configs, the hooks and the PR checks it finds,
+  and the subjects of the last 15 commits of the default branch. Claude reads them; the toolkit does not.
+- **Store.** `brain/schema/brain.md` holds `commit_format` (default `pb({skill}): {summary}`; only `{skill}`
+  and `{summary}`, the latter required, else `bad-commit-format`), `pr_title_brain`, `pr_title_init` and
+  `commit_rules` (free text). `/pb:init` proposes them when it finds rules; `/pb:schema` changes them.
+- **Compose.** `-m` of `PB commit`, `PB routine finish`, `PB merge finish` is a summary the format wraps;
+  `--raw` takes a whole message; `PB message` prints the message and the PR titles without committing.
+- **Adapt.** A commit a hook refuses returns `rejected` (the message and git's output), exit 1: nothing is
+  lost or pushed, a merge stays in progress. Claude rewrites and retries with `--raw`; the routine records it
+  under "Problems" and stops. pb never bypasses a hook (`--no-verify`, `core.hooksPath`, `HUSKY=0`).
+
 ## 9. Upgrading from 0.4
 
 One paragraph in the README: merge the open brain PR, update the plugin, run `/pb:init` (it removes

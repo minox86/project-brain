@@ -77,7 +77,7 @@ Every writing operation in repo mode ends like this:
    - the brain files changed (`files`), uncommitted in the branch `<branch>`: they commit them with their code, and the pages reach the default branch with that PR;
    - when `watched` is not empty: the points touched, with their reasons, and that the reviewers (`reviewers`) will be asked on the PR;
    - when `on_default` is true: the pages need a branch and a PR like any other change.
-5. Commit only if the user asks: `PB commit -m "pb(<skill>): <one-line summary>"` (`--allow-default` only if they asked to commit on the default branch). It commits the brain's pages and generated files together. Never push.
+5. Commit only if the user asks: `PB commit --skill <skill> -m "<one-line summary>"` (`--allow-default` only if they asked to commit on the default branch). It commits the brain's pages and generated files together, with the message `commit_format` of `brain/schema/brain.md` makes of the summary. Never push. With `rejected`, the repo's commit rules refused it: read `output`, rewrite the whole message so it satisfies the rule (and `commit_rules`), retry with `PB commit --raw -m "<message>"`, then offer to update `commit_format`/`commit_rules` with `/pb:schema`. Never bypass a hook. When the developer asks you to commit the pages together with code in one commit of their own, follow the repo's commit rules and `commit_rules`: that commit is theirs.
 6. Summarise: pages created/updated (as `[[links]]`), open questions raised, anything dropped by the significance gate worth mentioning.
 
 Routine runs use their own closing flow (`templates/routine/prompt.md`, `/pb:sync`, `/pb:routine-run`).

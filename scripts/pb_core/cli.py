@@ -265,7 +265,7 @@ def build_parser():
     p.add_argument("--base", default="HEAD", help="git commit to compare with (default: HEAD, uncommitted changes)")
     p.add_argument("--confidence", nargs="+", action="extend", metavar="PATH=LEVEL",
                    help="pages written with less than high confidence (low, medium)")
-    p.add_argument("--no-noise", action="store_true", help="noise warnings never hold a page")
+    p.add_argument("--no-noise", action="store_true", help="noise warnings are never listed as watched")
     p.set_defaults(handler=_cmd_review)
     p = sub.add_parser("scan")
     p.add_argument("--repo")

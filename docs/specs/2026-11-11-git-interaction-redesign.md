@@ -108,7 +108,8 @@ pb makes it cheap:
 moved them, the routine would not see it until that PR merged and would ingest the same content twice. So
 both keep running as a routine run: in a temporary worktree on `docs/brain`, pushed there, never in the
 developer's checkout. They are the one place where pb pushes on a developer's behalf, and only to
-`docs/brain`. Cursors and state files therefore change only on `docs/brain`. The skills that write into
+`docs/brain`. Sync cursors therefore change only on `docs/brain`, while a suppression recorded by `/pb:fix`
+travels with the developer's branch (**call**, added during implementation). The skills that write into
 the working branch are `capture`, `put`, `fix`, `meeting`, `lint --fix` and `schema`.
 
 ## 5. Routine
@@ -148,7 +149,8 @@ It works in a temporary worktree on `docs/brain`, so the person's checkout and b
 2. **Only the brain is merged.** Conflicts under `brain/` are resolved by the skill:
    - **generated files**: never merged by hand; regenerated once the pages are settled;
    - **pages**: both versions are combined following the type's writing rules;
-   - **state files** (`brain/.pb/state/`): `docs/brain` wins, they change only there;
+   - **state files** (`brain/.pb/state/`): `docs/brain`'s cursors and the union of both sides' suppressions
+     (**call**, added during implementation);
    - **schema and toolkit**: the one kind of brain conflict it never settles alone: it asks.
 3. **Anything else raises an alert.** `docs/brain` must differ from the default branch only under
    `brain/`. If it carries other changes, or the merge conflicts outside `brain/`, the skill stops before

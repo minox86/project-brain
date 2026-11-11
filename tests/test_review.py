@@ -228,7 +228,8 @@ class RoutineSplitTest(BrainRepoCase):
         run_cli("routine", "start", "--branch", "brain/inbox", cwd=self.repo)
         self.put("concept", "Invoice", f"term_en: Invoice\n{SRC}", "Billed by [[Billing]] monthly.\n")
         code, data, _ = run_cli("routine", "finish", "--branch", "brain/inbox", "-m", "m", cwd=self.repo)
-        self.assertEqual((code, data["review"]), (0, None))
+        self.assertEqual((code, data["watched"], data["pr"]), (0, [], None))
+        self.assertNotIn("review", data)
         self.assertEqual(self.log.read_text(), "")
 
 

@@ -61,8 +61,9 @@ class LocalRunTest(GitRepoCase):
         code, data, err = run_cli("--brain", wt / "brain", "routine", "finish", "--branch", "brain/inbox",
                                   "-m", "pb(routine): manual", cwd=self.repo)
         self.assertEqual(code, 0, err)
-        self.assertEqual(data, {"committed": True, "pushed": True, "conflict": False, "review": None,
-                                "promotion": None, "problems": []})
+        self.assertEqual({k: data[k] for k in ("committed", "pushed", "conflict", "pr", "watched", "problems")},
+                         {"committed": True, "pushed": True, "conflict": False, "pr": None, "watched": [],
+                          "problems": []})
         self.assertEqual(git(self.remote, "log", "--format=%s", "-2", "brain/inbox").splitlines(),
                          ["pb(generate): refresh generated files", "pb(routine): manual"])
 

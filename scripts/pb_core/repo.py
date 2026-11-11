@@ -1,4 +1,4 @@
-"""Git and GitHub helpers: the repository a brain lives in, its default branch, its GitHub name."""
+"""Git and GitHub helpers: the repository a brain lives in, its default branch, its GitHub name, the brain PR."""
 import json
 import os
 import re
@@ -6,6 +6,9 @@ import subprocess
 from pathlib import Path
 
 from .errors import GitError, UsageError
+
+BRAIN_BRANCH = "docs/brain"
+BRAIN_PR_TITLE = "Brain updates"
 
 
 def git(cwd, *args, check=True, env=None):
@@ -60,3 +63,50 @@ def gh_repo(brain):
     if isinstance(github, dict) and github.get("repo"):
         return github["repo"]
     return origin_repo(brain.repo_root)
+
+
+
+def brain_pr_body(markdown, behind, base):
+    """The description of the Brain updates PR: the behind notice, then the watched changes of the last run."""
+    lines = [f"Brain pages the pb routine wrote on `{BRAIN_BRANCH}`. Merging this PR brings them to `{base}`; "
+             "edit the pages here to correct them.", ""]
+    if behind:
+        lines += [f"> `{BRAIN_BRANCH}` is behind `{base}`: run `/pb:merge` to bring these changes to `{base}` "
+                  f"({behind} commit{'s' if behind != 1 else ''} of `{base}` are not on `{BRAIN_BRANCH}`).", ""]
+    lines.append(markdown.rstrip("\n") if markdown.strip() else
+                 "The last routine run changed nothing on a watched point and nothing of low confidence.")
+    return "\n".join(lines) + "\n"
+
+
+def ensure_brain_pr(owner, base, body):
+    """The open PR docs/brain -> base, found (its body refreshed) or opened. Returns (url, number, problem).
+    gh api, not gh pr: cloud routines can only reach the REST API."""
+    found = gh_json(["api", f"repos/{owner}/pulls?head={owner.split('/')[0]}:{BRAIN_BRANCH}&base={base}&state=open"])
+    if found is None:
+        return None, None, f"GitHub could not be reached (gh): the {BRAIN_PR_TITLE} PR was not checked"
+    if isinstance(found, list) and found:
+        pr = found[0]
+        number = pr.get("number")
+        problem = None
+        if gh_json(["api", f"repos/{owner}/pulls/{number}", "-X", "PATCH", "-f", f"body={body}"]) is None:
+            problem = f"the description of the {BRAIN_PR_TITLE} PR could not be updated"
+        return pr.get("html_url"), number, problem
+    pr = gh_json(["api", f"repos/{owner}/pulls", "-X", "POST", "-f", f"title={BRAIN_PR_TITLE}",
+                  "-f", f"head={BRAIN_BRANCH}", "-f", f"base={base}", "-f", f"body={body}"])
+    if not pr:
+        return None, None, (f"the {BRAIN_PR_TITLE} PR could not be opened: it is retried at the next run "
+                            f"(or open it by hand from {BRAIN_BRANCH} to {base})")
+    return pr.get("html_url"), pr.get("number"), None
+
+
+def request_reviewers(owner, number, reviewers):
+    """Ask the area reviewers (users and team slugs) to review PR `number`. Returns the problems."""
+    users, teams = (reviewers or {}).get("users") or [], (reviewers or {}).get("teams") or []
+    if not users and not teams:
+        return []
+    args = ["api", f"repos/{owner}/pulls/{number}/requested_reviewers", "-X", "POST"]
+    args += [x for u in users for x in ("-f", f"reviewers[]={u}")]
+    args += [x for t in teams for x in ("-f", f"team_reviewers[]={t}")]
+    if gh_json(args) is None:
+        return [f"reviewers not requested on the {BRAIN_PR_TITLE} PR: {', '.join(users + teams)}"]
+    return []

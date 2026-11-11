@@ -44,4 +44,4 @@ Show, for every page, the exact lines before and after. After confirmation:
 
 ## 6. Log and close
 
-`PB correction --page <rel path> --wrong "<wrong>" --right "<right>" --evidence "<evidence>"` once per corrected page. Then the closing flow: `PB save -m "pb(fix): <summary>" <files written>`.
+`PB correction --page <rel path> --wrong "<wrong>" --right "<right>" --evidence "<evidence>"` once per corrected page. Then the closing flow: `PB save <files written>`.

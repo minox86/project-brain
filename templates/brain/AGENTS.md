@@ -15,9 +15,7 @@ Accepted decisions constrain your work. If the code contradicts the brain, say s
 
 ## Writing
 
-The brain lives on the branch `docs/brain`; `brain/` in a code branch is a copy that can be a few days behind (it arrives through a PR from `docs/brain`). The latest version: the `pb` skills, or `git show origin/docs/brain:brain/<path>`.
-
-Write only through the `pb` plugin skills (`/pb:put`, `/pb:capture`, `/pb:fix`): they save to `docs/brain`. Never edit `brain/` in a code branch (it would conflict with the brain coming from `docs/brain`), and never edit generated files: `index.md`, `glossary.md`, `features.md`, `context/`, `.pb/backlinks.json`.
+The brain in this checkout is the brain of your branch. Write pages here with the `pb` skills and commit them with your code. Never edit generated files (`index.md`, `glossary.md`, `features.md`, `context/`, `.pb/backlinks.json`): the skills regenerate them, and on a merge conflict you take either side and run `python3 brain/.pb/toolkit/pb.py generate`.
 
 Content enters only if it is:
 - **durable** — still true and useful in a month;

@@ -54,8 +54,8 @@ class ScaffoldTest(unittest.TestCase):
         (self.repo / "brain/.gitattributes").unlink()
         agents = self.repo / "brain/AGENTS.md"
         agents.write_text(agents.read_text().replace(
-            agents.read_text()[agents.read_text().index("The brain lives"):agents.read_text().index("never edit generated files")],
-            "Write through the `pb` plugin skills (`/pb:put`) or, by hand, following the types. Never edit generated files"))
+            agents.read_text()[agents.read_text().index("The brain in this checkout"):agents.read_text().index("Never edit generated files")],
+            "Write through the `pb` plugin skills (`/pb:put`) or, by hand, following the types. "))
         code, data, err = run_cli("scaffold", "--repo", self.repo, "--upgrade")
         self.assertEqual(code, 0, err)
         self.assertFalse((self.repo / ".github/workflows/pb-generate.yml").exists())
@@ -63,7 +63,9 @@ class ScaffoldTest(unittest.TestCase):
         self.assertIn(".github/workflows/pb-brain-branch.yml", data["deleted"])
         self.assertIn(".github/workflows/pb-generate.yml", data["deleted"])
         self.assertIn("index.md linguist-generated", (self.repo / "brain/.gitattributes").read_text())
-        self.assertIn("Write only through the `pb` plugin skills", agents.read_text())
+        self.assertIn("The brain in this checkout is the brain of your branch. Write pages here with the `pb` skills "
+                      "and commit them with your code.", agents.read_text())
+        self.assertNotIn("Write through the `pb` plugin skills", agents.read_text())
 
     def test_validate_workflow_shape(self):
         text = (ROOT / "templates/github/pb-validate.yml").read_text()

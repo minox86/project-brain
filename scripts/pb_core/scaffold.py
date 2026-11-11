@@ -56,8 +56,8 @@ def _refresh_agents(brain):
         return
     lines = path.read_text(encoding="utf-8").split("\n")
     template = (PLUGIN_ROOT / "templates" / "brain" / "AGENTS.md").read_text(encoding="utf-8")
-    start = template.index("The brain lives on the branch `docs/brain`")
-    end = template.index("\n", template.index("Write only through the `pb` plugin skills"))
+    start = template.index("The brain in this checkout is the brain of your branch")
+    end = template.index("\n", start)
     new = template[start:end]
     out = [new if line.startswith(AGENTS_OLD) else line for line in lines]
     path.write_text("\n".join(out), encoding="utf-8")

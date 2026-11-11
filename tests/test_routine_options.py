@@ -103,3 +103,10 @@ class MeetingsSourceTest(unittest.TestCase):
         self.assertIn("meetings: []", (ROOT / "presets/software-product/sources.md").read_text())
         self.assertIn("`teams confluence github jira meetings --digest`",
                       (ROOT / "templates/routine/prompt.md").read_text())
+
+    def test_routine_prompt_follows_the_one_pr_model(self):
+        from helpers import ROOT
+        text = (ROOT / "templates/routine/prompt.md").read_text()
+        self.assertIn("never merge branches; never open pull requests any other way", text)
+        for key in ("`pr`", "`watched`", "`behind`", "`conflict`", "`problems`", "/pb:merge"):
+            self.assertIn(key, text)

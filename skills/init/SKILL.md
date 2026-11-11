@@ -27,8 +27,8 @@ Not a question: say it once, in plain words. The brain is the `brain/` folder of
 1. Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`.
 2. You must be in a git clone of the monorepo with `gh` logged in (`git rev-parse --show-toplevel`, `gh auth status`). If not, run `/pb:setup` first.
 3. Look for a brain: `git fetch -q origin`, then `git cat-file -e origin/<default>:brain/schema/VERSION`:
-   - it exists and `PB version` of the vendored toolkit (`brain/.pb/toolkit/VERSION` on the default branch) is the plugin's: the brain exists. Stop: "The brain already exists. Use `/pb:schema` to change it."
-   - it exists from an earlier pb version (older toolkit, or a merge-back workflow workflow still there): offer the **upgrade** (section U) and skip the rest.
+   - it exists and its vendored toolkit (`brain/.pb/toolkit/VERSION` on the default branch) has the plugin's version (`PB version`): the brain exists. Stop: "The brain already exists. Use `/pb:schema` to change it."
+   - it exists from an earlier pb version (older toolkit, or a merge-back workflow still there): offer the **upgrade** (section U) and skip the rest.
    - no brain on the default branch: create one, go on (an open PR from `pb/init` means a previous init is waiting to be merged: say so and stop).
 4. Never touch the user's checkout: everything is written in a temporary worktree (section 5).
 
@@ -58,9 +58,9 @@ The decisions that define the schema, each with the decisions that hang off it:
 - Glossary languages (default `[en, it]`).
 - Module map: which scan candidates are modules, their names, their `paths`, groupings.
 - Thresholds in `brain.md` (archive, stale open questions, digest retention, context pack cap, raw cap).
-- Review policy (`brain/schema/review.md`, the preset's template as the starting point): which changes the routine lands directly and which it holds for the area reviewers on the brain PR.
+- Review policy (`brain/schema/review.md`, the preset's template as the starting point): which changes need the area reviewers, asked on the PR that carries them (by CI on a code PR, by the routine on the brain PR).
   - Points of attention, once the types are settled: for each kept type, which changes need a human (any change, creation only, deletion, or only when given fields change, e.g. feature `status`, module `paths`). Recommend the preset's `watch` rules adapted to the kept and added types.
-  - Confidence: below which level the writer's own rating holds a change (`direct_min_confidence`: `high` recommended; `medium` for a team that wants fewer PRs; `low` never holds by confidence).
+  - Confidence: below which level the writer's own rating flags a change (`direct_min_confidence`: `high` recommended; `medium` for a team that wants fewer reviews; `low` never flags by confidence).
   - Noise: whether pages still carrying a noise warning wait for review (`noise_to_review`, recommended `true`).
   - Reviewers per area: who reviews **technical** changes (modules, interfaces, environments, technical decisions), **functional** ones (features, concepts, functional decisions) and **design** ones (`ux` decisions); GitHub users or `org/team`. Recommend from the reviewer candidates. Cross-cutting pages (epics, open questions without area) ask every area.
 - Sources to register now or later via `/pb:routine-setup` (Teams channels, Confluence spaces, Jira projects whose epics the brain follows).

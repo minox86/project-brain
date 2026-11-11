@@ -30,6 +30,18 @@ class PluginLayoutTest(unittest.TestCase):
         for command in ("PB merge start", "PB merge finish", "PB merge land", "PB routine cleanup"):
             self.assertIn(command, text)
 
+    def test_no_stale_model_in_shipped_text(self):
+        banned = ("PB workspace sync", "pb workspace", "save --continue", "--force-review", "pb/review/",
+                  "pb-brain-branch", "PB_BRAIN_TOKEN", "managed copy", "review PR")
+        for path in [*ROOT.glob("skills/*/SKILL.md"), *ROOT.glob("references/*.md"), *ROOT.glob("templates/**/*.md")]:
+            text = path.read_text()
+            for word in banned:
+                self.assertNotIn(word, text, f"{path.name}: {word}")
+
+    def test_read_mode_reads_the_default_branch(self):
+        self.assertIn("default branch", (ROOT / "skills/ask/SKILL.md").read_text())
+        self.assertNotIn("docs/brain", (ROOT / "skills/ask/SKILL.md").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

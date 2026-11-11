@@ -1,6 +1,6 @@
 ---
 name: sync
-description: Incrementally ingests into the project brain what changed in the configured sources since the last run — Teams channel threads (triaged), new or modified Confluence pages, merged GitHub PRs touching known modules, Jira epics of the configured projects, transcripts of the configured recurring Teams meetings — using stored cursors, and writes a digest when run by the routine. Use when the user asks to sync or update the brain from Teams, Confluence, GitHub or Jira, to check what would be ingested, or when the nightly routine runs.
+description: Incrementally ingests into the project brain what changed in the configured sources since the last run — Teams channel threads (triaged), new or modified Confluence pages, merged GitHub PRs touching known modules, Jira epics of the configured projects, transcripts of the configured recurring Teams meetings — using stored cursors, always as a routine run on `docs/brain` that ends in the Brain updates PR, never in the user's branch; writes a digest when run by the routine. Use when the user asks to sync or update the brain from Teams, Confluence, GitHub or Jira, to check what would be ingested, or when the nightly routine runs.
 argument-hint: "[teams] [confluence] [github] [jira] [meetings] [--check] [--digest]"
 ---
 
@@ -12,12 +12,13 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 
 ## 0. Setup
 
+- **Where it runs.** Always a routine run on `docs/brain` (see **Modes** in the conventions), never in the user's checkout: the cursors live there. Started by the routine prompt or by `/pb:routine-run`: the run is already started, use its brain. Typed by the user: say in one line that the result goes to `docs/brain` and the Brain updates PR, not to the current branch; then `PB routine start --branch docs/brain --worktree <tmp dir outside the repo>`, run every `PB` command as `PB --brain <brain from the result> …` and write files only under that `brain`.
 - Sources: the ones named in the arguments; none named → `teams confluence github jira meetings`.
-- `--check`: report what would be ingested, write nothing, move no cursor.
+- `--check`: report what would be ingested, write nothing, move no cursor; then `PB routine cleanup` (step 6).
 - `--digest`: write `brain/digests/YYYY-MM-DD.md` (always on when run by the routine).
 - Read `brain/schema/sources.md`. A source with no configuration is skipped with a note ("run `/pb:routine-setup`").
 - For each source read its state: `PB state get <source>`. `suppressed` lists claims corrected by `/pb:fix`: never re-ingest them.
-- Connectors: interactive run → check those the selected sources need before starting and guide the user to connect what is missing (see **Connectors** in the conventions); they may also choose to skip that source. Routine run → skip the source and write under "Problems" which connector the routine's owner must connect.
+- Connectors: interactive run → check those the selected sources need before starting and guide the user to connect what is missing (see **Connectors** in the conventions); they may also choose to skip that source. Scheduled routine → skip the source and write under "Problems" which connector the routine's owner must connect.
 
 ## Readers: raw content stays out of this session
 
@@ -84,7 +85,7 @@ For each configured series (`meetings:` entries):
 
 ## 6. Write, digest, cursors
 
-1. Validate as in the closing flow (fix errors, condense over-budget pages).
+1. `PB validate <every page this run created or changed>`: fix errors and retry at most twice; condense over-budget pages. Still failing: `PB routine discard`, write the failure under "Problems" in the digest, move no cursor.
 2. With `--digest`, write `brain/digests/YYYY-MM-DD.md` (no frontmatter):
 
        # Digest YYYY-MM-DD
@@ -96,13 +97,16 @@ For each configured series (`meetings:` entries):
        - <n> threads ignored; <source ref>: <reason>
        ## Deferred
        - <n> active threads
-       ## Pending review
+       ## Watched
        - [[Page]]: <reasons from PB review>
        ## Problems
        - <missing connectors, errors, previous run failures>
        ## Brain size
        - <pages> pages, <words> words; over budget: <titles>
 
-   Take the size from `PB stats`. For "Pending review": rate the confidence of every page you created or updated (see **Confidence and review** in the writing conventions), run `PB review --confidence <path>=<level>…` passing only pages below high, and list the pages it holds with their reasons. Keep the same `--confidence` arguments for `PB routine finish`.
+   Take the size from `PB stats`. For "Watched": rate the confidence of every page you created or updated (see **Confidence and review** in the writing conventions), run `PB review --confidence <path>=<level>…` passing only pages below high, and list the pages it flags with their reasons. Keep the same `--confidence` arguments for `PB routine finish`.
 3. Only after the pages are written and valid, move the cursors: `PB state set <source> <key> '<json>'`.
-4. Interactive run (`/pb:sync` typed by the user): closing flow (`PB save -m "pb(sync): <sources> <date>" <every file written, cursors in .pb/state/ included>`). Routine run (started by the routine prompt or by `/pb:routine-run`): no `PB save`; the routine's own steps commit and push.
+4. Started by the routine prompt or by `/pb:routine-run`: stop here; their own steps finish the run. Typed by the user:
+   - `PB routine finish --branch docs/brain -m "pb(sync): <sources> <YYYY-MM-DD>"`, with `--confidence` for pages below high (pages the user confirmed count as high). It commits, pushes `docs/brain` and keeps the Brain updates PR open, with the watched changes and their reviewers.
+   - Always end with `PB routine cleanup --worktree <tmp dir>`, also after `--check` or a stop.
+   - Report: pages ingested (as `[[links]]`), the PR (`pr`), the `watched` points and their reviewers, and `problems` one line each. `behind` > 0: "`docs/brain` is behind <default>: run `/pb:merge` to bring these changes to <default>". `"conflict": true`: nothing was pushed (`docs/brain` moved meanwhile, probably a routine run) and no cursor moved on GitHub: running `/pb:sync` again picks the same content up.

@@ -30,7 +30,7 @@ On `"alert": "outside-brain"` stop: nothing was merged or pushed and there is no
 
 A merge that git considers clean can still leave the brain contradicting itself, so compare what each side wrote, not only the conflicted files. Read `git -C <worktree> diff <base> origin/docs/brain -- <changed.routine paths>` and `git -C <worktree> diff <base> origin/<default> -- <changed.default paths>`, then the merged pages in the worktree, and look for:
 
-- the same concept, feature or decision created as two different pages, one per side (`PB resolve` with `--brain <brain>` helps);
+- the same concept, feature or decision created as two different pages, one per side (`PB --brain <brain> resolve "<name>"` helps);
 - a page one side changed and the other deleted, renamed or superseded;
 - statements that disagree: a glossary term defined two ways, a feature status, a decision accepted on one side and contradicted or superseded on the other, an interface contract described differently;
 - links to pages the other side removed or renamed.

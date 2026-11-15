@@ -76,6 +76,13 @@ class RetentionTest(unittest.TestCase):
         self.assertTrue((root / ".pb/digests/2026-11-01.md").exists())
         self.assertTrue((root / ".pb/digests/notes.md").exists())
 
+    def test_old_review_report_expires_like_a_digest(self):
+        root = self.brain({".pb/digests/2026-01-01-review.md": "old", ".pb/digests/2026-11-01-review.md": "kept",
+                           ".pb/digests/2026-01-01-notes.md": "x"})
+        self.assertEqual(apply_retention(Brain(root), TODAY)["deleted"], [".pb/digests/2026-01-01-review.md"])
+        self.assertTrue((root / ".pb/digests/2026-11-01-review.md").exists())
+        self.assertTrue((root / ".pb/digests/2026-01-01-notes.md").exists())
+
     def test_cli_retention(self):
         repo = make_brain(self.tmp.name, files_of(page("decision", "Old", "area: ux\nstatus: superseded\nupdated: 2026-01-01")))
         code, data, err = run_cli("retention", "--today", "2026-11-11", cwd=repo)

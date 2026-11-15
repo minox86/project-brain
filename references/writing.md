@@ -42,6 +42,8 @@ Functional pages describe the product as the business sees it (features, terms, 
 - **Decisions are never rewritten** because things changed: create a new decision with `supersedes` and set the old one to `superseded`.
 - **Propagation**: a decision that changes stable knowledge also updates the affected feature/module/contract page and links to it.
 
+- **Kept clean by the review**: `/pb:review` applies these rules to the whole brain, across pages (its **Rules**): what you write today should not need it tomorrow.
+
 ## Links
 
 - **In a body**, link a page by its title or an alias: `[[Title]]`, `[[Title|label]]`, `[[Title#Section heading]]`. Never compute paths: `PB save` normalises them into Markdown links relative to the page (`[Title](../concepts/Title.md)`, the section as GitHub's heading id: `#section-heading`), and gives the page its `# Title` heading. A link that matches no page stays as typed and fails validation (`broken-link`); a section the page lacks is dropped from the link (`broken-anchor` warning).
@@ -78,7 +80,7 @@ Every writing operation in repo mode ends like this:
 
 1. `PB validate <created or changed pages>`. Fix errors and repeat, at most twice. If errors remain, stop and report them; do not save broken pages.
 2. Condense every page with an `over-budget` warning and fix every noise warning (below), then validate again.
-3. `PB save <every file this work created, changed or deleted>`: pages, and also `.pb/raw/` extracts, `.pb/state/*.json` (suppressions only; cursors never change in a working branch), `.pb/corrections.md`, `.pb/schema/` files. Every skill's closing flow means this list. It normalises the pages' links and headings, checks those files, regenerates the folders' `README.md` (glossary and feature catalogue included), context packs and backlinks, and reports the watched points; it never commits or pushes. With `errors`: fix those files and save again. `code: no-brain`: see **Modes** in the conventions.
+3. `PB save <every file this work created, changed or deleted>`: pages, and also `.pb/raw/` extracts, `.pb/state/*.json` (suppressions only; cursors never change in a working branch), `.pb/corrections.md`, `.pb/pending.md` and the review report in `.pb/digests/` (`/pb:review`), `.pb/schema/` files. Every skill's closing flow means this list. It normalises the pages' links and headings, checks those files, regenerates the folders' `README.md` (glossary and feature catalogue included), context packs and backlinks, and reports the watched points; it never commits or pushes. With `errors`: fix those files and save again. `code: no-brain`: see **Modes** in the conventions.
 4. Tell the user, in one message:
    - the brain files changed (`files`), uncommitted in the branch `<branch>`: they commit them with their code, and the pages reach the default branch with that PR;
    - when `watched` is not empty: the points touched, with their reasons, and that the reviewers (`reviewers`) will be asked on the PR;
@@ -86,7 +88,7 @@ Every writing operation in repo mode ends like this:
 5. Commit only if the user asks: `PB commit --skill <skill> -m "<one-line summary>"` (`--allow-default` only if they asked to commit on the default branch). It commits the brain's pages and generated files together, with the message `commit_format` of `brain/.pb/schema/brain.md` makes of the summary. Never push. With `rejected`, the commit was refused: read `output`. About the message: rewrite the whole message so it satisfies the rule (and `commit_rules`), run the same command again with `--raw -m "<message>"`, every other argument unchanged, then offer to update `commit_format`/`commit_rules` with `/pb:schema`. About the files or the environment (a linter on the pages, a missing git identity): fix the files and run the same command again, or report it; do not rewrite the message. Never bypass a hook. When the developer asks you to commit the pages together with code in one commit of their own, follow the repo's commit rules and `commit_rules`: that commit is theirs.
 6. Summarise: pages created/updated (as Markdown links to their repo path, e.g. `[Association fact](brain/functional/concepts/Association%20fact.md)`), open questions raised, anything dropped by the significance gate worth mentioning.
 
-Routine runs use their own closing flow (`templates/routine/prompt.md`, `/pb:sync`, `/pb:routine-run`).
+Routine runs use their own closing flow (`templates/routine/prompt.md`, `templates/routine/review-prompt.md`, `/pb:sync`, `/pb:routine-run`, `/pb:review --auto`).
 
 ## Conflicts
 

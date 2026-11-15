@@ -1,7 +1,7 @@
 ---
 name: routine-setup
-description: Configures the nightly routine that feeds the project brain from Microsoft Teams channels and recurring meetings, Confluence spaces, Jira epics and merged GitHub PRs — picks channels, spaces and projects, writes the configuration and generates the cloud routine prompt. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion or routine.
-argument-hint: "[show | schedule <frequency>]"
+description: Configures the two routines of the project brain — the nightly one that feeds it from Microsoft Teams channels and recurring meetings, Confluence spaces, Jira epics and merged GitHub PRs, and the weekly review that keeps it clean — picks channels, spaces and projects, writes the configuration and generates the cloud routine prompts. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion, its weekly review or its routines.
+argument-hint: "[show | schedule <frequency> | review [<frequency> | off]]"
 ---
 
 # /pb:routine-setup — configure the nightly routine
@@ -14,7 +14,9 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 
 `schedule <frequency>`: change only how often the routine runs — go to **6. Schedule** with the given frequency, then update `routine.schedule` in `brain/.pb/schema/sources.md`, update the cloud routine (step 8, update instead of create) and save (step 9). Stop there.
 
-`show`: print the current `routine`, `teams`, `meetings`, `confluence`, `jira`, `github` configuration from `brain/.pb/schema/sources.md` and the cursors (`PB state get teams|meetings|confluence|jira|github`), then stop.
+`review [<frequency> | off]`: set up, reschedule or remove only the weekly review — go to **6b. Weekly review**, then update `review` in `brain/.pb/schema/sources.md` and the `## Routine` section of `brain/AGENTS.md`, create, update or delete its cloud routine (step 8) and save (step 9). Stop there.
+
+`show`: print the current `routine`, `review`, `teams`, `meetings`, `confluence`, `jira`, `github` configuration from `brain/.pb/schema/sources.md`, the cursors (`PB state get teams|meetings|confluence|jira|github`), when the review last ran (`PB state get review last`) and what waits for a decision (`PB pending`: `waiting`), then stop.
 
 ## 1. Owner
 
@@ -65,11 +67,20 @@ Ask how often the routine should run, offering plain-language options and turnin
 
 Routines run at most once an hour: the minute field must be a single number. `PB validate` rejects other schedules (`bad-schedule`). More frequent runs ingest sooner but cost more and often meet threads still being discussed, which are deferred anyway. For anything in between, `/pb:routine-run` starts a run on demand.
 
+## 6b. Weekly review
+
+Offer the weekly review: a second routine that reads the whole brain once a week, fixes by itself what has one right answer (duplicated facts, content on the wrong page, superseded versions, terms that differ from the glossary, feature status behind Jira, schema errors, pages over budget) and queues the rest for a person, who settles it with `/pb:review`. It collects no news and needs only the Atlassian connector (Jira). Recommended once the brain has a few dozen pages.
+
+Schedule: once a week, away from the nightly run. Default **Sunday at 04:00** (`0 4 * * 0`); the user may give another cron that runs at most once a week — one hour, on one weekday (`0 4 * * 0`) or one day of the month (`0 4 1 * *`) — and `PB validate` refuses any other (`bad-schedule`). More often than weekly costs a full read of the brain each time and finds little.
+
+Declined, or `review off`: no `review` in `sources.md`; delete the review's cloud routine if `review.trigger_id` exists. The owner can still run the same review by hand with `/pb:review`.
+
 ## 7. Write the configuration
 
 Edit the frontmatter of `brain/.pb/schema/sources.md`:
 
     routine: {branch: docs/brain, schedule: "<cron>", owner_role: Engineering Manager, trigger_id: <id, after step 8>}
+    review: {schedule: "<weekly cron>", trigger_id: <id, after step 8>}   # omit when the weekly review is declined
     teams:
       - {id: <slug>, team: "<team name>", team_id: "<id>", channel: "<channel name>", channel_id: "<id>"}
     confluence:
@@ -80,13 +91,13 @@ Edit the frontmatter of `brain/.pb/schema/sources.md`:
       - {id: <slug>, subject: "<series subject>", organizer: <organizer email>}
     github: {repo: <owner/name>}
 
-Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule, the list of channels, recurring meetings, spaces and Jira projects, and "digests in `brain/.pb/digests/`".
+Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule, the list of channels, recurring meetings, spaces and Jira projects, "digests in `brain/.pb/digests/`" and, with the weekly review, its schedule, "review reports in `brain/.pb/digests/<date>-review.md`" and "what waits for a decision is settled with `/pb:review`".
 
-Cloud routines do not load plugins: the routine follows the copy of the toolkit and of its instructions (sync, put, meeting skills and the references) vendored in `brain/.pb/toolkit/`. Refresh it from this plugin with `PB toolkit-sync`, so the routine runs the same version as the plugin.
+Cloud routines do not load plugins: the routines follow the copy of the toolkit and of their instructions (sync, put, meeting and review skills and the references) vendored in `brain/.pb/toolkit/`. Refresh it from this plugin with `PB toolkit-sync`, so the routine runs the same version as the plugin.
 
-Do not save yet: step 9 saves everything at once, routine id included.
+Do not save yet: step 9 saves everything at once, routine ids included.
 
-## 8. Create the routine
+## 8. Create the routines
 
 Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo}}`, `{{channels}}`, `{{spaces}}`, `{{projects}}`, `{{meetings}}`.
 
@@ -97,6 +108,8 @@ Render `BASE/../../templates/routine/prompt.md`, replacing `{{branch}}`, `{{repo
 2. Paste the rendered prompt.
 3. Enable the Microsoft 365 and Atlassian connectors for the routine. The `pb` plugin is not needed there: the routine follows the instructions vendored in `brain/.pb/toolkit/`.
 4. Tell you the routine id, so it can be recorded in `routine.trigger_id`.
+
+**The weekly review**, when chosen in 6b: a second routine, created the same way on the same monorepo. Render `BASE/../../templates/routine/review-prompt.md`, replacing `{{branch}}` (`routine.branch`, or `docs/brain` when only the review is set up) and `{{repo}}`; schedule `review.schedule`; the Atlassian connector only. Write its id to `review.trigger_id`; when it already exists, update that routine instead of creating a new one.
 
 ## 9. Save
 

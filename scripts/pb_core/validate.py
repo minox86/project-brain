@@ -4,12 +4,12 @@ import os
 import re
 from pathlib import Path
 
-from . import frontmatter, links, policy
+from . import frontmatter, links, pending, policy
 from .brain import DIGESTS, INDEX, RAW, SCHEMA, _as_list
 from .changes import changed_pages
 from .errors import FrontmatterError
 from .messages import format_problem
-from .scaffold import ROUTINE_SYNC_SKILL
+from .scaffold import ROUTINE_REVIEW_SKILL, ROUTINE_SYNC_SKILL
 from .secrets import scan
 
 IMPLICIT = {"type", "title", "aliases", "summary", "created", "updated", "sources", "archived"}
@@ -73,7 +73,8 @@ def validate(brain, paths=None, base="HEAD"):
             report(errors, p.rel, "secret", f"line {hit['line']}: looks like a {hit['kind']} secret")
 
     for rel, text in _other_texts(brain):
-        if scope is not None and rel not in scope:
+        # The queue is scanned whatever the scope: routine runs validate pages only, and its lines quote pages.
+        if scope is not None and rel not in scope and rel != pending.PATH:
             continue
         if rel.startswith(RAW + "/"):
             try:
@@ -86,7 +87,8 @@ def validate(brain, paths=None, base="HEAD"):
                 report(warnings, rel, "raw-too-long",
                        f"{len(body.split())} words, limit {limit}: keep a summary and the external link instead")
         for hit in scan(text):
-            report(errors, rel, "secret", f"line {hit['line']}: looks like a {hit['kind']} secret")
+            errors.append({"path": rel, "code": "secret",
+                           "message": f"line {hit['line']}: looks like a {hit['kind']} secret"})
 
     routine = brain.sources.get("routine")
     if isinstance(routine, dict) and routine.get("schedule") is not None:
@@ -98,6 +100,22 @@ def validate(brain, paths=None, base="HEAD"):
         report(warnings, f"{SCHEMA}/sources.md", "routine-instructions-missing",
                "the cloud routine reads its instructions from brain/.pb/toolkit, which has none: "
                "run `PB toolkit-sync` from the plugin and commit it to the routine's branch")
+
+    weekly = brain.sources.get("review")
+    if isinstance(weekly, dict) and weekly.get("schedule") is not None:
+        problem = schedule_problem(str(weekly.get("schedule"))) or weekly_problem(str(weekly.get("schedule")))
+        if problem:
+            report(errors, f"{SCHEMA}/sources.md", "bad-schedule", problem)
+        elif not (brain.root / ".pb" / "toolkit" / ROUTINE_REVIEW_SKILL).is_file():
+            report(warnings, f"{SCHEMA}/sources.md", "routine-instructions-missing",
+                   "the weekly review reads its instructions from brain/.pb/toolkit, which has none: "
+                   "run `PB toolkit-sync` from the plugin and commit it to the routine's branch")
+
+    # Whatever the scope: CI and routine runs validate pages only, and a broken queue silently loses items.
+    for bad in pending.read(brain)["bad"]:
+        errors.append({"path": pending.PATH, "code": "bad-pending",
+                       "message": f"line {bad['line']} is {bad['why']}: a queue line is `{pending.FORMAT}`, "
+                                  "each with its own number"})
 
     problem = format_problem(brain.config.get("commit_format"))
     if problem:
@@ -122,6 +140,20 @@ def schedule_problem(cron):
     minute = fields[0]
     if not minute.isdigit() or int(minute) > 59:
         return f"'{cron}' runs more than once an hour: the minute field must be one number (0-59)"
+    return None
+
+
+def weekly_problem(cron):
+    """Why a valid cron expression runs more than once a week, or None: one hour, and either one weekday or one day
+    of the month."""
+    _, hour, day, _, weekday = cron.split()
+    if not hour.isdigit() or int(hour) > 23:
+        return f"'{cron}' runs more than once a day: the review's hour field must be one number (0-23)"
+    one_weekday = weekday.isdigit() and int(weekday) <= 7 and day == "*"
+    one_day = day.isdigit() and 1 <= int(day) <= 31 and weekday == "*"
+    if not (one_weekday or one_day):
+        return (f"'{cron}' runs more than once a week: the review runs on one weekday (`0 4 * * 0`) or on one day "
+                "of the month (`0 4 1 * *`)")
     return None
 
 
@@ -302,9 +334,10 @@ def _readme_pages(brain):
 
 
 def _other_texts(brain):
-    """(rel, text) of non-page brain files that must be scanned: .pb/raw/, .pb/digests/, AGENTS.md."""
+    """(rel, text) of non-page brain files that must be scanned: .pb/raw/, .pb/digests/, the review's queue,
+    AGENTS.md."""
     root = brain.root
-    candidates = [root / "AGENTS.md"]
+    candidates = [root / "AGENTS.md", root / pending.PATH]
     for folder in (RAW, DIGESTS):
         base = root / folder
         if base.is_dir():

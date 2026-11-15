@@ -11,9 +11,11 @@ from .errors import UsageError
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 POINTER = "<!-- pb:start -->\nFor product and domain context read brain/AGENTS.md.\n<!-- pb:end -->"
 PROPOSALS = "# Schema proposals\n\nOne line per proposal: `- [ ] P<n> · <proposal>`.\n"
-# Skills the cloud routine follows from the repo: sync, and those sync defers to (put's analysis, meeting's step 3).
-ROUTINE_SKILLS = ("sync", "put", "meeting")
+# Skills the cloud routines follow from the repo: sync, those sync defers to (put's analysis, meeting's step 3),
+# and the weekly review.
+ROUTINE_SKILLS = ("sync", "put", "meeting", "review")
 ROUTINE_SYNC_SKILL = "skills/sync/SKILL.md"
+ROUTINE_REVIEW_SKILL = "skills/review/SKILL.md"
 WORKFLOWS = ("pb-validate.yml",)
 # pb-generate: the generated files are committed with the pages. pb-brain-branch: nothing merges the default branch back any more.
 RETIRED_WORKFLOWS = ("pb-generate.yml", "pb-brain-branch.yml")
@@ -43,6 +45,7 @@ def upgrade(repo_root):
             old.unlink()
             deleted.append(old.relative_to(repo).as_posix())
     _refresh_agents(brain)
+    _rename_skills(brain)
     if enable_plugin(repo):
         created.append(".claude/settings.json")
     return {"brain": str(brain), "created": created, "deleted": deleted, "skipped": [],
@@ -54,6 +57,21 @@ def upgrade(repo_root):
 AGENTS_OLD = ("Write through the `pb` plugin skills", "Write only through the `pb` plugin skills",
               "The brain lives on the branch `docs/brain`")
 AGENTS_NEXT = "Content enters only if it is:"
+
+
+# Skills renamed since a brain's schema was copied: the prose of its types still names the old ones.
+RENAMED_SKILLS = (("/pb:questions", "/pb:review"), ("/pb:lint --fix", "/pb:review"), ("/pb:lint", "/pb:review"))
+
+
+def _rename_skills(brain):
+    """The type prose of an older brain names skills that no longer exist: write the current names, touch nothing else."""
+    for path in sorted((brain / SCHEMA / "types").glob("*.md")):
+        text = path.read_bytes().decode("utf-8")
+        new = text
+        for old, current in RENAMED_SKILLS:
+            new = new.replace(old, current)
+        if new != text:
+            path.write_bytes(new.encode("utf-8"))
 
 
 def _refresh_agents(brain):

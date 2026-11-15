@@ -82,6 +82,14 @@ class LintTest(unittest.TestCase):
         hits = [f for f in data["findings"] if f["code"] == "superseded-referenced"]
         self.assertEqual([f["path"] for f in hits], ["open-questions/Q.md"])
 
+    def test_successor_may_link_the_decision_it_supersedes(self):
+        _, data, _ = self.lint(files_of(
+            *self.linked_module(),
+            page("decision", "Old", 'area: ux\nstatus: superseded\nupdated: 2026-10-30\naffects: [F]'),
+            page("decision", "New", 'area: ux\nsupersedes: Old\naffects: [F]', "Replaces [[Old]].\n"),
+        ), ["services/billing/a.py"])
+        self.assertEqual([f for f in data["findings"] if f["code"] == "superseded-referenced"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

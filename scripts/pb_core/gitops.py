@@ -2,7 +2,7 @@
 import datetime
 from pathlib import Path
 
-from . import links
+from . import links, pending
 from .brain import DIGESTS
 from .changes import changed_pages
 from .errors import GitError, UsageError
@@ -202,7 +202,8 @@ def _brain_pr(brain, base, routed, out):
                                f"{BRAIN_BRANCH} to {base} was not opened")
         return
     url, number, problem, author = ensure_brain_pr(owner, base,
-                                                   brain_pr_body(routed["markdown"], out["behind"], base),
+                                                   brain_pr_body(routed["markdown"], out["behind"], base,
+                                                                 pending.pr_line(pending.waiting(brain))),
                                                    pr_title(brain, "brain"))
     out["pr"] = url
     if problem:

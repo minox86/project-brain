@@ -136,13 +136,14 @@ Once per product.
    - the Jira projects to read;
    - how often it runs: every night (default), weekdays only, a few times a day, every N hours, once a week, or a custom schedule. At most once an hour.
 2. Claude checks that `docs/brain` accepts the routine's pushes, creates the routine (or prints the steps) and writes the configuration in your working tree: commit it and merge its PR, like any brain change.
-3. Run **`/pb:routine-run`** for a first run, then `/pb:routine-run status` to see what was added and what was skipped.
+3. Accept the **weekly review** when it is offered (Sunday at 04:00 by default; `/pb:routine-setup review` adds it later): a second routine that keeps the brain clean. It needs only the Atlassian connector.
+4. Run **`/pb:routine-run`** for a first run, then `/pb:routine-run status` to see what was added and what was skipped.
 
 ## 💾 How saving works
 
 - **Pages are written in your branch.** Every `pb` skill writes in `brain/` of your checkout, on the branch you are on, turns its `[[links]]` into Markdown links, checks the pages and rebuilds the generated files. pb never commits, pushes or switches branch: commit the pages with your code (or ask Claude to), and they reach the default branch with your PR, under the same review as the code. On the default branch pb writes anyway and reminds you that the pages need a branch and a PR.
 - **Watched points name their reviewers.** When a change touches a point listed in `brain/.pb/schema/review.md` (decisions, contracts, feature status…), the schema or the toolkit, Claude tells you at save time, and CI's `review` job requests the area reviewers on the PR. It informs; your branch protection decides what blocks.
-- **The routine has its own lane.** The routine, `/pb:sync` and `/pb:routine-run --local` write only on the branch `docs/brain`, never in your checkout, and keep one PR open: "Brain updates". Nothing merges by itself.
+- **The routine has its own lane.** The routine, the weekly review, `/pb:sync`, `/pb:routine-run --local` and `/pb:review --auto` write only on the branch `docs/brain`, never in your checkout, and keep one PR open: "Brain updates". Nothing merges by itself.
 - **`/pb:merge` brings the routine's knowledge in.** The maintainer runs it when they want it on the default branch: it brings the default branch into `docs/brain`, combines pages changed on both sides, settles inconsistencies (and asks when the sources do not), then merges "Brain updates". Their checkout is not touched.
 - **Generated-file conflicts are cheap.** Two PRs that both touch the brain often conflict on the folders' `README.md` files and the other generated files: take either side, run `PB generate` (`python3 brain/.pb/toolkit/pb.py generate`), commit. CI fails a PR whose generated files are stale.
 
@@ -163,6 +164,7 @@ Once the brain and the routine are set up, these happen without anyone running a
 - 👀 **Sensitive changes reach the right reviewer.** `brain/.pb/schema/review.md`, written by `/pb:init` and changed with `/pb:schema`, lists the points that need a human and who reviews technical, functional and design changes; they are asked on the PR that carries the change.
 - 📏 **Your commit rules are followed.** `/pb:init` reads the repo's commitlint, hooks and PR checks and sets the format of every commit and PR title pb makes; a hook is never bypassed.
 - 📚 **Indexes stay fresh.** Every save rebuilds the README of every folder, the glossary (in the languages you chose), the feature catalogue and a context pack for every feature.
+- 🧽 **The brain is reviewed every week.** The weekly review compares all pages against each other and fixes what has one right answer: the same fact on two pages, content on the wrong page, superseded versions, words that differ from the glossary, feature status behind Jira, pages over budget. It never deletes a page and never guesses: what it cannot settle waits for a person, counted on "Brain updates" and listed first in its report (`brain/.pb/digests/<date>-review.md`), where every change is numbered with its before, after and reason.
 - 🧹 **Old items step aside.** The routine marks superseded decisions and answered questions as archived after a while, and they leave their folder's README. Git keeps the history.
 - 💬 **No commands to remember.** Ask in plain words: *"what did we decide about approvals?"*, *"save this decision in the brain"*, *"give me the context for FIN-412"*.
 
@@ -179,11 +181,10 @@ Once the brain and the routine are set up, these happen without anyone running a
 | Add a document, Confluence page, Jira ticket, PR or link | `/pb:put <text \| file \| confluence:… \| jira:KEY \| gh:pr/N \| url>` (`--as <type>`, `--plan` to preview) |
 | Save a one-off Teams meeting | `/pb:meeting last` (or `today`, a Teams link, a meeting name) |
 | Correct something wrong | `/pb:fix <what is wrong and what is right>` |
-| Answer the open questions, one at a time, in your language | `/pb:questions` (or a feature, a Jira key, an area) |
 | Bring in what changed in the sources now | `/pb:sync [teams] [confluence] [github] [jira] [meetings]` (`--check` to preview; writes on `docs/brain`) |
-| Clean up the brain | `/pb:lint --fix` |
-| Run the routine now | `/pb:routine-run` (`--local` to run it here, `--check` to preview, `status` for the last run) |
-| Set up or change the routine | `/pb:routine-setup` (`show`, `schedule every 4 hours`) |
+| Clean up the brain and settle what is open: tell it your competence (functional, technical or both) and answer one question at a time, in your language | `/pb:review` (or a feature, a process, a Jira key; `--check` to preview, `--full` to redo the automatic pass, `--auto` for the automatic pass alone, on `docs/brain`) |
+| Run the routine now | `/pb:routine-run` (`--local` to run it here, `--check` to preview, `status` for the last run, `review` for the weekly review) |
+| Set up or change the routines | `/pb:routine-setup` (`show`, `schedule every 4 hours`, `review`, `review off`) |
 | Bring the routine's changes to the default branch | `/pb:merge` |
 | Change the wiki structure | `/pb:schema` (`show`, `propose`, `apply P3`, or the change in plain words) |
 | Create the brain, or upgrade an older one | `/pb:init [product name]` |

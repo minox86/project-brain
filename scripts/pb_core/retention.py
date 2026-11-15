@@ -5,7 +5,8 @@ import re
 from .brain import DIGESTS
 from .generate import CLOSED, is_archived
 
-DIGEST = re.compile(r"(\d{4}-\d{2}-\d{2})\.md$")
+# Digests of the nightly routine and reports of the weekly review.
+DIGEST = re.compile(r"(\d{4}-\d{2}-\d{2})(?:-review)?\.md$")
 
 
 def apply_retention(brain, today):

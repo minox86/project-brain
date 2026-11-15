@@ -40,6 +40,33 @@ class ScheduleValidationTest(unittest.TestCase):
         self.assertEqual([(w["path"], w["code"]) for w in data["warnings"]],
                          [(".pb/schema/sources.md", "routine-instructions-missing")])
 
+    def weekly(self, schedule, vendored=False):
+        files = {".pb/schema/sources.md": f'---\nreview: {{schedule: "{schedule}"}}\n---\n# Sources\n'}
+        if vendored:
+            files[".pb/toolkit/skills/review/SKILL.md"] = "x"
+        repo = make_brain(Path(self.tmp.name) / f"weekly{len(list(Path(self.tmp.name).iterdir()))}", files)
+        return run_cli("validate", cwd=repo)
+
+    def test_weekly_review_schedule_is_checked(self):
+        code, data, _ = self.weekly("*/30 * * * *")
+        self.assertEqual(code, 1)
+        self.assertEqual([e["code"] for e in data["errors"]], ["bad-schedule"])
+        for cron in ("0 4 * * 0", "30 22 * * 7", "0 4 1 * *"):
+            code, data, _ = self.weekly(cron, vendored=True)
+            self.assertEqual((code, data["warnings"]), (0, []), (cron, data))
+
+    def test_weekly_review_runs_at_most_once_a_week(self):
+        for cron in ("0 4 * * *", "0 4 * * 1,4", "0 4 * * 1-5", "0 * * * 0", "0 4,16 * * 0", "0 4 1 * 0",
+                     "0 4 */2 * *", "0 4 * * 9", "0 25 * * 0"):
+            code, data, _ = self.weekly(cron, vendored=True)
+            self.assertEqual((code, [e["code"] for e in data["errors"]]), (1, ["bad-schedule"]), (cron, data))
+            self.assertIn("more than once", data["errors"][0]["message"])
+
+    def test_weekly_review_without_vendored_instructions_warns(self):
+        code, data, _ = self.weekly("0 4 * * 0")
+        self.assertEqual(code, 0, data)
+        self.assertEqual([w["code"] for w in data["warnings"]], ["routine-instructions-missing"])
+
     def test_no_routine_configured_is_fine(self):
         repo = make_brain(self.tmp.name)
         code, _, _ = run_cli("validate", cwd=repo)

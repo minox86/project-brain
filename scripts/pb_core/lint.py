@@ -99,6 +99,8 @@ def _superseded_refs(brain, pages, add):
             if t.type != "decision" or t.get("status") != "superseded" or t.rel == p.rel:
                 continue
             newer = successors.get(t.rel, [])
+            if any(n.rel == p.rel for n in newer):  # the successor may name what it replaces
+                continue
             if not any(n.rel in targets for n in newer):
                 hint = ", ".join(f"[[{n.title}]]" for n in newer) or "its successor"
                 add("superseded-referenced", p, f"links superseded [[{t.title}]]: link {hint} instead or as well")

@@ -16,7 +16,7 @@ from .lint import lint
 from .links import normalise
 from .messages import commit_message, compose, pr_title
 from .stats import stats
-from . import gitops, merge, state
+from . import gitops, merge, pending, state
 from .repo import repo_root
 from .scaffold import scaffold, sync_toolkit, upgrade
 from .scan import scan
@@ -117,6 +117,24 @@ def _cmd_retention(args):
 def _cmd_lint(args):
     result = lint(_brain(args), _today(args))
     return result, 1 if result["findings"] else 0
+
+
+def _cmd_pending(args):
+    brain = _brain(args)
+    out = {}
+    if sum(value is not None for value in (args.add, args.done, args.remove)) > 1:
+        raise UsageError("pb pending takes one of --add, --done, --remove per call")
+    if args.done is not None and not args.kept:
+        raise UsageError("pb pending --done N needs --kept REASON (an answered item is removed with --remove N)")
+    if args.add:
+        out["added"] = pending.add(brain, args.add, _today(args))
+    if args.done is not None:
+        out["settled"] = pending.settle(brain, args.done, args.kept)
+    if args.remove is not None:
+        out["settled"] = pending.settle(brain, args.remove)
+    out.update(pending.read(brain))
+    out["waiting"] = pending.waiting(brain)
+    return out, 0
 
 
 def _cmd_state(args):
@@ -259,6 +277,13 @@ def build_parser():
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_retention)
     sub.add_parser("stats").set_defaults(handler=_cmd_stats)
+    p = sub.add_parser("pending", help="the review's queue (brain/.pb/pending.md) and what waits for a decision")
+    p.add_argument("--add", metavar="ENTRY", help="'AREA · TAG · pages · doubt · suggested: action'")
+    p.add_argument("--done", type=int, metavar="N", help="tick R<N>: a no that stays (with --kept)")
+    p.add_argument("--kept", metavar="REASON")
+    p.add_argument("--remove", type=int, metavar="N", help="delete R<N>: answered, or its cause is gone")
+    p.add_argument("--today")
+    p.set_defaults(handler=_cmd_pending)
     p = sub.add_parser("state")
     p.add_argument("action", choices=["get", "set", "suppress"])
     p.add_argument("source")

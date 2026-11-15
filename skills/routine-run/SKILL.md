@@ -1,19 +1,20 @@
 ---
 name: routine-run
-description: Runs the project brain's ingestion routine now, outside its schedule — either by starting the configured cloud routine immediately, or by running the same steps locally with the user's own connectors — and reports what the run ingested. Use when the user asks to run, trigger, launch or test the routine or the sync now, to ingest today's Teams or Confluence content without waiting for the night, or to check the last routine run.
-argument-hint: "[--local] [--check] [status]"
+description: Runs a routine of the project brain now, outside its schedule — the ingestion routine, either by starting the configured cloud routine immediately or by running the same steps locally with the user's own connectors, or the weekly review routine — and reports what the run did. Use when the user asks to run, trigger, launch or test the routine, the sync or the weekly review now, to ingest today's Teams or Confluence content without waiting for the night, or to check the last routine run.
+argument-hint: "[review] [--local] [--check] [status]"
 ---
 
 # /pb:routine-run — run the routine now
 
 Arguments: `$ARGUMENTS`
 
-Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only. Read `routine` from the frontmatter of `brain/.pb/schema/sources.md`: no `routine.branch` → stop and suggest `/pb:routine-setup`.
+Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.md`. Repo mode only. Read `routine` and `review` from the frontmatter of `brain/.pb/schema/sources.md`: no `routine.branch` → stop and suggest `/pb:routine-setup`, unless the argument is `review` (the review needs no ingestion routine and works on `docs/brain`).
 
-**Connectors:** check those this run needs before starting (see **Connectors** in the conventions) and guide the user to connect what is missing. A local run needs Microsoft 365, Atlassian and `gh`; a cloud run needs the `schedule` skill or the remote-trigger tool, and otherwise the user can press **Run now** on the routine at claude.ai/code/routines.
+**Connectors:** check those this run needs before starting (see **Connectors** in the conventions) and guide the user to connect what is missing. A local run needs Microsoft 365, Atlassian and `gh` (a `review` run: Atlassian only, and optional); a cloud run needs the `schedule` skill or the remote-trigger tool, and otherwise the user can press **Run now** on the routine at claude.ai/code/routines.
 
 ## Choose how
 
+- `review`: the weekly review routine instead of the ingestion one. With `review.trigger_id` in `sources.md` and a way to manage routines here, start that routine now and go on as **Cloud run** steps 2–3, reading `brain/.pb/digests/<today>-review.md` instead of the digest; `review status` is step 3 only. With `--local`, `--check`, no `review.trigger_id` or no way to manage routines: follow `/pb:review --auto` (with `--check` when given) as if the user typed it. Stop.
 - `--check`: follow `/pb:sync teams confluence github jira meetings --check` as if the user typed it and report what would be ingested. Nothing is written, no cursor moves. Stop.
 - `status`: show the latest runs of the cloud routine (below, step 3 only). Stop.
 - `--local`, or no `routine.trigger_id`, or no way to manage routines here: **local run**.

@@ -56,6 +56,12 @@ class BrainPrBodyTest(unittest.TestCase):
         self.assertNotIn("/pb:merge", body)
         self.assertIn("decisions/X.md", body)
 
+    def test_body_says_what_waits_for_a_decision(self):
+        line = "Waiting for a decision (run `/pb:review`): functional 2, technical 0, any 1."
+        body = brain_pr_body("- decisions/X.md: decision accepted\n", 0, "main", line)
+        self.assertLess(body.index(line), body.index("decisions/X.md"))
+        self.assertNotIn("Waiting for a decision", brain_pr_body("", 0, "main"))
+
     def test_body_without_watched_changes_says_so(self):
         body = brain_pr_body("", 0, "main")
         self.assertIn("nothing on a watched point", body)

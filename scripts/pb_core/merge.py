@@ -6,7 +6,7 @@ import json
 import time
 from pathlib import Path
 
-from . import frontmatter, links
+from . import frontmatter, links, pending
 from .brain import MARKER, SCHEMA as SCHEMA_DIR, Brain
 from .errors import FrontmatterError, GitError, UsageError
 from .generate import generate
@@ -17,6 +17,7 @@ from .save import _generated, check
 from .state import _save
 
 STATE = "brain/.pb/state/"
+PENDING = f"brain/{pending.PATH}"
 SCHEMA = (f"brain/{SCHEMA_DIR}/", "brain/.pb/toolkit/")
 OK_CHECKS = ("success", "neutral", "skipped")
 MERGEABLE = ("clean", "unstable", "has_hooks")
@@ -35,7 +36,7 @@ def _count(cwd, spec):
     return int(git(cwd, "rev-list", "--count", spec).stdout.strip())
 
 
-PB_OWN = ("brain/.pb/toolkit/", "brain/.pb/state/", "brain/.pb/corrections.md")
+PB_OWN = ("brain/.pb/toolkit/", "brain/.pb/state/", "brain/.pb/corrections.md", PENDING)
 
 
 def _type_folders(cwd, *refs):
@@ -99,6 +100,17 @@ def _merge_state(cwd, path):
     git(cwd, "add", "--", path)
 
 
+def _merge_pending(cwd, path):
+    """A conflicted review queue: the routine appended items on docs/brain while a person answered or ticked
+    others in a branch. Both are kept (`pending.merge_texts`)."""
+    texts = []
+    for stage in (1, 2, 3):
+        shown = git(cwd, "show", f":{stage}:{path}", check=False)
+        texts.append(shown.stdout if shown.returncode == 0 else None)
+    (Path(cwd) / path).write_text(pending.merge_texts(*texts), encoding="utf-8")
+    git(cwd, "add", "--", path)
+
+
 def merge_start(repo, worktree):
     repo = Path(repo)
     git(repo, "fetch", "-q", "--prune", "origin")
@@ -138,6 +150,9 @@ def merge_start(repo, worktree):
             conflicts["generated"].append(f)
         elif f.startswith(STATE):
             _merge_state(worktree, f)  # docs/brain's cursors, both sides' suppressions
+            conflicts["state"].append(f)
+        elif f == PENDING:
+            _merge_pending(worktree, f)  # the review's queue: both sides' items, answers and ticks kept
             conflicts["state"].append(f)
         elif f.startswith(SCHEMA):
             conflicts["schema"].append(f)

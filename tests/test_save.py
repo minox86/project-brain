@@ -37,6 +37,22 @@ class SaveTest(SaveCase):
         self.assertFalse(out["on_default"])
         self.assertEqual(out["watched"], [])
 
+    def test_save_takes_the_review_queue_and_report_and_refuses_a_malformed_queue(self):
+        queue, report = "brain/.pb/pending.md", "brain/.pb/digests/2026-11-13-review.md"
+        code, _, err = run_cli("pending", "--add", "functional · DUPLICATE · A, B · same thing? · suggested: merge",
+                               cwd=self.repo)
+        self.assertEqual(code, 0, err)
+        self.write(report, "# Review 2026-11-13\n")
+        rel = self.put("feature", "Approvals")
+        code, out, err = self.save(rel, queue, report)
+        self.assertEqual((code, out["errors"]), (0, []), err)
+        self.assertTrue({rel, queue, report} <= set(out["files"]))
+        with (self.repo / queue).open("a") as handle:
+            handle.write("- [ ] R9 · nobody · DUPLICATE · A · x\n")
+        code, out, _ = self.save(queue)
+        self.assertEqual(code, 1)
+        self.assertEqual([e["code"] for e in out["errors"]], ["bad-pending"])
+
     def test_save_without_paths_takes_every_changed_brain_file(self):
         good = self.put("feature", "Approvals")
         bad = self.put("decision", "Single approver")  # no area: required

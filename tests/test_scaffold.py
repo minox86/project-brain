@@ -183,14 +183,28 @@ class ScaffoldTest(unittest.TestCase):
     def test_toolkit_vendors_routine_instructions_with_plugin_layout(self):
         self.scaffold()
         toolkit = self.repo / "brain/.pb/toolkit"
-        for rel in ("skills/sync/SKILL.md", "skills/put/SKILL.md", "skills/meeting/SKILL.md",
+        for rel in ("skills/sync/SKILL.md", "skills/put/SKILL.md", "skills/meeting/SKILL.md", "skills/review/SKILL.md",
                     "references/conventions.md", "references/writing.md", "references/reader.md"):
             self.assertEqual((toolkit / rel).read_text(), (ROOT / rel).read_text(), rel)
         # Every BASE-relative path the sync skill uses resolves inside the vendored copy.
-        base = toolkit / "skills/sync"
-        text = (base / "SKILL.md").read_text()
-        for rel in sorted(set(re.findall(r"BASE/([\w./-]+\.md)", text))):
-            self.assertTrue((base / rel).resolve().is_file(), rel)
+        for skill in ("sync", "review"):
+            base = toolkit / "skills" / skill
+            text = (base / "SKILL.md").read_text()
+            for rel in sorted(set(re.findall(r"BASE/([\w./-]+\.md)", text))):
+                self.assertTrue((base / rel).resolve().is_file(), rel)
+
+    def test_upgrade_renames_removed_skills_in_the_type_prose_and_nothing_else(self):
+        self.scaffold()
+        prose = self.repo / "brain/.pb/schema/types/open-question.md"
+        current = prose.read_text()
+        self.assertIn("/pb:review", current)
+        prose.write_text(current.replace("/pb:review", "/pb:questions"))
+        other = self.repo / "brain/.pb/schema/types/decision.md"
+        before = other.read_bytes()
+        code, _, err = run_cli("scaffold", "--repo", self.repo, "--upgrade")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(prose.read_text(), current)
+        self.assertEqual(other.read_bytes(), before)
 
     def test_vendored_toolkit_writes_no_bytecode_under_brain(self):
         self.scaffold()

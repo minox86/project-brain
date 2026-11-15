@@ -1,5 +1,6 @@
 ---
 routine: null
+review: null
 teams: []
 confluence: []
 github: null
@@ -11,6 +12,7 @@ meetings: []
 External sources the brain ingests. Configured by `/pb:routine-setup`; edited by hand only with care.
 
 - `routine`: `{branch, schedule, owner_role, trigger_id}` — branch the routine pushes to (`docs/brain`, with its PR "Brain updates" to the default branch), cron schedule (at most hourly), role of the account that owns the routine, id of the cloud routine (used by `/pb:routine-run`).
+- `review`: `{schedule, trigger_id}` — the weekly review routine (`/pb:review --auto` on `docs/brain`): weekly cron schedule, id of its cloud routine. `null`: no weekly review; `/pb:review` is still run by hand.
 - `teams`: list of `{id, team, team_id, channel, channel_id}` — channels where the team discusses the product.
 - `confluence`: list of `{id, space, root_page}` — spaces (optionally a page tree) where analyses and requirements are written.
 - `github`: `{repo}` — `owner/name` of the monorepo, for merged-PR ingestion.

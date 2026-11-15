@@ -27,6 +27,10 @@ class StateTest(unittest.TestCase):
         stored = json.loads((self.repo / "brain/.pb/state/teams.json").read_text())
         self.assertEqual(stored["count"], 3)
 
+    def test_review_keeps_when_it_last_ran(self):
+        self.assertEqual(self.cli("state", "set", "review", "last", '"2026-11-08"')[0], 0)
+        self.assertEqual(self.cli("state", "get", "review", "last")[1]["value"], "2026-11-08")
+
     def test_unknown_source_is_usage_error(self):
         code, data, _ = self.cli("state", "get", "slack")
         self.assertEqual(code, 2)

@@ -66,13 +66,16 @@ def gh_repo(brain):
 
 
 
-def brain_pr_body(markdown, behind, base):
-    """The description of the Brain updates PR: the behind notice, then the watched changes the PR holds."""
+def brain_pr_body(markdown, behind, base, waiting=""):
+    """The description of the Brain updates PR: the behind notice, what waits for a decision (the review's queue),
+    then the watched changes the PR holds."""
     lines = [f"Brain pages the pb routine wrote on `{BRAIN_BRANCH}`. Merging this PR brings them to `{base}`; "
              "edit the pages here to correct them.", ""]
     if behind:
         lines += [f"> `{BRAIN_BRANCH}` is behind `{base}`: run `/pb:merge` to bring these changes to `{base}` "
                   f"({behind} commit{'s' if behind != 1 else ''} of `{base}` are not on `{BRAIN_BRANCH}`).", ""]
+    if waiting:
+        lines += [waiting, ""]
     lines.append(markdown.rstrip("\n") if markdown.strip() else
                  "This PR holds nothing on a watched point and nothing of low confidence.")
     return "\n".join(lines) + "\n"

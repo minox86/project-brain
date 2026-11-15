@@ -108,6 +108,23 @@ class MergeStartTest(MergeCase):
         self.assertEqual(done["unresolved"], [])
         self.assertEqual(git(self.remote, "show", f"docs/brain:{state}"), '{"cursor": "routine"}')
 
+    def test_review_queue_conflict_keeps_both_sides(self):
+        queue = "brain/.pb/pending.md"
+        line = "- [{}] R{} · functional · DUPLICATE · {} · same? · suggested: merge · found: 2026-11-01{}\n"
+        start = line.format(" ", 1, "A, B", "") + line.format(" ", 2, "C, D", "")
+        self.on_main(lambda: self.write(queue, start))
+        git(self.repo, "push", "-q", "-f", "origin", "main:refs/heads/docs/brain")
+        self.on_brain_branch(lambda: self.write(queue, start + line.format(" ", 3, "E, F", "")))
+        self.on_main(lambda: self.write(queue, line.format("x", 2, "C, D", " · kept: different")))
+        out = self.start()
+        self.assertEqual(out["conflicts"]["state"], [queue])
+        self.assertEqual(out["conflicts"]["pages"], [])
+        self.assertEqual((self.worktree / queue).read_text(),
+                         "<!-- last: R3 -->\n\n" + line.format("x", 2, "C, D", " · kept: different")
+                         + line.format(" ", 3, "E, F", ""))
+        code, done, err = self.finish_cli()
+        self.assertEqual((code, done["unresolved"], done["errors"]), (0, [], []), err)
+
     def test_state_conflict_keeps_docs_brain_cursors_and_both_suppressions(self):
         state = "brain/.pb/state/teams.json"
         self.on_main(lambda: self.write(state, json.dumps({"cursor": "c1", "suppressed": ["old claim"]}) + "\n"))

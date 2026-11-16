@@ -163,19 +163,19 @@ jobs:
   brain-only:
     # The brain PR carries the brain to the code: it must not carry code.
     runs-on: ubuntu-latest
+    # The job always runs and its steps only on the brain PR, so it can be a required check on every PR.
     steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request' && github.head_ref == 'docs/brain' && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          fetch-depth: 0
       - name: Only brain/ changes in the PR from docs/brain
         if: github.event_name == 'pull_request' && github.head_ref == 'docs/brain' && github.event.pull_request.head.repo.full_name == github.repository
         env:
-          GH_TOKEN: ${{ github.token }}
-          # GitHub Enterprise Server: gh reads the token for another host from here, and the host from GH_HOST.
-          GH_ENTERPRISE_TOKEN: ${{ github.token }}
-          SERVER_URL: ${{ github.server_url }}
-          REPO: ${{ github.repository }}
-          NUMBER: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          export GH_HOST="${SERVER_URL#*://}"
-          files=$(gh api --paginate "repos/$REPO/pulls/$NUMBER/files" --jq '.[] | .filename, (.previous_filename // empty)')
+          # The checkout is the merge result of the PR and its base: what the PR changes, a rename as both its paths.
+          files=$(git -c core.quotePath=false diff --name-only --no-renames "$BASE"...HEAD)
           # Nothing but brain/: /pb:init brings its files on pb/init, and /pb:merge alerts on anything else.
           outside=$(printf '%s\n' "$files" | grep -v -E '^brain/' || true)
           if [ -n "$outside" ]; then

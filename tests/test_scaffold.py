@@ -103,6 +103,11 @@ class ScaffoldTest(unittest.TestCase):
         self.assertIn("review:", text)
         self.assertIn("pull-requests: write", text)
         self.assertIn("brain-only:", text)
+        # brain-only compares commits with git: it needs neither gh nor a token.
+        job = text[text.index("  brain-only:"):]
+        self.assertNotIn("gh ", job)
+        self.assertNotIn("GH_TOKEN", job)
+        self.assertIn('git -c core.quotePath=false diff --name-only --no-renames "$BASE"...HEAD', job)
         self.assertFalse((ROOT / "templates/github/pb-brain-branch.yml").exists())
 
     def test_freshness_uses_the_pr_toolkit_when_the_pr_changes_the_toolkit(self):

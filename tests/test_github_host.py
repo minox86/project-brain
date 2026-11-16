@@ -81,8 +81,8 @@ class GithubHostTest(unittest.TestCase):
 
     def test_ci_workflow_sets_the_host_for_gh(self):
         text = (Path(__file__).resolve().parents[1] / "templates/github/pb-validate.yml").read_text()
-        self.assertEqual(text.count('export GH_HOST="${SERVER_URL#*://}"'), 2)
-        self.assertEqual(text.count("GH_ENTERPRISE_TOKEN: ${{ github.token }}"), 2)
+        self.assertEqual(text.count('export GH_HOST="${SERVER_URL#*://}"'), text.count("gh api"))
+        self.assertEqual(text.count("GH_ENTERPRISE_TOKEN: ${{ github.token }}"), text.count("gh api"))
 
 
 if __name__ == "__main__":

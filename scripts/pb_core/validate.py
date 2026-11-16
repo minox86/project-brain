@@ -4,7 +4,7 @@ import os
 import re
 from pathlib import Path
 
-from . import frontmatter, links, pending, policy
+from . import frontmatter, links, pending, policy, questions
 from .brain import DIGESTS, INDEX, RAW, SCHEMA, _as_list
 from .changes import changed_pages
 from .errors import FrontmatterError
@@ -110,6 +110,15 @@ def validate(brain, paths=None, base="HEAD"):
             report(warnings, f"{SCHEMA}/sources.md", "routine-instructions-missing",
                    "the weekly review reads its instructions from brain/.pb/toolkit, which has none: "
                    "run `PB toolkit-sync` from the plugin and commit it to the routine's branch")
+
+    for problem in questions.problems(brain):
+        report(errors, f"{SCHEMA}/sources.md", "bad-questions", problem)
+    # Whatever the scope: the schema's settings are no place for a webhook URL or any other secret.
+    for name in ("sources.md", "brain.md", "review.md"):
+        path = brain.schema / name
+        for hit in scan(path.read_text(encoding="utf-8")) if path.is_file() else []:
+            errors.append({"path": f"{SCHEMA}/{name}", "code": "secret",
+                           "message": f"line {hit['line']}: looks like a {hit['kind']} secret"})
 
     # Whatever the scope: CI and routine runs validate pages only, and a broken queue silently loses items.
     for bad in pending.read(brain)["bad"]:

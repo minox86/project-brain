@@ -5,8 +5,9 @@ import tempfile
 
 from .errors import UsageError
 
-# `review` is not a source to ingest: it holds when the weekly review last ran (`last`).
-SOURCES = ("teams", "confluence", "github", "jira", "meetings", "review")
+# `review` is not a source to ingest: it holds when the weekly review last ran (`last`). `questions` holds the
+# open questions posted on Teams (`posted`), written by `pb questions`.
+SOURCES = ("teams", "confluence", "github", "jira", "meetings", "review", "questions")
 CORRECTIONS_HEADER = "# Corrections\n\n| Date | Page | Wrong | Right | Evidence |\n|---|---|---|---|---|\n"
 
 

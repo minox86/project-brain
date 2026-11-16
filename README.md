@@ -154,6 +154,7 @@ Once the brain and the routine are set up, these happen without anyone running a
 
 - 🔄 **Teams, Confluence and Jira flow in on schedule.** The routine keeps only what is worth remembering (decisions, requirement clarifications, domain explanations, open questions). It never copies messages verbatim and writes a digest of what it added and skipped.
 - 🎙️ **Recurring meetings are captured.** After each refinement or design review, the routine reads the transcript and keeps the decisions and open questions. The transcript itself is never stored.
+- ❓ **Open questions go to the team, and the answers come back** (optional). Give the routine a Teams workflow webhook (`/pb:routine-setup questions`) and each new open question is posted once to a channel, as a card with what it blocks, what is known and who can answer (Tech, Product, Analyst or UX, with the people of that role tagged when you list them). People answer by replying to it; the next run writes the answer in the brain as a decision or a fact, deletes the question and sends the change to its reviewers. The webhook is a secret: it lives in the routine's environment, never in the repo.
 - 🎯 **Jira keys lead to features.** Discussions that mention a Jira key reach the feature that carries it. Scope and status of the work stay in Jira.
 - 🤖 **Every Claude session in the repo knows the brain**, even without the plugin. `CLAUDE.md` points to `brain/AGENTS.md`. Claude then:
   - uses the glossary terms;

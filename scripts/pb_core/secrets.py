@@ -13,6 +13,9 @@ PATTERNS = [
     ("bearer", re.compile(r"(?i)\bAuthorization:\s*Bearer\s+[A-Za-z0-9._~+/=-]{20,}")),
     ("private-key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
     ("jwt", re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")),
+    # A Teams workflow or connector webhook: whoever has the URL can post to the channel.
+    ("teams-webhook", re.compile(r"(?i)https://[^\s\"'<>]*(?:logic\.azure\.com|api\.powerplatform\.com)[^\s\"'<>]*"
+                                 r"[?&]sig=[A-Za-z0-9_%-]{8,}|https://[^\s\"'<>]*webhook\.office\.com/webhookb2/")),
     ("url-credentials", re.compile(r"[a-z][a-z0-9+.-]*://[^\s:/@]+:[^\s@/${}<>]{3,}@")),
 ]
 

@@ -53,6 +53,16 @@ class CommitFixesTest(test_gitops.GitRepoCase):
         status = git(self.repo, "status", "--porcelain", "--untracked-files=all", "brain")
         self.assertEqual(status, "?? brain/.pb/digests/2026-10-31.md")
 
+    def test_routine_discard_keeps_the_record_of_questions_posted_on_teams(self):
+        run_cli("routine", "start", "--branch", "docs/brain", cwd=self.repo)
+        self.add_page("Invalid")
+        self.write("brain/.pb/state/questions.json", '{"posted": {"Q": {"at": "2026-11-16T02:00:00Z"}}}\n')
+        self.write("brain/.pb/state/teams.json", '{"general": {"cursor": "2026-11-16T02:00:00Z"}}\n')
+        code, data, err = run_cli("routine", "discard", cwd=self.repo)
+        self.assertEqual(code, 0, err)
+        status = git(self.repo, "status", "--porcelain", "--untracked-files=all", "brain")
+        self.assertEqual(status, "?? brain/.pb/state/questions.json")
+
 
 class ScaffoldBranchTest(unittest.TestCase):
     def test_generate_workflow_targets_default_branch_not_current(self):

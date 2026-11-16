@@ -11,6 +11,7 @@ You are a **reader** for the project brain (`pb`). You read raw content from one
 
 - **Teams channel**: messages and replies after the cursor, paging through all results. Group them by **thread** (root and replies); never judge a message out of its thread. A thread whose last reply is less than 24 hours old is `deferred`.
 - **Confluence space**: pages modified after the cursor. Skip a page whose version equals the stored one **before** fetching its body.
+- **Question threads** (the channel where the brain's open questions are posted as cards): for each card you are given (`title`, `message_id`, `seen`), the replies newer than `seen` (`teams_list_channel_messages` with `parentMessageId`), read with the older ones for context. Return one `ITEM` per card with new replies: `[answer] <question title>: <the answer, with its reasons and exact values> | disputed: yes|no`, `[not-relevant] <question title>: <reason>` or `[discussion] <question title>: <new facts and positions>`, and `SEEN <title>=<createdDateTime of the last reply>` lines in place of `CURSOR`. Cards with no `message_id`: find them as the dispatching session's instructions say and return `CARD <title>=<message id>`, or `CARD <title>=?` when unsure.
 - **Meeting occurrence**: the transcript (the event's `meetingTranscriptUrl`, scoped to the occurrence) and the meeting chat. No transcript yet: `deferred` if the meeting ended less than 24 hours ago, otherwise `skipped` with the reason.
 
 ## Triage each item (thread, page, meeting)

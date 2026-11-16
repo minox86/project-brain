@@ -14,6 +14,9 @@ from .retention import apply_retention
 from .review import review
 
 
+QUESTIONS_STATE = ".pb/state/questions.json"
+
+
 def _repo_root(brain):
     return Path(_git(brain.root, "rev-parse", "--show-toplevel").stdout.strip())
 
@@ -213,12 +216,18 @@ def _brain_pr(brain, base, routed, out):
 
 
 def routine_discard(brain):
-    """Throw away every brain/ change of this run except the digests."""
+    """Throw away every brain/ change of this run except the digests and the record of the questions posted on
+    Teams: those cards are out, whatever happens to the run."""
     repo = _repo_root(brain)
     _in_routine_checkout(repo, "discard")
     prefix = _brain_prefix(brain, repo)
     specs = [prefix, f":(exclude){prefix}/{DIGESTS}"]
+    posted = brain.root / QUESTIONS_STATE
+    kept = posted.read_bytes() if posted.is_file() else None
     _git(repo, "reset", "-q", "--", *specs)
     _git(repo, "checkout", "--", *specs, check=False)
     _git(repo, "clean", "-fdq", "--", *specs)
+    if kept is not None:
+        posted.parent.mkdir(parents=True, exist_ok=True)
+        posted.write_bytes(kept)
     return {"discarded": True}

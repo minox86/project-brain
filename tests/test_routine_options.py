@@ -131,7 +131,7 @@ class MeetingsSourceTest(unittest.TestCase):
     def test_preset_and_routine_prompt_know_meetings(self):
         from helpers import ROOT
         self.assertIn("meetings: []", (ROOT / "presets/software-product/sources.md").read_text())
-        self.assertIn("`teams confluence github jira meetings --digest`",
+        self.assertIn("`teams confluence github jira meetings questions --digest`",
                       (ROOT / "templates/routine/prompt.md").read_text())
 
     def test_routine_prompt_follows_the_one_pr_model(self):

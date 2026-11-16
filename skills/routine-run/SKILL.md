@@ -15,7 +15,7 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 ## Choose how
 
 - `review`: the weekly review routine instead of the ingestion one. With `review.trigger_id` in `sources.md` and a way to manage routines here, start that routine now and go on as **Cloud run** steps 2–3, reading `brain/.pb/digests/<today>-review.md` instead of the digest; `review status` is step 3 only. With `--local`, `--check`, no `review.trigger_id` or no way to manage routines: follow `/pb:review --auto` (with `--check` when given) as if the user typed it. Stop.
-- `--check`: follow `/pb:sync teams confluence github jira meetings --check` as if the user typed it and report what would be ingested. Nothing is written, no cursor moves. Stop.
+- `--check`: follow `/pb:sync teams confluence github jira meetings questions --check` as if the user typed it and report what would be ingested. Nothing is written, no cursor moves. Stop.
 - `status`: show the latest runs of the cloud routine (below, step 3 only). Stop.
 - `--local`, or no `routine.trigger_id`, or no way to manage routines here: **local run**.
 - Otherwise: **cloud run**.
@@ -33,7 +33,7 @@ Same routine, same account and connectors as the scheduled runs.
 The routine's steps, here, with the user's own Microsoft 365 and Atlassian connectors. Commits are attributed to the user and pushed to `routine.branch`, into the Brain updates PR, where watched changes are flagged for their reviewers. Say so and ask for confirmation first.
 
 1. Worktree outside the repo, so the user's checkout and uncommitted work are never touched: `PB routine start --branch <routine.branch> --worktree <tmp dir>`. From now on, run every `PB` command as `PB --brain <brain from the result> …`.
-2. Follow `/pb:sync teams confluence github jira meetings --digest` against that brain, applying all of its rules. This is a routine run (see **Modes** in the conventions): never ask, no `PB save`. Use the configured sources and the cursors stored on `docs/brain`.
+2. Follow `/pb:sync teams confluence github jira meetings questions --digest` against that brain, applying all of its rules. Open questions are posted to Teams only if this clone has the webhook (`PB questions`: `webhook`); without it the run says so and the scheduled routine posts them. This is a routine run (see **Modes** in the conventions): never ask, no `PB save`. Use the configured sources and the cursors stored on `docs/brain`.
 3. `PB validate` there: fix errors and retry at most twice; condense over-budget pages. If it still fails: `PB --brain <brain> routine discard`, write the failure under "Problems" in today's digest, and do not move any cursor.
 4. `PB --brain <brain> routine finish --branch <routine.branch> --skill routine -m "manual sync <YYYY-MM-DD>" --confidence <PATH=LEVEL items, as in sync>`. On `"conflict": true` nothing was pushed: report it and do not retry. With `rejected`, nothing was pushed: handle it as the closing flow of `writing.md` says (the same command with `--raw -m "<message>"`, every other argument unchanged). Give the PR link (`pr`) and the `watched` points with their reviewers. `behind` > 0: "`docs/brain` is behind <default>: run `/pb:merge` to bring these changes to <default>".
 5. Always finish with `PB routine cleanup --worktree <tmp dir>`.

@@ -33,7 +33,7 @@ def changed_pages(brain, base="HEAD"):
         return None
     fields = [f for f in diff.split("\0") if f]
     entries = list(zip(fields[0::2], fields[1::2])) + [("A", f) for f in untracked.split("\0") if f]
-    folders = [t.folder for t in brain.types.values() if t.folder]
+    folders = list(brain.type_folders())
     out = {}
     for status, path in entries:
         rel = path[len(prefix) + 1:] if prefix else path

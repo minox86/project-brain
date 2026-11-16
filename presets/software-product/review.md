@@ -26,7 +26,7 @@ Where it applies:
 
 - `direct_min_confidence`: `low`, `medium` or `high`. A page the writer rated below this level is flagged for review. `high`: only what the model is sure of goes unflagged. `low`: confidence never flags anything.
 - `noise_to_review`: `true` flags pages that still carry a noise warning from `PB validate` (`possible-duplicate`, `new-orphan`, `missing-source`, `log-heading`, `ephemeral`, `verbatim`).
-- `reviewers`: GitHub users (`login`) or teams (`org/team-slug`) per area: `technical` (modules, contracts, integrations, environments, technical decisions), `functional` (features, processes, concepts, roles, functional decisions), `ux` (design decisions). A page with no area of its own (open questions, decisions without `area`) asks every area.
+- `reviewers`: GitHub users (`login`) or teams (`org/team-slug`) per area: `technical` (modules, contracts, integrations, environments, technical decisions), `functional` (features, processes, concepts, roles, functional decisions), `ux` (design decisions). A page with no area of its own (open questions, `cross` decisions) asks every area.
 - `watch`: the points of the schema where any change needs a review. Each rule matches when all its keys match:
   - `type`: a type name, a list, or `"*"`;
   - `change`: `create`, `update`, `delete`, or a list (default: any);

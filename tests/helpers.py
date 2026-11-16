@@ -48,13 +48,22 @@ FOLDERS = {
 }
 
 
+# A decision lives in the folder of its area (`area_folders` in the preset); a cross one in `decisions`.
+DECISION_FOLDERS = {"functional": "functional/decisions", "ux": "functional/decisions",
+                    "technical": "technical/decisions"}
+
+
 def page(type_, title, meta="", body="Body.\n"):
     """(relative path, text) of a brain page of the given type."""
     lines = [f"type: {type_}", f'title: "{title}"']
     if meta.strip():
         lines.append(meta.strip("\n"))
     text = "---\n" + "\n".join(lines) + "\n---\n" + body
-    return f"{FOLDERS[type_]}/{title}.md", text
+    folder = FOLDERS[type_]
+    area = re.search(r"(?m)^area: *(\S+)", meta)
+    if type_ == "decision" and area:
+        folder = DECISION_FOLDERS.get(area.group(1), folder)
+    return f"{folder}/{title}.md", text
 
 
 def make_brain(tmp, files=None):

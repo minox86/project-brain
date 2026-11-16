@@ -27,9 +27,8 @@ def generate(brain):
 
     pages = [p for p in brain.pages() if p.type in brain.types]
     write(INDEX, _index(brain))
-    for typedef in sorted(brain.types.values(), key=lambda t: t.folder):
-        if typedef.folder:
-            write(f"{typedef.folder}/{INDEX}", _folder_readme(brain, typedef, pages))
+    for folder, typedef in sorted(brain.type_folders().items()):
+        write(f"{folder}/{INDEX}", _folder_readme(brain, typedef, folder, pages))
     write(f"{CONTROL}/backlinks.json",
           json.dumps(_backlinks(brain, pages), indent=2, sort_keys=True, ensure_ascii=False) + "\n")
 
@@ -89,8 +88,12 @@ def _first_sentence(text, limit=120):
     return "".join(out)
 
 
-def _heading(folder):
-    name = folder.rstrip("/").split("/")[-1].replace("-", " ")
+def _heading(folder, typedef=None):
+    """A folder's name as a heading; a folder a type has for one area carries its parent too ("Technical
+    decisions")."""
+    parts = folder.rstrip("/").split("/")
+    own = typedef is not None and folder != typedef.folder
+    name = " ".join(parts[-2:] if own else parts[-1:]).replace("-", " ")
     return name[:1].upper() + name[1:]
 
 
@@ -121,44 +124,50 @@ def _index(brain):
            "Pages change with the code in working branches, through the `pb` Claude plugin; agents follow "
            "[AGENTS.md](AGENTS.md).", ""]
     groups = {}
-    for t in brain.types.values():
-        if t.folder:
-            area = t.area if t.area in ("functional", "technical") else None
-            groups.setdefault(area, []).append(t)
+    for folder, t in brain.type_folders().items():
+        area = t.area_of(folder)
+        groups.setdefault(area if area in ("functional", "technical") else None, []).append((t, folder))
     for area, title in GROUPS:
-        types = sorted(groups.get(area, []), key=lambda t: (_ORDER.get(t.name, 99), t.folder))
+        types = sorted(groups.get(area, []), key=lambda item: (_ORDER.get(item[0].name, 99), item[1]))
         if not types:
             continue
         out += [f"## {title}", ""]
-        for t in types:
-            line = f"- [{_heading(t.folder)}]({links.href(t.folder + '/' + INDEX, '')})"
+        for t, folder in types:
+            line = f"- [{_heading(folder)}]({links.href(folder + '/' + INDEX, '')})"
             description = describe(t)
             out.append(line + (f" — {description}" if description else ""))
         out.append("")
     return "\n".join(out).rstrip() + "\n"
 
 
-def _intro(brain, typedef, heading):
-    up = links.href(INDEX, typedef.folder)
+def _intro(brain, typedef, heading, folder):
+    """The top of a folder's README.md; a type with a folder per area also links its other folders."""
+    up = links.href(INDEX, folder)
     description = describe(typedef)
-    return [HEADER, f"# {heading}", "", (description + " " if description else "") + f"[Brain index]({up})", ""]
+    out = [HEADER, f"# {heading}", "", (description + " " if description else "") + f"[Brain index]({up})", ""]
+    others = [f for f in typedef.folders if f != folder]
+    if others:
+        out += ["See also: " + ", ".join(f"[{_heading(f, typedef)}]({links.href(f + '/' + INDEX, folder)})"
+                                         for f in others) + ".", ""]
+    return out
 
 
-def _folder_readme(brain, typedef, pages):
-    mine = [p for p in pages if p.type == typedef.name]
+def _folder_readme(brain, typedef, folder, pages):
+    """The README.md of one folder of a type: the type's pages that live there."""
+    mine = [p for p in pages if p.type == typedef.name and typedef.folder_for(p.meta) == folder]
     listed = [p for p in mine if not is_archived(p)]
     if typedef.name == "concept":
-        out = _glossary(brain, typedef, listed)
+        out = _glossary(brain, typedef, folder, listed)
     elif typedef.name == "feature":
-        out = _features(brain, typedef, listed)
+        out = _features(brain, typedef, folder, listed)
     else:
-        out = _intro(brain, typedef, _heading(typedef.folder))
+        out = _intro(brain, typedef, _heading(folder, typedef), folder)
         for p in sorted(listed, key=lambda p: p.title.lower()):
-            line = f"- {_link(brain, p, typedef.folder)}"
+            line = f"- {_link(brain, p, folder)}"
             notes = _notes(p)
             if notes:
                 line += f" ({', '.join(notes)})"
-            summary = _summary(brain, p, typedef.folder)
+            summary = _summary(brain, p, folder)
             out.append(line + (f" — {summary}" if summary else ""))
         if not listed:
             out.append("_none yet_")
@@ -185,10 +194,10 @@ def _cell(text):
     return str(text).replace("|", "\\|").replace("\n", " ")
 
 
-def _glossary(brain, typedef, concepts):
+def _glossary(brain, typedef, folder, concepts):
     langs = brain.config.get("glossary_languages") or ["en"]
     names = [LANGUAGES.get(l, l) for l in langs]
-    out = _intro(brain, typedef, "Glossary")
+    out = _intro(brain, typedef, "Glossary", folder)
     if not concepts:
         return out + ["_none yet_", ""]
     out += ["| " + " | ".join(names + ["Definition"]) + " |", "|" + "---|" * (len(names) + 1)]
@@ -197,10 +206,10 @@ def _glossary(brain, typedef, concepts):
         for i, lang in enumerate(langs):
             term = p.get(f"term_{lang}")
             if i == 0:
-                cells.append(f"[{_cell(term or p.title)}]({links.href(p.rel, typedef.folder)})")
+                cells.append(f"[{_cell(term or p.title)}]({links.href(p.rel, folder)})")
             else:
                 cells.append(_cell(term) if term else "—")
-        cells.append(_cell(_summary(brain, p, typedef.folder, 200)))
+        cells.append(_cell(_summary(brain, p, folder, 200)))
         out.append("| " + " | ".join(cells) + " |")
     return out + [""]
 
@@ -209,10 +218,10 @@ STATUS_ORDER = ["released", "in-progress", "planned", "idea", "deprecated"]
 UNCATEGORISED = "Uncategorised"
 
 
-def _features(brain, typedef, features):
+def _features(brain, typedef, folder, features):
     """Feature catalogue: features grouped by capability, then by status."""
     product = brain.config.get("product") or "Product"
-    out = _intro(brain, typedef, f"{product} features")
+    out = _intro(brain, typedef, f"{product} features", folder)
     groups = {}
     for p in features:
         groups.setdefault(str(p.get("capability") or "").strip() or UNCATEGORISED, []).append(p)
@@ -224,15 +233,15 @@ def _features(brain, typedef, features):
         cells = []
         for _, title in links.meta_links({"roles": p.get("roles")}, typedef):
             found, _ = brain.lookup(title)
-            cells.append(_link(brain, found, typedef.folder) if found is not None else _cell(title))
+            cells.append(_link(brain, found, folder) if found is not None else _cell(title))
         return ", ".join(cells)
 
     names = sorted((g for g in groups if g != UNCATEGORISED), key=str.lower)
     for name in names + ([UNCATEGORISED] if UNCATEGORISED in groups else []):
         out += [f"## {name}", "", "| Feature | Status | Roles | Summary |", "|---|---|---|---|"]
         for p in sorted(groups[name], key=lambda p: (rank.get(p.get("status") or "idea", 99), p.title.lower())):
-            out.append(f"| {_link(brain, p, typedef.folder)} | {p.get('status') or 'idea'} | {roles(p) or '—'} | "
-                       f"{_cell(_summary(brain, p, typedef.folder, 160))} |")
+            out.append(f"| {_link(brain, p, folder)} | {p.get('status') or 'idea'} | {roles(p) or '—'} | "
+                       f"{_cell(_summary(brain, p, folder, 160))} |")
         out.append("")
     return out
 

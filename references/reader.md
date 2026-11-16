@@ -24,7 +24,7 @@ You are a **reader** for the project brain (`pb`). You read raw content from one
 
 One line per finding, tagged by kind:
 
-    [decision] <outcome> | options: <alternatives> | reasons: <why> | affects: <names> | area: functional|ux|technical
+    [decision] <outcome> | options: <alternatives> | reasons: <why> | affects: <names> | area: functional|ux|technical|cross
     [behaviour] <feature>: <rule, state or edge case, with exact values>
     [concept] <term_en> / <term_it if used>: <definition> | not to confuse with: <term>
     [module] <name>: <non-obvious behaviour, invariant or responsibility>

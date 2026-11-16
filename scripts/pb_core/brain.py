@@ -82,13 +82,40 @@ def find_brain(start, explicit=None):
 class TypeDef:
     def __init__(self, name, meta, prose):
         self.name = name
+        self.meta = meta
         self.area = meta.get("area")
         self.folder = (meta.get("folder") or "").strip("/")
+        # Per value of a page's `area`, the folder its pages live in instead of `folder`.
+        by_area = meta.get("area_folders")
+        self.area_folders = {str(area): str(folder).strip("/") for area, folder in by_area.items()
+                             if folder and str(folder).strip("/")} if isinstance(by_area, dict) else {}
         self.fields = meta.get("fields") or {}
         self.required = list(meta.get("required") or [])
         self.max_words = meta.get("max_words")
         self.system = bool(meta.get("system"))
         self.prose = prose
+
+    @property
+    def folders(self):
+        """Every folder the type's pages live in: `folder` first, then those of `area_folders`."""
+        out = []
+        for folder in [self.folder] + list(self.area_folders.values()):
+            if folder and folder not in out:
+                out.append(folder)
+        return out
+
+    def folder_for(self, meta):
+        """The folder of a page with this frontmatter: its area's folder when the type has one, else `folder`."""
+        area = (meta or {}).get("area")
+        return self.area_folders.get(area, self.folder) if isinstance(area, str) else self.folder
+
+    def area_of(self, folder):
+        """The area a folder of the type belongs to in the index: the type's for `folder`, else the functional or
+        technical area that names it in `area_folders` (None: cross-cutting)."""
+        if folder == self.folder:
+            return self.area
+        areas = [area for area, f in self.area_folders.items() if f == folder]
+        return next((area for area in ("functional", "technical") if area in areas), None)
 
 
 class Page:
@@ -151,7 +178,7 @@ class Brain:
         return types
 
     def type_folders(self):
-        return {t.folder: t for t in self.types.values() if t.folder}
+        return {folder: t for t in self.types.values() for folder in t.folders}
 
     def pages(self):
         if self._pages is None:

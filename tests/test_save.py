@@ -207,12 +207,12 @@ class WatchedTest(SaveCase):
         code, out, err = self.save()
         self.assertEqual(code, 0, err)
         self.assertTrue(out["saved"])
-        self.assertEqual(out["watched"][0]["path"], "decisions/X.md")
+        self.assertEqual(out["watched"][0]["path"], "technical/decisions/X.md")
         self.assertIn("decisions", out["watched"][0]["reason"])
         self.assertTrue(out["reviewers"]["users"] or out["reviewers"]["teams"])
         self.assertEqual(out["reviewers"], {"users": ["dev-lead"], "teams": ["backend"]})
-        self.assertIn("`decisions/X.md`", out["markdown"])
-        self.assertTrue((self.repo / "brain/decisions/X.md").is_file())
+        self.assertIn("`technical/decisions/X.md`", out["markdown"])
+        self.assertTrue((self.repo / "brain/technical/decisions/X.md").is_file())
         self.assertEqual(git(self.repo, "rev-parse", "HEAD"), head)
 
     def test_schema_change_is_always_watched(self):

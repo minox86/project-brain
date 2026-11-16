@@ -40,6 +40,7 @@ Functional pages describe the product as the business sees it (features, terms, 
 - **Plain, dense prose**: no preambles, no filler; bullets over paragraphs. The heading is added for you; do not repeat the title in the first sentence.
 - **Budgets**: respect each type's `max_words`. An `over-budget` warning from validate means: condense that page before committing.
 - **Decisions are never rewritten** because things changed: create a new decision with `supersedes` and set the old one to `superseded`.
+- **A decision goes in the folder of its `area`** (the type's `area_folders`): `technical` when it is about how the product is built, `functional` or `ux` when it is about what it does or how it is used, `cross` (the root `decisions/`) only when it binds both sides and neither owns it.
 - **Propagation**: a decision that changes stable knowledge also updates the affected feature/module/contract page and links to it.
 
 - **Kept clean by the review**: `/pb:review` applies these rules to the whole brain, across pages (its **Rules**): what you write today should not need it tomorrow.

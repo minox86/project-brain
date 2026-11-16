@@ -58,7 +58,7 @@ flowchart LR
 | | `process` | End-to-end flows across features and roles: steps, hand-offs, exceptions |
 | | domain types | Chosen at init after a few questions on your domain: business `rule`s, `regulation`s, `edition`s, `metric`s, or types designed for it |
 | **Technical** | `module`, `contract`, `integration`, `environment` | **All and only** what the code cannot tell: boundaries and non-goals, invariants, pitfalls, direction, contract semantics, how external systems really behave |
-| **Across** | `decision`, `open-question` | Choices with their reasons, unanswered questions and contradictions |
+| **Across** | `decision`, `open-question` | Choices with their reasons, unanswered questions and contradictions. A decision lives where its `area` says: functional and UX ones in `functional/decisions/`, technical ones in `technical/decisions/`, those that bind both sides in `decisions/` |
 
 On GitHub it reads like a small site: pages start with their title and link each other with ordinary Markdown links.
 
@@ -66,9 +66,10 @@ On GitHub it reads like a small site: pages start with their title and link each
 brain/
   README.md        the index: one line per folder
   AGENTS.md        rules for AI agents
-  functional/      features/ concepts/ roles/ processes/ (+ domain types), each with a README.md listing its pages
-  technical/       modules/ contracts/ integrations/ environments/
-  decisions/  open-questions/
+  functional/      features/ concepts/ roles/ processes/ decisions/ (+ domain types), each with a README.md listing its pages
+  technical/       modules/ contracts/ integrations/ environments/ decisions/
+  decisions/       the cross-cutting ones
+  open-questions/
   .pb/             control: schema, vendored toolkit, sync state, context packs, digests, extracted raw text
 ```
 

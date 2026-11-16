@@ -85,7 +85,7 @@ The routine is not interactive: there, a missing connector skips that source, an
 
 ## Page format
 
-- File name = `title` + `.md`, in the type's `folder`. Titles are unique across the brain and cannot contain `\ / : * ? " < > | # ^ [ ]`.
+- File name = `title` + `.md`, in the type's `folder`. A type with `area_folders` (the preset's `decision`) keeps a folder per area: the page goes in the folder of its `area` (`technical` → `technical/decisions/`, `functional` and `ux` → `functional/decisions/`), in `folder` (`decisions/`) when its area has none (`cross`); `PB validate` reports `wrong-folder`. Titles are unique across the brain and cannot contain `\ / : * ? " < > | # ^ [ ]`.
 - Bodies start with `# <title>` and link pages with Markdown links relative to the page; write `[[Invoice]]` or `[[Invoice|invoices]]` and `PB save` turns them into those links (`writing.md`, **Links**). Frontmatter link fields hold plain titles: `provided_by: Billing`, `affects: [A, B]`.
 - In chat, cite a page as a Markdown link to its repo path: `[Invoice](brain/functional/concepts/Invoice.md)`.
 - Implicit fields for every type: `type`, `title`, `aliases`, `summary` (one line, shown in its folder's `README.md`), `created`, `updated`, `sources`.

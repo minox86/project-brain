@@ -315,8 +315,8 @@ class RoutineFinishTest(BrainBranchCase):
         self.write("brain/" + rel, text)
         self.add_page("Approval")
         self.finish()
-        shown = git(self.repo, "show", "origin/docs/brain:brain/decisions/X.md")
-        self.assertTrue(shown.endswith("---\n# X\n\nBuilt in [Approval](../functional/features/Approval.md)."), shown)
+        shown = git(self.repo, "show", "origin/docs/brain:brain/technical/decisions/X.md")
+        self.assertTrue(shown.endswith("---\n# X\n\nBuilt in [Approval](../../functional/features/Approval.md)."), shown)
 
     def test_finish_repairs_links_after_a_rename_with_alias(self):
         old = "brain/functional/concepts/Association fact.md"

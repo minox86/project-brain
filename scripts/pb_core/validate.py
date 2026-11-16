@@ -121,6 +121,10 @@ def validate(brain, paths=None, base="HEAD"):
     if problem:
         report(errors, f"{SCHEMA}/brain.md", "bad-commit-format", problem)
 
+    for typedef in brain.types.values():
+        for problem in _folder_problems(brain, typedef):
+            report(errors, f"{SCHEMA}/types/{typedef.name}.md", "bad-area-folders", problem)
+
     for problem in policy.problems(brain):
         report(errors, f"{SCHEMA}/review.md", "bad-review-policy", problem)
 
@@ -174,8 +178,12 @@ def _check_page(brain, p, error, warn):
     if BAD_TITLE.search(p.title):
         error("bad-title-chars", 'titles cannot contain \\ / : * ? " < > | # ^ [ ]')
     folder = Path(p.rel).parent.as_posix()
-    if folder != typedef.folder and not folder.startswith(typedef.folder + "/"):
-        error("wrong-folder", f"type '{p.type}' lives in {typedef.folder}/")
+    home = typedef.folder_for(p.meta)
+    if folder != home and not folder.startswith(home + "/"):
+        area = p.meta.get("area")
+        which = f"a '{p.type}' with area '{area}'" if typedef.area_folders and isinstance(area, str) \
+            else f"type '{p.type}'"
+        error("wrong-folder", f"{which} lives in {home}/")
 
     for name in typedef.required:
         if p.meta.get(name) in (None, "", []):
@@ -316,6 +324,31 @@ def _check_value(name, spec, value, error):
         error("bad-kind", f"'{name}' must be true or false")
     elif kind in ("string", "text") and isinstance(value, (list, dict)):
         error("bad-kind", f"'{name}' must be a single value")
+
+
+def _folder_problems(brain, typedef):
+    """Why a type's `area_folders` is unusable, one message each."""
+    by_area = typedef.meta.get("area_folders")
+    if by_area is None:
+        return []
+    if not isinstance(by_area, dict):
+        return ["area_folders must map values of the `area` field to folders, e.g. "
+                "{technical: technical/decisions}"]
+    out = []
+    spec = typedef.fields.get("area")
+    values = (spec.get("values") or []) if isinstance(spec, dict) and spec.get("kind") == "enum" else None
+    if values is None:
+        out.append("area_folders needs an `area` enum field on the type: the page's area picks its folder")
+    for area, folder in by_area.items():
+        if values is not None and area not in values:
+            out.append(f"area_folders: '{area}' is not a value of the `area` field {values}")
+        if not isinstance(folder, str) or not folder.strip("/"):
+            out.append(f"area_folders.{area} must be a folder")
+            continue
+        for other in brain.types.values():
+            if other is not typedef and folder.strip("/") in other.folders:
+                out.append(f"area_folders.{area}: {folder} is a folder of type '{other.name}'")
+    return out
 
 
 def _readme_pages(brain):

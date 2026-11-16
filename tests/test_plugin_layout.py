@@ -12,7 +12,7 @@ class PluginLayoutTest(unittest.TestCase):
         self.assertEqual(market["name"], "project-brain")
         self.assertEqual(market["plugins"][0]["name"], "pb")
         self.assertEqual(market["plugins"][0]["source"], "./")
-        self.assertEqual(manifest["version"], "0.7.0")
+        self.assertEqual(manifest["version"], "0.8.0")
 
     def test_readme_describes_the_current_model(self):
         text = (ROOT / "README.md").read_text()

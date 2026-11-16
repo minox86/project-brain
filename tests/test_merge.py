@@ -9,7 +9,7 @@ from test_gitops import GitRepoCase, git
 
 SRC = 'sources: ["jira:FIN-1"]'
 A = "brain/functional/features/A.md"
-R = "brain/decisions/R.md"
+R = "brain/technical/decisions/R.md"
 D = "brain/functional/concepts/D.md"
 
 
@@ -238,13 +238,13 @@ class MergeFinishTest(MergeCase):
         self.assertEqual(git(self.repo, "rev-list", "--count", "origin/docs/brain..origin/main"), "0")
         self.assertEqual(git(self.repo, "log", "-1", "--format=%s", "origin/docs/brain"),
                          "pb(merge): bring main into docs/brain")
-        for title, folder in (("A", "functional/features"), ("R", "decisions"), ("D", "functional/concepts")):
+        for title, folder in (("A", "functional/features"), ("R", "technical/decisions"), ("D", "functional/concepts")):
             readme = git(self.repo, "show", f"origin/docs/brain:brain/{folder}/README.md")
             self.assertIn(f"[{title}]({title}.md)", readme)
         merged = git(self.repo, "show", f"origin/docs/brain:{A}")
         self.assertIn("Developer body.", merged)
         # The merged page is normalised: a heading and a Markdown link.
-        self.assertIn("---\n# A\n\nRoutine body, see [R](../../decisions/R.md).", merged)
+        self.assertIn("---\n# A\n\nRoutine body, see [R](../../technical/decisions/R.md).", merged)
         self.assertEqual(git(self.repo, "branch", "--show-current"), "main")
         self.assertEqual(git(self.repo, "rev-parse", "HEAD"), git(self.repo, "rev-parse", "origin/main"))
 

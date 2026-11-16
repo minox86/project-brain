@@ -68,6 +68,47 @@ class ValidateTest(unittest.TestCase):
         _, text = page("decision", "X", "area: ux")
         self.assertError({"open-questions/X.md": text}, "wrong-folder")
 
+    def test_a_decision_lives_in_the_folder_of_its_area(self):
+        code, data, _ = self.run_on(files_of(
+            page("decision", "Scope", "area: cross"),
+            page("decision", "Use REST", "area: technical"),
+            page("decision", "Single approver", "area: functional"),
+            page("decision", "One click", "area: ux"),
+        ))
+        self.assertEqual((code, data["errors"]), (0, []), data)
+        for area, home in (("technical", "technical/decisions"), ("functional", "functional/decisions"),
+                           ("ux", "functional/decisions"), ("cross", "decisions")):
+            _, text = page("decision", "X", f"area: {area}")
+            wrong = "decisions" if home != "decisions" else "technical/decisions"
+            repo = make_brain(tempfile.mkdtemp(dir=self.tmp.name), {f"{wrong}/X.md": text})
+            _, data, _ = run_cli("validate", cwd=repo)
+            found = [e for e in data["errors"] if e["code"] == "wrong-folder"]
+            self.assertEqual(len(found), 1, data)
+            self.assertIn(f"area '{area}' lives in {home}/", found[0]["message"])
+
+    def test_a_type_without_area_folders_keeps_one_folder(self):
+        # A brain created before area_folders existed: its decisions stay in decisions/, whatever their area.
+        repo = make_brain(self.tmp.name, {"decisions/X.md": page("decision", "X", "area: technical")[1]})
+        schema = repo / "brain/.pb/schema/types/decision.md"
+        schema.write_text("".join(l for l in schema.read_text().splitlines(True) if not l.startswith("area_folders")))
+        code, data, _ = run_cli("validate", cwd=repo)
+        self.assertEqual((code, data["errors"]), (0, []), data)
+        run_cli("generate", cwd=repo)
+        self.assertIn("[X](X.md)", (repo / "brain/decisions/README.md").read_text())
+        self.assertFalse((repo / "brain/technical/decisions").exists())
+
+    def test_bad_area_folders(self):
+        def messages(line):
+            repo = make_brain(tempfile.mkdtemp(dir=self.tmp.name))
+            schema = repo / "brain/.pb/schema/types/decision.md"
+            lines = schema.read_text().splitlines(True)
+            schema.write_text("".join(line + "\n" if l.startswith("area_folders") else l for l in lines))
+            _, data, _ = run_cli("validate", cwd=repo)
+            return [e["message"] for e in data["errors"] if e["code"] == "bad-area-folders"]
+        self.assertIn("not a value of the `area` field", messages("area_folders: {legal: legal/decisions}")[0])
+        self.assertIn("is a folder of type 'module'", messages("area_folders: {technical: technical/modules}")[0])
+        self.assertIn("must map values", messages("area_folders: [technical]")[0])
+
     def test_missing_required(self):
         self.assertError(files_of(page("module", "Billing")), "missing-required")
 

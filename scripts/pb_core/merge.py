@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from . import frontmatter, links, pending
-from .brain import MARKER, SCHEMA as SCHEMA_DIR, Brain
+from .brain import MARKER, SCHEMA as SCHEMA_DIR, Brain, TypeDef
 from .errors import FrontmatterError, GitError, UsageError
 from .generate import generate
 from .gitops import adds_nothing, routine_cleanup, try_commit
@@ -50,8 +50,8 @@ def _type_folders(cwd, *refs):
                 meta, _ = frontmatter.parse(shown.stdout) if shown.returncode == 0 else (None, "")
             except FrontmatterError:
                 meta = None
-            if meta and meta.get("folder"):
-                folders.add(str(meta["folder"]).strip("/"))
+            if meta:
+                folders.update(TypeDef(path, meta, "").folders)
     return folders
 
 

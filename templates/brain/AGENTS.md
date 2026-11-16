@@ -1,6 +1,6 @@
 # {{product}} brain — instructions for agents
 
-`brain/` is the product knowledge base of {{product}}: on the functional side the glossary, the features, the processes, the roles and the domain pages of the schema; on the technical side only what the code cannot say (module boundaries and invariants, contract semantics, external integrations, environments); plus decisions and open questions. It is the source of truth for decisions and for what it describes.
+`brain/` is the product knowledge base of {{product}}: on the functional side the glossary, the features, the processes, the roles and the domain pages of the schema; on the technical side only what the code cannot say (module boundaries and invariants, contract semantics, external integrations, environments); plus decisions (functional ones in `functional/decisions/`, technical ones in `technical/decisions/`, those that bind both in `decisions/`) and open questions. It is the source of truth for decisions and for what it describes.
 
 ## Reading
 

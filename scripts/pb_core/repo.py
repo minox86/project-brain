@@ -29,11 +29,51 @@ def default_branch(repo):
     return "main"
 
 
-def origin_repo(repo):
-    """owner/name from a GitHub origin URL, or None."""
+GITHUB = "github.com"
+# `[scheme://][user@]host[:port](/|:)owner/name[.git]`: https, ssh and scp-like remotes, on github.com or on a
+# GitHub Enterprise host. A local path is not one.
+REMOTE = re.compile(r"^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/\s]+@)?([^:/\s@]+)(?::\d+)?[:/]([^/\s:]+/[^/\s]+?)(?:\.git)?/?$",
+                    re.IGNORECASE)
+# The GitHub Enterprise host of this run (None: github.com, or whatever gh is set up for). Set once per command.
+_host = None
+
+
+def origin_parts(repo):
+    """(host, owner/name) from the origin URL, or (None, None)."""
     url = git(repo, "remote", "get-url", "origin", check=False).stdout.strip()
-    found = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?/?$", url)
-    return found.group(1) if found else None
+    found = REMOTE.match(url)
+    if not found or found.group(1).startswith(".") or (len(found.group(1)) == 1 and "://" not in url):
+        return None, None  # a relative path, or a Windows drive
+    return found.group(1).lower(), found.group(2)
+
+
+def origin_repo(repo):
+    """owner/name from the origin URL (github.com or a GitHub Enterprise host), or None."""
+    return origin_parts(repo)[1]
+
+
+def use_host(host):
+    """The GitHub host every gh call of this command goes to: a GitHub Enterprise host, or None for gh's own
+    default (github.com, or $GH_HOST when the user set it)."""
+    global _host
+    host = (host or "").strip().lower() or None
+    if host:
+        host = re.sub(r"^[a-z]+://", "", host).split("/")[0]
+    _host = None if host in (None, GITHUB) else host
+    return _host
+
+
+def gh_host():
+    return _host
+
+
+def gh_command(args):
+    """The gh command line for `args` (`api …`): `gh api` goes to github.com unless told the host, whatever the
+    repo it runs in."""
+    args = list(args)
+    if _host and args[:1] == ["api"] and "--hostname" not in args and not os.environ.get("GH_HOST"):
+        args[1:1] = ["--hostname", _host]
+    return ["gh", *args]
 
 
 def repo_root(start):
@@ -45,7 +85,7 @@ def repo_root(start):
 
 def gh_json(args):
     try:
-        proc = subprocess.run(["gh", *args], capture_output=True, text=True)
+        proc = subprocess.run(gh_command(args), capture_output=True, text=True)
     except FileNotFoundError:
         return None
     if proc.returncode != 0:

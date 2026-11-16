@@ -17,6 +17,7 @@ from .links import normalise
 from .messages import commit_message, compose, pr_title
 from .stats import stats
 from . import gitops, merge, pending, questions, state
+from . import repo as repo_
 from .repo import repo_root
 from .scaffold import scaffold, sync_toolkit, upgrade
 from .scan import scan
@@ -40,6 +41,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if not getattr(args, "handler", None):
         parser.error("missing command")
+    repo_.use_host(_github_host(args))
     try:
         result, code = args.handler(args)
     except PbError as exc:
@@ -62,9 +64,23 @@ def _brain(args):
     return Brain.locate(getattr(args, "brain", None))
 
 
+def _github_host(args):
+    """The GitHub host of the monorepo: `github.host` in sources.md, else the host of the origin URL."""
+    try:
+        root = find_brain(Path.cwd(), getattr(args, "brain", None))
+        if root is not None:
+            github = Brain._meta_of(root / ".pb" / "schema" / "sources.md").get("github")
+            if isinstance(github, dict) and github.get("host"):
+                return str(github["host"])
+        return repo_.origin_parts(root.parent if root is not None else Path.cwd())[0]
+    except Exception:  # never a reason to fail a command: gh then goes where it is set up to go
+        return None
+
+
 def _cmd_version(args):
     root = find_brain(Path.cwd(), args.brain)
-    return {"version": __version__, "format": FORMAT_VERSION, "brain": str(root) if root else None}, 0
+    return {"version": __version__, "format": FORMAT_VERSION, "brain": str(root) if root else None,
+            "github_host": repo_.gh_host()}, 0
 
 
 def _cmd_resolve(args):

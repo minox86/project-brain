@@ -110,10 +110,14 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           GH_TOKEN: ${{ github.token }}
+          # GitHub Enterprise Server: gh reads the token for another host from here, and the host from GH_HOST.
+          GH_ENTERPRISE_TOKEN: ${{ github.token }}
+          SERVER_URL: ${{ github.server_url }}
           REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
+          export GH_HOST="${SERVER_URL#*://}"
           if git diff --quiet "$BASE"...HEAD -- brain; then
             echo "No file under brain/ changed."
             exit 0
@@ -164,9 +168,13 @@ jobs:
         if: github.event_name == 'pull_request' && github.head_ref == 'docs/brain' && github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ github.token }}
+          # GitHub Enterprise Server: gh reads the token for another host from here, and the host from GH_HOST.
+          GH_ENTERPRISE_TOKEN: ${{ github.token }}
+          SERVER_URL: ${{ github.server_url }}
           REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          export GH_HOST="${SERVER_URL#*://}"
           files=$(gh api --paginate "repos/$REPO/pulls/$NUMBER/files" --jq '.[] | .filename, (.previous_filename // empty)')
           # Nothing but brain/: /pb:init brings its files on pb/init, and /pb:merge alerts on anything else.
           outside=$(printf '%s\n' "$files" | grep -v -E '^brain/' || true)

@@ -14,7 +14,7 @@ Resolve the path once (no `..`, no quotes unless it contains spaces), so permiss
 
 | Command | Use |
 |---|---|
-| `PB version` | `brain` is the brain path, or `null` outside a brain |
+| `PB version` | `brain` is the brain path, or `null` outside a brain; `github_host` is the GitHub Enterprise host of the monorepo (`null` on github.com) |
 | `PB validate [paths…] [--base REF]` | Check pages against the schema, secrets, budgets and the review policy; noise warnings on pages created or updated since `REF` (default `HEAD`). Warnings never fail |
 | `PB review [--base REF] [--confidence PATH=LEVEL…]` | Apply `brain/.pb/schema/review.md` to the pages changed since `REF`: which touch a watched point (or are rated too low, or carry noise), why, and the reviewers per area |
 | `PB resolve "<name>" [--type T]` | Candidate pages for a name (`title`, `alias`, `partial`, `fuzzy`) |
@@ -79,6 +79,7 @@ When something is missing:
    - **Cowork or claude.ai**: **Customize → Connectors** (Settings → Connectors on claude.ai), find Atlassian / Microsoft 365 / GitHub / Figma, **Connect**, sign in with the work account. If it is not in the list or is locked, an organization Owner must enable it first: say so.
    - **Claude Code**: connectors added on claude.ai are available to Claude Code when signed in with the same account. After connecting, run `/mcp` to check its status and sign in, then retry; a new session may be needed.
    - **GitHub CLI**: suggest `! gh auth login` (the `!` runs it in this session), then `gh auth status`.
+   - **GitHub Enterprise** (`PB version`: `github_host` is not `null`): the toolkit sends its own `gh` calls to that host. Do the same with yours: `gh api --hostname <github_host> repos/…` (a bare `gh api` goes to github.com, whatever the repo), `gh auth login --hostname <github_host>`, `gh auth status --hostname <github_host>`. `gh pr …` and `gh repo …` follow the repo's remote by themselves. When the remote is an SSH alias the host cannot be read from it: set `github: {repo, host}` in `brain/.pb/schema/sources.md`.
    - **GitHub connector in Cowork**: grant access to the monorepo (an organization-owned repo may need approval from a GitHub org owner).
 4. **Offer a way forward now**, so the user is not blocked: paste the content, export the page to a file, or run the command in Claude Code instead of Cowork. Then wait for their choice.
 5. **Never invent content** for a source you could not read.

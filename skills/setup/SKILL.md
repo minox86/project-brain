@@ -23,7 +23,7 @@ Check again after installing. Do not go on until all three answer.
 
 ## 2. GitHub sign-in
 
-`gh auth status`. If not signed in: `! gh auth login --web --git-protocol https`. The user copies the one-time code into the browser page that opens and approves. Then `gh auth setup-git`, so git uses the same sign-in, and check `gh auth status` again.
+`gh auth status`. If not signed in: `! gh auth login --web --git-protocol https`. A monorepo on GitHub Enterprise: add `--hostname <host>` to both (the host of the repo's URL), and to every `gh api` call below. The user copies the one-time code into the browser page that opens and approves. Then `gh auth setup-git`, so git uses the same sign-in, and check `gh auth status` again.
 
 ## 3. Git identity
 

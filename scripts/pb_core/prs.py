@@ -4,6 +4,7 @@ import subprocess
 
 from .context import modules_for_paths
 from .errors import PbError, UsageError
+from .repo import gh_command
 
 PAGE = 100
 MAX_FILE_PAGES = 30
@@ -13,7 +14,7 @@ MATCHED_FILES_SHOWN = 20
 
 def _gh(path):
     try:
-        proc = subprocess.run(["gh", "api", path], capture_output=True, text=True)
+        proc = subprocess.run(gh_command(["api", path]), capture_output=True, text=True)
     except FileNotFoundError:
         raise PbError("gh is not installed", {"error": "the GitHub CLI (gh) is not installed", "code": "gh-missing"})
     if proc.returncode != 0:

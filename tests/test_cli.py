@@ -15,7 +15,7 @@ class CliTest(unittest.TestCase):
                 if env is not None:
                     os.environ["PB_BRAIN"] = env
         self.assertEqual(code, 0)
-        self.assertEqual(data["version"], "0.9.2")
+        self.assertEqual(data["version"], "0.10.0")
         self.assertEqual(data["format"], 2)
         self.assertIsNone(data["brain"])
 

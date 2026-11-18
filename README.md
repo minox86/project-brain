@@ -152,9 +152,10 @@ Once per product.
 
 Once the brain and the routine are set up, these happen without anyone running a command:
 
-- 🔄 **Teams, Confluence and Jira flow in on schedule.** The routine keeps only what is worth remembering (decisions, requirement clarifications, domain explanations, open questions). It never copies messages verbatim and writes a digest of what it added and skipped.
+- 🔄 **Teams, Confluence and Jira flow in on schedule.** The routine keeps only what is worth remembering (decisions, requirement clarifications, domain explanations, open questions). Messages are ingested at the first run after they are written, and a thread that goes on updates the pages it fed. It never copies messages verbatim and writes a digest of what it added and skipped.
+- 🎚️ **Every source has a switch.** `/pb:routine-setup off jira` (or `github`, `teams`, `confluence`, `meetings`, `questions`, or a single channel) stops reading it from the next run, without touching its configuration; `on` resumes from where it stopped.
 - 🎙️ **Recurring meetings are captured.** After each refinement or design review, the routine reads the transcript and keeps the decisions and open questions. The transcript itself is never stored.
-- ❓ **Open questions go to the team, and the answers come back** (optional). Give the routine a Teams workflow webhook (`/pb:routine-setup questions`) and each new open question is posted once to a channel, as a card with what it blocks, what is known and who can answer (Tech, Product, Analyst or UX, with the people of that role tagged when you list them). People answer by replying to it; the next run writes the answer in the brain as a decision or a fact, deletes the question and sends the change to its reviewers. The webhook is a secret: it lives in the routine's environment, never in the repo.
+- ❓ **Open questions go to the team, and the answers come back** (optional). Give the routine a Teams workflow webhook (`/pb:routine-setup questions`) and each new open question is posted once to a channel, as a card with what it blocks, what is known and who can answer (Tech, Product, Analyst or UX, with the people of that role tagged when you list them). The cards are written in the team's main language, asked at init (English by default; the brain itself is always in English). People answer by replying to it; the next run writes the answer in the brain as a decision or a fact, deletes the question and sends the change to its reviewers. The webhook is a secret: it lives in the routine's environment, never in the repo.
 - 🎯 **Jira keys lead to features.** Discussions that mention a Jira key reach the feature that carries it. Scope and status of the work stay in Jira.
 - 🤖 **Every Claude session in the repo knows the brain**, even without the plugin. `CLAUDE.md` points to `brain/AGENTS.md`. Claude then:
   - uses the glossary terms;
@@ -187,6 +188,7 @@ Once the brain and the routine are set up, these happen without anyone running a
 | Clean up the brain and settle what is open: tell it your competence (functional, technical or both) and answer one question at a time, in your language | `/pb:review` (or a feature, a process, a Jira key; `--check` to preview, `--full` to redo the automatic pass, `--auto` for the automatic pass alone, on `docs/brain`) |
 | Run the routine now | `/pb:routine-run` (`--local` to run it here, `--check` to preview, `status` for the last run, `review` for the weekly review) |
 | Set up or change the routines | `/pb:routine-setup` (`show`, `schedule every 4 hours`, `review`, `review off`) |
+| Stop or resume reading a source | `/pb:routine-setup off jira` (or `github`, `teams`, one channel…), `/pb:routine-setup on jira`: it holds from the next run |
 | Bring the routine's changes to the default branch | `/pb:merge` |
 | Change the wiki structure | `/pb:schema` (`show`, `propose`, `apply P3`, or the change in plain words) |
 | Create the brain, or upgrade an older one | `/pb:init [product name]` |

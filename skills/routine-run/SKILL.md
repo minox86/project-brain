@@ -16,6 +16,8 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 
 - `review`: the weekly review routine instead of the ingestion one. With `review.trigger_id` in `sources.md` and a way to manage routines here, start that routine now and go on as **Cloud run** steps 2–3, reading `brain/.pb/digests/<today>-review.md` instead of the digest; `review status` is step 3 only. With `--local`, `--check`, no `review.trigger_id` or no way to manage routines: follow `/pb:review --auto` (with `--check` when given) as if the user typed it. Stop.
 - `--check`: follow `/pb:sync teams confluence github jira meetings questions --check` as if the user typed it and report what would be ingested. Nothing is written, no cursor moves. Stop.
+
+Every run, cloud or local, reads only the sources that are switched on: those listed in `disabled` of `sources.md` on `docs/brain` are skipped (`/pb:routine-setup off|on <source>` flips them).
 - `status`: show the latest runs of the cloud routine (below, step 3 only). Stop.
 - `--local`, or no `routine.trigger_id`, or no way to manage routines here: **local run**.
 - Otherwise: **cloud run**.

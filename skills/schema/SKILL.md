@@ -12,7 +12,7 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 
 ## show (default)
 
-Table of types from `brain/.pb/schema/types/*.md`: name, area, folder (and `area_folders`, the folder per area of a type that has them), fields (with enum values), required, budget, system. Then the thresholds and the commit settings (`commit_format`, `pr_title_brain`, `pr_title_init`, `commit_rules`) in `brain/.pb/schema/brain.md`, the review policy in `brain/.pb/schema/review.md` (watched points, confidence threshold, noise, reviewers per area; "not configured: no change is flagged for review" when the file is missing) and open proposals in `brain/.pb/schema/proposals.md`.
+Table of types from `brain/.pb/schema/types/*.md`: name, area, folder (and `area_folders`, the folder per area of a type that has them), fields (with enum values), required, budget, system. Then the thresholds, the team's language (`team_language`: the language of what the routine posts on Teams; the brain stays in English) and the commit settings (`commit_format`, `pr_title_brain`, `pr_title_init`, `commit_rules`) in `brain/.pb/schema/brain.md`, the review policy in `brain/.pb/schema/review.md` (watched points, confidence threshold, noise, reviewers per area; "not configured: no change is flagged for review" when the file is missing) and open proposals in `brain/.pb/schema/proposals.md`.
 
 ## propose
 

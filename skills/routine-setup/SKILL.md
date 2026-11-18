@@ -1,7 +1,7 @@
 ---
 name: routine-setup
-description: Configures the two routines of the project brain — the nightly one that feeds it from Microsoft Teams channels and recurring meetings, Confluence spaces, Jira epics and merged GitHub PRs, and the weekly review that keeps it clean — picks channels, spaces and projects, optionally sets up the posting of open questions to a Teams channel through a workflow webhook, writes the configuration and generates the cloud routine prompts. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion, its weekly review or its routines, or wants the brain's open questions asked on Teams (add, change or remove the Teams webhook).
-argument-hint: "[show | schedule <frequency> | review [<frequency> | off] | questions [off]]"
+description: Configures the two routines of the project brain — the nightly one that feeds it from Microsoft Teams channels and recurring meetings, Confluence spaces, Jira epics and merged GitHub PRs, and the weekly review that keeps it clean — picks channels, spaces and projects, optionally sets up the posting of open questions to a Teams channel through a workflow webhook, switches single sources off and on between runs, writes the configuration and generates the cloud routine prompts. Use when the user (typically the Engineering Manager) wants to set up, change or check the brain's periodic ingestion, its weekly review or its routines, wants to stop or resume reading a source (turn off Jira, the pull requests, Teams, one channel), or wants the brain's open questions asked on Teams (add, change or remove the Teams webhook).
+argument-hint: "[show | off <source…> | on <source…> | schedule <frequency> | review [<frequency> | off] | questions [off]]"
 ---
 
 # /pb:routine-setup — configure the nightly routine
@@ -18,7 +18,9 @@ Read `BASE/../../references/conventions.md` and `BASE/../../references/writing.m
 
 `questions [off]`: set up, change or remove only the posting of open questions on Teams, at any time after the routine exists — go to **6c. Questions on Teams**, then update `questions` in `brain/.pb/schema/sources.md` and the `## Routine` section of `brain/AGENTS.md`, update the cloud routine's prompt (step 8, update instead of create: older prompts do not name the `questions` source) and save (step 9). Stop there.
 
-`show`: print the current `routine`, `review`, `teams`, `meetings`, `confluence`, `jira`, `github`, `questions` configuration from `brain/.pb/schema/sources.md`, the cursors (`PB state get teams|meetings|confluence|jira|github`), when the review last ran (`PB state get review last`) what waits for a decision (`PB pending`: `waiting`) and, with `questions` set, `PB questions` (cards waiting for an answer, questions not posted yet, whether this clone has the webhook), then stop.
+`off <source…>` / `on <source…>`: stop or resume reading a source — go to **6d. The switch**. Stop there.
+
+`show`: print the current `routine`, `review`, `teams`, `meetings`, `confluence`, `jira`, `github`, `questions` configuration from `brain/.pb/schema/sources.md`, what is switched off (`disabled`, read from the branch the routine follows: `git fetch -q origin docs/brain`, `git show origin/docs/brain:brain/.pb/schema/sources.md`; the checkout's own with `PB sources` when that branch does not exist yet), the cursors (`PB state get teams|meetings|confluence|jira|github`), when the review last ran (`PB state get review last`) what waits for a decision (`PB pending`: `waiting`) and, with `questions` set, `PB questions` (cards waiting for an answer, questions not posted yet, whether this clone has the webhook), then stop.
 
 ## 1. Owner
 
@@ -67,7 +69,7 @@ Ask how often the routine should run, offering plain-language options and turnin
 | Once a week (Monday 06:00) | `0 6 * * 1` |
 | Custom | the user's cron |
 
-Routines run at most once an hour: the minute field must be a single number. `PB validate` rejects other schedules (`bad-schedule`). More frequent runs ingest sooner but cost more and often meet threads still being discussed, which are deferred anyway. For anything in between, `/pb:routine-run` starts a run on demand.
+Routines run at most once an hour: the minute field must be a single number. `PB validate` rejects other schedules (`bad-schedule`). More frequent runs ingest sooner but cost more. Every Teams message is ingested at the first run after it is written, with no waiting time: a thread that goes on is picked up again by the following runs, which update the pages it fed. For anything in between, `/pb:routine-run` starts a run on demand.
 
 ## 6b. Weekly review
 
@@ -87,12 +89,28 @@ Offer it; it can also be added later with `/pb:routine-setup questions`. The rou
    - **the cloud routine**: an environment variable `PB_QUESTIONS_WEBHOOK` in the environment the routine runs in (claude.ai/code, the routine's environment settings). When that environment restricts network access, the webhook's host (the host of the URL, e.g. `….logic.azure.com` or `….api.powerplatform.com`) must be among the allowed domains;
    - **this clone**, for `/pb:routine-run --local`, `/pb:sync` and the test below: `! git config --local pb.questionsWebhook '<url>'` — it stays in `.git/config`, which is never pushed. Optional: without it, only the scheduled routine posts.
    If the user pastes the URL in the chat anyway, do not repeat it and do not write it anywhere: give them the command to run themselves, and suggest creating the workflow again if the conversation is shared.
-4. **Settings**, each with its default: how many cards per run (`max_per_run`, 5: on the first run a brain with many open questions would flood the channel; the oldest go first, the rest follow run by run); only some areas (`areas`, default all); **who is tagged** (`people`): ask who covers each role — Tech, Product, Analyst, UX — and write their Teams sign-in addresses (`people: {tech: [name@company.com], product: [...], analyst: [...], ux: [...]}`; `{name: "…", email: …}` when the name to show differs from the address). A role left out is named on the card without tagging anyone; the people tagged must be members of the channel's team to be notified. Offer the candidates you can see (the `reviewers` of `brain/.pb/schema/review.md` are GitHub handles, not addresses: use them only to ask "is it the same people?"); another name for the environment variable (`webhook_env`), when the team's rules ask for one.
-5. **Test**, once `questions` is written (step 7) and when this clone has the webhook: `PB questions test` posts a sample card. `posted: true` → ask the user to check that it arrived in the right channel and that replying to it is allowed. An error → relay it: 4xx usually means a wrong or deleted workflow, "could not reach" a network that blocks the host. Without the webhook in this clone, say that the first scheduled run is the test: its digest lists the questions asked under "Questions", or the failure under "Problems".
+4. **Language.** The cards are written in the team's main language, `team_language` in `brain/.pb/schema/brain.md` (asked at `/pb:init`, default `en`; the brain itself stays in English). Say which one it is and, if the user wants another, change it there (a schema change: `/pb:schema`, or edit the setting and save it with step 9).
+5. **Settings**, each with its default: how many cards per run (`max_per_run`, 5: on the first run a brain with many open questions would flood the channel; the oldest go first, the rest follow run by run); only some areas (`areas`, default all); **who is tagged** (`people`): ask who covers each role — Tech, Product, Analyst, UX — and write their Teams sign-in addresses (`people: {tech: [name@company.com], product: [...], analyst: [...], ux: [...]}`; `{name: "…", email: …}` when the name to show differs from the address). A role left out is named on the card without tagging anyone; the people tagged must be members of the channel's team to be notified. Offer the candidates you can see (the `reviewers` of `brain/.pb/schema/review.md` are GitHub handles, not addresses: use them only to ask "is it the same people?"); another name for the environment variable (`webhook_env`), when the team's rules ask for one.
+6. **Test**, once `questions` is written (step 7) and when this clone has the webhook: `PB questions test` posts a sample card. `posted: true` → ask the user to check that it arrived in the right channel and that replying to it is allowed (the sample card is in English whatever the team's language). An error → relay it: 4xx usually means a wrong or deleted workflow, "could not reach" a network that blocks the host. Without the webhook in this clone, say that the first scheduled run is the test: its digest lists the questions asked under "Questions", or the failure under "Problems".
 
 `questions off`: set `questions: null`. Nothing is posted and no reply is read any more; the cards already posted stay in Teams. Tell the user to delete the workflow in Teams and remove the variable from the routine's environment (and `git config --local --unset pb.questionsWebhook`).
 
 Changing the webhook later (a new workflow, a new channel): the same steps; only the variable changes, and `questions` in `sources.md` when the channel does.
+
+## 6d. The switch: turn a source off or on
+
+Every source can be switched off without losing its configuration: `disabled` in `sources.md` lists what the routine does not read for now. A whole source — `teams`, `confluence`, `github` (the merged pull requests), `jira`, `meetings`, `questions` — or one entry of it, by its `id`: `teams/<id>` (one channel), `confluence/<id>`, `jira/<id>`, `meetings/<id>`. What is off keeps its cursor: switched on again, it is read from where it stopped, so nothing written meanwhile is lost (after a long pause the first run has more to read).
+
+The routine reads its configuration from `docs/brain`, so the switch is flipped **there**, not in the user's checkout: it holds from the very next run, scheduled or started with `/pb:routine-run`, with no PR to merge first. A run already in progress finishes with what it read at its start.
+
+1. Turn the user's words into names: "the PRs", "GitHub" → `github`; "Teams" → `teams` (the channels; the questions asked on Teams are `questions`, ask which when unclear); "the dev channel" → `teams/<id>` (the ids are in `sources.md`). Nothing named: show `PB sources` and ask with `AskUserQuestion` (`multiSelect`) what to switch.
+2. `PB routine start --branch docs/brain --worktree <tmp dir outside the repo>`; from here run every `PB` command as `PB --brain <brain from the result> …`.
+3. `PB sources off <name…>` or `PB sources on <name…>`: it rewrites only the `disabled` line and returns `active`, `off`, `unconfigured`. An unknown name is refused with the valid ones. Update the `## Routine` section of that brain's `AGENTS.md`: mark what is off as "(switched off)".
+4. `PB validate`, then `PB --brain <brain> routine finish --branch docs/brain --skill routine-setup -m "switch <off|on> <names>"`. `"conflict": true` (a run pushed meanwhile): `PB routine cleanup`, then start again from step 2, once. `rejected`: as the closing flow of `writing.md` says.
+5. `PB routine cleanup --worktree <tmp dir>`, always.
+6. Report in two lines: what is read now and what is off, and that it holds from the next run (`/pb:routine-run` to run now). The change travels to the default branch with the Brain updates PR, flagged for its reviewers like every schema change: `/pb:merge` lands it.
+
+The cloud routine's prompt and its connectors do not change: a connector whose sources are all off is simply not used.
 
 ## 7. Write the configuration
 
@@ -110,6 +128,7 @@ Edit the frontmatter of `brain/.pb/schema/sources.md`:
       - {id: <slug>, subject: "<series subject>", organizer: <organizer email>}
     github: {repo: <owner/name>}
     questions: {team: "<team name>", team_id: "<id>", channel: "<channel name>", channel_id: "<id>", max_per_run: 5, people: {tech: [<address>], product: [<address>]}}   # null when declined; `people` optional; never the webhook URL
+    disabled: []   # the switch (6d): sources or entries not read for now, e.g. [jira, teams/<id>]; never reset it here: write the list `docs/brain` has (as `show` reads it), minus the entries this setup removed
 
 Replace the `## Routine` section of `brain/AGENTS.md` with: owner role, schedule, the list of channels, recurring meetings, spaces and Jira projects, "digests in `brain/.pb/digests/`" and, with the weekly review, its schedule, "review reports in `brain/.pb/digests/<date>-review.md`" and "what waits for a decision is settled with `/pb:review`"; with questions on Teams, "open questions are asked in <team> / <channel>: answer by replying to the card".
 

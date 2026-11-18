@@ -9,6 +9,7 @@ from .repo import BRAIN_PR_TITLE
 DEFAULTS = {
     "product": None,
     "glossary_languages": ["en", "it"],
+    "team_language": "en",
     "archive_after_days": 90,
     "open_question_stale_days": 30,
     "digest_retention_days": 30,

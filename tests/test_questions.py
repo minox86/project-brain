@@ -209,6 +209,76 @@ class QuestionsTest(unittest.TestCase):
         self.assertEqual(data["forgotten"], ["Twice"])
         self.assertEqual(sorted(self.state()), ["Later"])
 
+    def italian(self, *pages, extra=""):
+        self.brain(*pages, extra=extra)
+        path = self.repo / "brain/.pb/schema/brain.md"
+        path.write_text(path.read_text().replace("team_language: en", "team_language: it"))
+
+    def translations(self, data):
+        path = os.path.join(self.tmp.name, "translations.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+        return path
+
+    def test_cards_are_in_english_by_default(self):
+        self.brain(page("open-question", "Twice", "area: functional"))
+        _, data, _ = self.cli("publish", "--check")
+        self.assertEqual(data["language"], "en")
+        self.assertNotIn("translate", data)
+
+    def test_another_team_language_asks_for_the_translation_and_posts_it(self):
+        self.italian(page("open-question", "Twice", "area: functional\naffects: [Approval]", QUESTION),
+                     page("feature", "Approval"))
+        _, data, _ = self.cli("publish", "--check")
+        self.assertEqual(data["language"], "it")
+        self.assertEqual(data["translate"]["questions"], {"Twice": {
+            "title": "Twice", "question": "Can an invoice be approved twice?",
+            "sections": [{"heading": "Why it matters", "text": "Blocks the approval rules."},
+                         {"heading": "Known so far", "text": "- Finance says no.\n- The code allows it."}]}})
+        self.assertEqual(data["translate"]["labels"]["open_question"], "OPEN QUESTION")
+        path = self.translations({
+            "labels": {"open_question": "DOMANDA APERTA", "functional": "FUNZIONALE", "affects": "Riguarda",
+                       "for": "Per", "colour": "ignored"},
+            "questions": {"Twice": {"title": "Due volte", "question": "Una fattura può essere approvata due volte?",
+                                    "sections": [{"heading": "Perché conta", "text": "Blocca le regole."}]}}})
+        code, data, err = self.cli("publish", "--translations", path)
+        self.assertEqual(code, 0, err)
+        self.assertEqual((data["published"], data["untranslated"]), (["Twice"], []))
+        self.assertEqual(texts(self.hook.received[0]), [
+            "DOMANDA APERTA · FUNZIONALE", "Due volte", "Una fattura può essere approvata due volte?",
+            "Perché conta", "Blocca le regole.", "Riguarda: Approval", "Per: **Product**, **Analyst**"])
+        # The brain keeps the English title; the state remembers what the card shows, to find it in the channel.
+        self.assertEqual(self.state()["Twice"]["shown"], "Due volte")
+        self.assertEqual(self.cli()[1]["posted"][0]["shown"], "Due volte")
+        self.assertTrue((self.repo / "brain/open-questions/Twice.md").is_file())
+
+    def test_a_question_without_translation_waits(self):
+        self.italian(page("open-question", "A", "area: ux\ncreated: 2026-11-01"),
+                     page("open-question", "B", "area: ux\ncreated: 2026-11-02"))
+        code, data, _ = self.cli("publish")
+        self.assertEqual((code, data["published"], data["untranslated"], data["left"]), (0, [], ["A", "B"], 2))
+        self.assertEqual(self.hook.received, [])
+        path = self.translations({"questions": {"B": {"title": "Bi"}}})
+        _, data, _ = self.cli("publish", "--translations", path)
+        self.assertEqual((data["published"], data["untranslated"], data["left"]), (["B"], ["A"], 1))
+        self.assertEqual(self.cli("publish", "--translations", self.translations({"questions": {"A": {}}}))[0], 2)
+
+    def test_team_language_is_validated(self):
+        self.italian()
+        self.assertEqual(run_cli("validate", cwd=self.repo)[1]["errors"], [])
+        path = self.repo / "brain/.pb/schema/brain.md"
+        path.write_text(path.read_text().replace("team_language: it", "team_language: the language of Dante"))
+        self.assertEqual([e["code"] for e in run_cli("validate", cwd=self.repo)[1]["errors"]], ["bad-team-language"])
+
+    def test_init_asks_the_team_language_and_the_brain_stays_english(self):
+        init = (ROOT / "skills/init/SKILL.md").read_text()
+        self.assertIn("`team_language`", init)
+        self.assertIn("Default **English** (`en`)", init)
+        self.assertIn("team_language: en", (ROOT / "presets/software-product/brain.md").read_text())
+        sync = (ROOT / "skills/sync/SKILL.md").read_text()
+        self.assertIn("PB questions publish --translations <file>", sync)
+        self.assertIn("never translated in the brain", sync)
+
     def test_test_card(self):
         self.brain()
         code, data, _ = self.cli("test")

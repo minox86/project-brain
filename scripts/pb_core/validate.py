@@ -4,7 +4,7 @@ import os
 import re
 from pathlib import Path
 
-from . import frontmatter, links, pending, policy, questions
+from . import frontmatter, links, pending, policy, questions, sources
 from .brain import DIGESTS, INDEX, RAW, SCHEMA, _as_list
 from .changes import changed_pages
 from .errors import FrontmatterError
@@ -113,6 +113,11 @@ def validate(brain, paths=None, base="HEAD"):
 
     for problem in questions.problems(brain):
         report(errors, f"{SCHEMA}/sources.md", "bad-questions", problem)
+    for problem in sources.problems(brain):
+        report(errors, f"{SCHEMA}/sources.md", "bad-disabled", problem)
+    problem = questions.language_problem(brain.config.get("team_language"))
+    if problem:
+        report(errors, f"{SCHEMA}/brain.md", "bad-team-language", problem)
     # Whatever the scope: the schema's settings are no place for a webhook URL or any other secret.
     for name in ("sources.md", "brain.md", "review.md"):
         path = brain.schema / name

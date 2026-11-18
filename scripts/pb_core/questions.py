@@ -1,6 +1,9 @@
 """Open questions on Teams: each one posted once as a card through a Teams workflow webhook, answered by replying
 to it. The toolkit posts and remembers what it posted; the routine reads the replies through its connector.
 
+The brain is written in English; the cards are posted in the team's language (`team_language` of brain.md). The
+toolkit does not translate: for another language the routine passes the translated texts of each card to `publish`.
+
 The webhook URL carries a secret: it is never read from the brain nor printed. It comes from the environment
 (`webhook_env`, default PB_QUESTIONS_WEBHOOK) or from the clone's own git config (`pb.questionsWebhook`).
 """
@@ -30,6 +33,66 @@ SECTION_CHARS = 700
 TIMEOUT = 20
 CITATION = re.compile(r"\s*\^\[[^\]]*\]")
 ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$")
+LANGUAGE = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$")
+# The fixed words of a card, in English; a translation may replace any of them.
+LABELS = {"open_question": "OPEN QUESTION", "affects": "Affects", "for": "For",
+          "functional": "FUNCTIONAL", "technical": "TECHNICAL", "ux": "UX"}
+
+
+def language(brain):
+    """The team's main language, as a code (`en`, `it`, `pt-BR`): the one the cards are posted in."""
+    value = brain.config.get("team_language")
+    return value.strip() if isinstance(value, str) and value.strip() else "en"
+
+
+def language_problem(value):
+    """Why `team_language` is unusable, or None."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not LANGUAGE.match(value.strip()):
+        return f"'{value}' is not a language code: use one like en, it, de, pt-BR"
+    return None
+
+
+def _english(brain):
+    return language(brain).lower().split("-")[0] == "en"
+
+
+def _translations(path):
+    """The translated texts the routine wrote for this run: {"labels": {...}, "questions": {title: {...}}}."""
+    if path is None:
+        return {}, {}
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError) as exc:
+        raise UsageError(f"--translations {path}: {exc}")
+    found = data.get("questions") if isinstance(data, dict) else None
+    labels = data.get("labels") if isinstance(data, dict) else None
+    if not isinstance(found, dict) or any(not _usable(entry) for entry in found.values()):
+        raise UsageError(f'--translations {path}: expected {{"labels": {{…}}, "questions": {{"<title>": {{"title": "…", '
+                         '"question": "…", "sections": [{"heading": "…", "text": "…"}]}}}}')
+    return found, {k: v for k, v in (labels if isinstance(labels, dict) else {}).items()
+                   if k in LABELS and isinstance(v, str) and v.strip()}
+
+
+def _usable(entry):
+    if not isinstance(entry, dict) or not isinstance(entry.get("title"), str) or not entry["title"].strip():
+        return False
+    parts = entry.get("sections", [])
+    return isinstance(entry.get("question", ""), str) and isinstance(parts, list) and all(
+        isinstance(part, dict) and isinstance(part.get("heading"), str) and isinstance(part.get("text"), str)
+        for part in parts)
+
+
+def texts(page, translated=None):
+    """What a card says: (title, question, [(heading, text)]) of the page, or of its translation."""
+    if translated:
+        return (translated["title"].strip(), (translated.get("question") or "").strip(),
+                [(part["heading"].strip(), part["text"].strip()) for part in translated.get("sections", [])
+                 if part["text"].strip()])
+    question, parts = sections(page)
+    return page.title, question, parts
 
 
 def config(brain):
@@ -118,16 +181,19 @@ def status(brain):
     return {
         "configured": True,
         "webhook": where,
+        "language": language(brain),
         "channel": {key: settings.get(key) for key in ("team", "team_id", "channel", "channel_id")},
         "posted": [{"title": title, "path": pages[title].rel if title in pages else None,
+                    "shown": entry.get("shown") or title,
                     "at": entry.get("at"), "message_id": entry.get("message_id"), "seen": entry.get("seen")}
                    for title, entry in sorted(posted.items(), key=lambda item: str(item[1].get("at")))],
         "unpublished": len([title for title in pages if title not in posted]),
     }
 
 
-def publish(brain, now=None, check=False):
-    """Post a card for each open question not posted yet, at most `max_per_run`, oldest first."""
+def publish(brain, now=None, check=False, translations=None):
+    """Post a card for each open question not posted yet, at most `max_per_run`, oldest first, in the team's
+    language: when it is not English, only the questions `translations` (a JSON file) carries are posted."""
     settings = config(brain)
     if settings is None:
         return {"configured": False, "published": [], "failed": [], "left": 0}, 0
@@ -138,12 +204,23 @@ def publish(brain, now=None, check=False):
     new = [p for p in _open(brain, settings) if p.title not in posted]
     batch = new[:settings.get("max_per_run", MAX_PER_RUN)]
     url, where = webhook(brain)
-    out = {"configured": True, "webhook": where, "published": [], "failed": [], "left": len(new) - len(batch),
-           "forgotten": forgotten}
+    out = {"configured": True, "webhook": where, "language": language(brain), "published": [], "failed": [],
+           "left": len(new) - len(batch), "forgotten": forgotten}
     if check:
         out["would_publish"] = [p.title for p in batch]
         out["left"] = len(new)
+        if not _english(brain):
+            # What the routine translates before posting: the texts of each card and its fixed words.
+            out["translate"] = {"labels": dict(LABELS), "questions": {
+                p.title: {"title": p.title, "question": texts(p)[1],
+                          "sections": [{"heading": name, "text": text} for name, text in texts(p)[2]]}
+                for p in batch}}
         return out, 0
+    translated, labels = _translations(translations)
+    if not _english(brain):
+        out["untranslated"] = [p.title for p in batch if p.title not in translated]
+        batch = [p for p in batch if p.title in translated]
+        out["left"] += len(out["untranslated"])
     if url is None:
         if forgotten:
             state.set_(brain, SOURCE, "posted", posted)
@@ -153,11 +230,14 @@ def publish(brain, now=None, check=False):
         return out, 0
     now = now or datetime.datetime.now(datetime.timezone.utc)
     for page in batch:
-        error = post(url, card(brain, page, settings))
+        error = post(url, card(brain, page, settings, translated.get(page.title), labels))
         if error:
             out["failed"].append({"title": page.title, "error": error})
             continue
         posted[page.title] = {"at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "message_id": None}
+        shown = texts(page, translated.get(page.title))[0]
+        if shown != page.title:
+            posted[page.title]["shown"] = shown  # the title the card shows, to find it in the channel
         out["published"].append(page.title)
     out["left"] += len(out["failed"])
     if out["published"] or forgotten:
@@ -290,25 +370,27 @@ def _message(body, mentions=()):
         {"contentType": "application/vnd.microsoft.card.adaptive", "contentUrl": None, "content": content}]}
 
 
-def card(brain, page, settings=None):
+def card(brain, page, settings=None, translated=None, labels=None):
     """The Teams message of one open question: an Adaptive Card that reads top-down as title, question, why it
     matters, what is known, who can answer (the roles of its area, and their people tagged when the settings list
-    them)."""
+    them). `translated` and `labels` are its texts and fixed words in the team's language."""
     settings = settings or {}
-    question, parts = sections(page)
-    area = str(page.get("area") or "").upper()
-    body = [_text(" · ".join(["OPEN QUESTION"] + ([area] if area else [])), size="Small", weight="Bolder",
+    words = dict(LABELS, **(labels or {}))
+    title, question, parts = texts(page, translated)
+    area = str(page.get("area") or "")
+    area = words.get(area, area.upper())
+    body = [_text(" · ".join([words["open_question"]] + ([area] if area else [])), size="Small", weight="Bolder",
                   color="Accent", spacing="None"),
-            _text(page.title, size="Large", weight="Bolder", spacing="Small")]
-    if question and question.rstrip("?. ").lower() != page.title.rstrip("?. ").lower():
+            _text(title, size="Large", weight="Bolder", spacing="Small")]
+    if question and question.rstrip("?. ").lower() != title.rstrip("?. ").lower():
         body.append(_text(_cut(question)))
     for name, text in parts:
         body += [_text(name, weight="Bolder", spacing="Medium"), _text(_cut(text), spacing="Small")]
     affects = [str(a) for a in (page.get("affects") or [])] if isinstance(page.get("affects"), list) else []
     if affects:
-        body.append(_text("Affects: " + ", ".join(affects), isSubtle=True, spacing="Medium"))
+        body.append(_text(f"{words['affects']}: " + ", ".join(affects), isSubtle=True, spacing="Medium"))
     roles, people = answerers(page, settings)
-    who = "For: **" + "**, **".join(roles) + "**"
+    who = f"{words['for']}: **" + "**, **".join(roles) + "**"
     if people:
         who += " · " + " ".join(f"<at>{name}</at>" for name, _ in people)
     body.append(_text(who, spacing="Medium", separator=True))

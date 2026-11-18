@@ -57,6 +57,7 @@ The decisions that define the schema, each with the decisions that hang off it:
   - Feature `capability` values: propose the functional areas found in the docs, the navigation of the frontend apps and the Confluence tree (e.g. "Invoicing", "Master data"), so the catalogue starts grouped.
 - **Product domain** (section D): the domain types the product needs, from the catalogue or designed for it.
 - Glossary languages (default `[en, it]`).
+- **Team language** (`team_language` in `brain.md`): the main language the team speaks and writes in, asked always, never assumed from the repo alone. Default **English** (`en`), first option and recommended unless the docs, the commit messages or the user's own language clearly point to another one, which is then offered as the second option (e.g. "Italian (`it`)"); any other through "Other". Say what it changes and what it does not: the routine writes to the team in this language — the open questions it posts on Teams — while the brain itself is always written in English. It can be changed later with `/pb:schema`.
 - Module map: which scan candidates are modules, their names, their `paths`, groupings.
 - Thresholds in `brain.md` (archive, stale open questions, digest retention, context pack cap, raw cap).
 - Review policy (`brain/.pb/schema/review.md`, the preset's template as the starting point): which changes need the area reviewers, asked on the PR that carries them (by CI on a code PR, by the routine on the brain PR).
@@ -102,13 +103,13 @@ Every commit pb makes and the titles of its PRs must pass the repo's commit rule
 
 ## 4. Confirm
 
-Show the final schema in one block in the chat: types table (area, folder, fields, budget; domain types marked as such), thresholds, glossary languages, review policy (watched points, confidence threshold, reviewers per area), module map, bootstrap scope, documentation to ingest (groups, files, words), GitHub changes (applied now or for an admin) and workflow edits. Then one `AskUserQuestion`: confirm / change something / stop. Do not write anything before it.
+Show the final schema in one block in the chat: types table (area, folder, fields, budget; domain types marked as such), thresholds, glossary languages, team language, review policy (watched points, confidence threshold, reviewers per area), module map, bootstrap scope, documentation to ingest (groups, files, words), GitHub changes (applied now or for an admin) and workflow edits. Then one `AskUserQuestion`: confirm / change something / stop. Do not write anything before it.
 
 ## 5. Scaffold and apply the schema
 
 1. Temporary worktree from the default branch, so the user's checkout is never touched: `git fetch -q origin`, then `git worktree add -q --detach <tmp> origin/<default>`. Run every following command and edit every file there.
 2. `PB scaffold --repo <tmp> --product "<name>"` (creates `brain/`, the `pb-validate` workflow, `brain/.gitattributes`, the CLAUDE.md pointer, the shared `.claude/settings.json` that enables the plugin for every clone, vendored toolkit). Report `skipped` workflows if any already existed, and check them against the templates.
-3. Apply the interview results by editing `<tmp>/brain/.pb/schema/brain.md` (with the commit settings of section C), `review.md` and `types/*.md`. In `review.md` set `watch`, `direct_min_confidence`, `noise_to_review` and `reviewers`; check each handle with `gh api users/<login>` or `gh api orgs/<org>/teams/<slug>`, and keep the prose in sync with the rules. For the types: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; copy the domain types chosen in section D from `BASE/../../presets/domain-types/<type>.md` and adapt them; add new type files in the same format.
+3. Apply the interview results by editing `<tmp>/brain/.pb/schema/brain.md` (with `team_language`, as a language code, and the commit settings of section C), `review.md` and `types/*.md`. In `review.md` set `watch`, `direct_min_confidence`, `noise_to_review` and `reviewers`; check each handle with `gh api users/<login>` or `gh api orgs/<org>/teams/<slug>`, and keep the prose in sync with the rules. For the types: add/remove fields and enum values, set budgets, rewrite prose so it says when to create, when not to, body structure and budget. Delete dropped non-system type files; copy the domain types chosen in section D from `BASE/../../presets/domain-types/<type>.md` and adapt them; add new type files in the same format.
 4. `PB --brain <tmp>/brain validate` must pass on the empty brain.
 
 ## 6. Bootstrap content
@@ -158,7 +159,7 @@ Then explain the next steps, in a few lines:
 
 A brain of the current format whose vendored toolkit is older than the plugin gets the current `pb-validate` workflow, toolkit and `AGENTS.md` writing rule through an ordinary PR. Say in plain words what changes and ask to confirm. Before it, the open brain PR from `docs/brain` should be merged: say so if one is open. Then:
 
-1. Run sections G (GitHub) and C (commit rules).
+1. Run sections G (GitHub) and C (commit rules). When `brain/.pb/schema/brain.md` has no `team_language`, ask it as in section 2 (default English) and write it with the settings of section C.
 2. Temporary worktree from the default branch (as in section 5), `PB scaffold --repo <tmp> --upgrade` (rewrites `pb-validate`, writes `brain/.gitattributes`, deletes retired workflows, enables the plugin, refreshes the toolkit and the writing rule in `brain/AGENTS.md`; the result lists what it removed in `deleted`); write the settings of section C to `<tmp>/brain/.pb/schema/brain.md`. Commit with `PB --brain <tmp>/brain commit --skill init -m "upgrade the project brain" --allow-default --include .claude/settings.json .github/workflows/pb-validate.yml`, adding every path of `deleted`; then `PB --brain <tmp>/brain generate`, `PB --brain <tmp>/brain commit --skill generate -m "refresh generated files" --allow-default`, and steps 2–4 of section 7 (branch `pb/init`, a title that satisfies the PR rules found in section C, e.g. the prefix of `pr_title_init` followed by "upgrade the project brain").
 3. Tell the user to run `/pb:routine-setup` again once the PR is merged: it updates the routine's prompt.
 

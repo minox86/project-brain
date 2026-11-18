@@ -16,7 +16,7 @@ from .lint import lint
 from .links import normalise
 from .messages import commit_message, compose, pr_title
 from .stats import stats
-from . import gitops, merge, pending, questions, state
+from . import gitops, merge, pending, questions, sources, state
 from . import repo as repo_
 from .repo import repo_root
 from .scaffold import scaffold, sync_toolkit, upgrade
@@ -156,7 +156,7 @@ def _cmd_pending(args):
 def _cmd_questions(args):
     brain = _brain(args)
     if args.action == "publish":
-        return questions.publish(brain, check=args.check)
+        return questions.publish(brain, check=args.check, translations=args.translations)
     if args.action == "test":
         return questions.test(brain)
     if args.action == "mark":
@@ -164,6 +164,13 @@ def _cmd_questions(args):
             raise UsageError('usage: pb questions mark "<title>" [--message ID] [--seen ISO]')
         return {"marked": questions.mark(brain, args.title, args.message, args.seen)}, 0
     return questions.status(brain), 0
+
+
+def _cmd_sources(args):
+    brain = _brain(args)
+    if args.action in ("on", "off"):
+        return sources.switch(brain, args.names, on=args.action == "on"), 0
+    return sources.status(brain), 0
 
 
 def _cmd_state(args):
@@ -320,7 +327,12 @@ def build_parser():
     p.add_argument("--message", metavar="ID", help="mark: the id of its Teams message")
     p.add_argument("--seen", metavar="ISO", help="mark: the time of the last reply read")
     p.add_argument("--check", action="store_true", help="publish: post nothing, say what would be posted")
+    p.add_argument("--translations", metavar="FILE", help="publish: the cards' texts in the team's language (JSON)")
     p.set_defaults(handler=_cmd_questions)
+    p = sub.add_parser("sources", help="the sources a sync reads, and the switch that turns one off or on")
+    p.add_argument("action", nargs="?", default="status", choices=["status", "off", "on"])
+    p.add_argument("names", nargs="*", help="off/on: a source (jira) or one of its entries (teams/<id>)")
+    p.set_defaults(handler=_cmd_sources)
     p = sub.add_parser("state")
     p.add_argument("action", choices=["get", "set", "suppress"])
     p.add_argument("source")

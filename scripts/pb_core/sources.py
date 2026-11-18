@@ -99,8 +99,11 @@ def _write(brain, switches):
     while i < len(lines):
         if DISABLED_LINE.match(lines[i]):
             i += 1
-            while i < len(lines) and lines[i].strip() and (lines[i][0] in " \t-"):
-                i += 1  # the items of a block list
+            # The whole previous value, as the parser reads it: the items of a block list, blank lines among them.
+            while i < len(lines) and (not lines[i].strip() or lines[i][0] in " \t" or frontmatter._is_item(lines[i])):
+                i += 1
+            while not lines[i - 1].strip():
+                i -= 1  # blank lines after the last item belong to what follows
             continue
         kept.append(lines[i])
         i += 1

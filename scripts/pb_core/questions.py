@@ -15,7 +15,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import links, state
+from . import links, sources, state
 from .brain import SCHEMA, _without_heading
 from .errors import UsageError
 from .repo import git
@@ -101,6 +101,11 @@ def config(brain):
     return value if isinstance(value, dict) and value else None
 
 
+def switched_off(brain):
+    """True when `questions` is listed in `disabled` of sources.md: configured, but nothing is posted or read."""
+    return SOURCE in sources.status(brain)["off"]
+
+
 def problems(brain):
     """Why the `questions` settings are unusable, one message each."""
     value = (brain.sources or {}).get(SOURCE)
@@ -180,6 +185,7 @@ def status(brain):
     pages = {p.title: p for p in _open(brain, settings)}
     return {
         "configured": True,
+        "off": switched_off(brain),
         "webhook": where,
         "language": language(brain),
         "channel": {key: settings.get(key) for key in ("team", "team_id", "channel", "channel_id")},
@@ -197,6 +203,10 @@ def publish(brain, now=None, check=False, translations=None):
     settings = config(brain)
     if settings is None:
         return {"configured": False, "published": [], "failed": [], "left": 0}, 0
+    if switched_off(brain):
+        # The switch wins over the configuration: no card leaves, and the record of the posted ones is not touched.
+        return {"configured": True, "off": True, "published": [], "failed": [], "left": 0,
+                "skipped": "questions is switched off (`disabled` in sources.md): `pb sources on questions`"}, 0
     found = problems(brain)
     if found:
         raise UsageError(f"{SCHEMA}/sources.md: " + "; ".join(found))
@@ -204,7 +214,8 @@ def publish(brain, now=None, check=False, translations=None):
     new = [p for p in _open(brain, settings) if p.title not in posted]
     batch = new[:settings.get("max_per_run", MAX_PER_RUN)]
     url, where = webhook(brain)
-    out = {"configured": True, "webhook": where, "language": language(brain), "published": [], "failed": [],
+    out = {"configured": True, "off": False, "webhook": where, "language": language(brain), "published": [],
+           "failed": [],
            "left": len(new) - len(batch), "forgotten": forgotten}
     if check:
         out["would_publish"] = [p.title for p in batch]

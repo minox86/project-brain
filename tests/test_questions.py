@@ -279,6 +279,21 @@ class QuestionsTest(unittest.TestCase):
         self.assertIn("PB questions publish --translations <file>", sync)
         self.assertIn("never translated in the brain", sync)
 
+    def test_switched_off_nothing_is_posted_until_it_is_switched_on_again(self):
+        self.brain(page("open-question", "Twice", "area: functional"), extra="}\ndisabled: [questions")
+        path = self.repo / "brain/.pb/schema/sources.md"
+        path.write_text(path.read_text().replace("[questions}", "[questions]"))
+        for args in (("publish",), ("publish", "--check")):
+            code, data, err = self.cli(*args)
+            self.assertEqual((code, data["off"], data["published"]), (0, True, []), err)
+            self.assertIn("switched off", data["skipped"])
+        self.assertEqual((self.hook.received, self.state()), ([], {}))
+        self.assertTrue(self.cli()[1]["off"])
+        self.assertEqual(run_cli("sources", "on", "questions", cwd=self.repo)[0], 0)
+        code, data, _ = self.cli("publish")
+        self.assertEqual((data["off"], data["published"]), (False, ["Twice"]))
+        self.assertEqual(len(self.hook.received), 1)
+
     def test_test_card(self):
         self.brain()
         code, data, _ = self.cli("test")

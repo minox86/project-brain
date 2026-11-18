@@ -2,6 +2,7 @@
 product: null
 glossary_languages: [en, it]
 team_language: en
+thread_watch_days: 14
 archive_after_days: 90
 open_question_stale_days: 30
 digest_retention_days: 30
@@ -17,6 +18,7 @@ commit_rules: null
 - `product`: name of the product this brain describes.
 - `glossary_languages`: languages of the glossary; `concept` pages carry `term_<lang>` for each.
 - `team_language`: the team's main language, as a code (`en`, `it`, `de`, `pt-BR`…): the language the routine uses when it writes to the team, i.e. the open questions it posts on Teams. Default `en`. The brain itself is always written in English, whatever this says.
+- `thread_watch_days`: how long the routine keeps checking a Teams thread it already read for new replies, counted from the thread's last message. Each watched thread costs one request per run; a reply to a thread silent for longer is still picked up when the channel lists that thread among the recently active ones.
 - `archive_after_days`: superseded decisions and closed open questions not updated for this long are left out of their folder's `README.md`.
 - `open_question_stale_days`: open questions not updated for this long are flagged by `pb lint`.
 - `digest_retention_days`: routine digests older than this are deleted by `pb generate` (history stays in git).

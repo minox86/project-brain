@@ -21,6 +21,16 @@ Prose that stays.
 """
 
 
+class TeamsThreadStateTest(unittest.TestCase):
+    def test_channel_state_keeps_cursor_and_watched_threads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_brain(tmp)
+            value = '{"cursor": "2026-11-18T09:00:00Z", "threads": {"1700000000001": "2026-11-17T16:30:00Z"}}'
+            self.assertEqual(run_cli("state", "set", "teams", "dev", value, cwd=repo)[0], 0)
+            data = run_cli("state", "get", "teams", "dev", cwd=repo)[1]
+            self.assertEqual(data["value"]["threads"], {"1700000000001": "2026-11-17T16:30:00Z"})
+
+
 class SourcesSwitchTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -74,6 +84,25 @@ class SourcesSwitchTest(unittest.TestCase):
         self.assertIn("disabled: [teams/dev]\n---\n", self.text())
         self.assertNotIn("  - jira", self.text())
 
+    def test_a_block_list_with_blank_lines_is_removed_whole(self):
+        self.brain("disabled:\n  - jira\n\n  - teams/dev\n\n- github\n\n")
+        self.assertEqual(self.cli()[1]["disabled"], ["jira", "teams/dev", "github"])
+        code, data, err = self.cli("on", "jira")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.text().count("disabled:"), 1)
+        self.assertIn("questions: null\ndisabled: [teams/dev, github]\n---\n", self.text())
+        self.assertEqual(self.cli()[1]["disabled"], ["teams/dev", "github"])  # it loads again, nothing left behind
+        self.assertEqual(run_cli("validate", cwd=self.repo)[1]["errors"], [])
+
+    def test_a_switch_in_the_middle_keeps_the_keys_around_it(self):
+        self.repo = make_brain(tempfile.mkdtemp(dir=self.tmp.name), {".pb/schema/sources.md": (
+            "---\ndisabled:\n  - jira\n\n  - github\n\njira:\n  - {id: fin, project: FIN}\n"
+            "github: {repo: acme/mono}\n---\n# Sources\n")})
+        _, data, _ = self.cli("on", "github")
+        self.assertEqual((data["active"], data["off"]), (["github"], ["jira"]))
+        self.assertEqual(self.text(), "---\n\njira:\n  - {id: fin, project: FIN}\ngithub: {repo: acme/mono}\n"
+                                      "disabled: [jira]\n---\n# Sources\n")
+
     def test_unknown_names_are_refused(self):
         self.brain()
         for name in ("slack", "teams/nope", "github/x"):
@@ -102,6 +131,15 @@ class SourcesSwitchTest(unittest.TestCase):
         # Teams messages are ingested at the first run that sees them: only a meeting without transcript waits.
         self.assertIn("A Teams thread is never deferred", reader)
         self.assertIn("with no waiting time", sync)
+        # Replies never come with the roots: the reader asks for them, also on threads older than the cursor,
+        # and the state keeps the last-read point of each watched thread.
+        for part in ("parentMessageId: <root id>", "created before the cursor", "its last-read point",
+                     "Check the watched threads the walk did not reach", "THREADS <root message id=last-read point"):
+            self.assertIn(part, reader)
+        for part in ('"threads": {"<root message id>": "<ISO datetime>"}', "the reader's `THREADS`",
+                     "`thread_watch_days`"):
+            self.assertIn(part, sync)
+        self.assertIn("thread_watch_days: 14", (ROOT / "presets/software-product/brain.md").read_text())
         for text in (sync, reader, setup):
             self.assertNotIn("less than 24 hours old", text)
             self.assertNotIn("active threads", text)

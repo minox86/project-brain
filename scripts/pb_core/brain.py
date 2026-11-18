@@ -10,6 +10,7 @@ DEFAULTS = {
     "product": None,
     "glossary_languages": ["en", "it"],
     "team_language": "en",
+    "thread_watch_days": 14,
     "archive_after_days": 90,
     "open_question_stale_days": 30,
     "digest_retention_days": 30,

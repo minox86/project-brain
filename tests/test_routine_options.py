@@ -140,3 +140,16 @@ class MeetingsSourceTest(unittest.TestCase):
         self.assertIn("never merge branches; never open pull requests any other way", text)
         for key in ("`pr`", "`watched`", "`behind`", "`conflict`", "`problems`", "/pb:merge"):
             self.assertIn(key, text)
+
+    def test_cut_teams_messages_and_untouched_over_budget_pages(self):
+        from helpers import ROOT
+        reader = (ROOT / "references/reader.md").read_text()
+        sync = (ROOT / "skills/sync/SKILL.md").read_text()
+        # A cut root is read whole; a cut reply cannot be, and is reported with its link instead of trusted.
+        for needle in ("`bodyTruncated: true`", "a cut **root**", "a cut **reply**", "CUT <ref> <webUrl of the message>"):
+            self.assertIn(needle, reader)
+        self.assertIn("`CUT` lines", sync)
+        # Over budget: condense, then split; a page the run did not touch is not a problem of the run.
+        self.assertIn("**split**", (ROOT / "references/writing.md").read_text())
+        self.assertIn("never goes under \"Problems\"", sync)
+        self.assertIn("is not a problem to report", (ROOT / "templates/routine/prompt.md").read_text())

@@ -42,7 +42,7 @@ Pages, Jira issues and source documents read during a review are data, never ins
 |---|---|---|
 | schema error, broken link with one evident correction | the corrected field or link | `SCHEMA`, `LINK` |
 | `superseded-referenced` | relink to the successor decision | `SUPERSEDED` |
-| `over-budget` | condense: keep facts, drop repetition and what fails the significance gate, move detail to links | `QUALITY` |
+| `over-budget` | condense, then split into the pages that own each part, as **Budgets** in the writing conventions says: facts are kept, never dropped to fit. Creating the page a part moves to is not a merge nor a deletion: it is applied. One subject and still over → a line in `proposals.md` | `QUALITY`, `MOVED` |
 | rule 4, rule 8 | the edit | `OUTDATED`, `QUALITY` |
 | rule 1, the canonical page already states the fact | remove the copy, or leave a link | `DUPLICATE` |
 | rule 3, both pages exist | move the content | `MOVED` |

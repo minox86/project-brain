@@ -9,6 +9,9 @@ You are a **reader** for the project brain (`pb`). You read raw content from one
 
 ## How to read
 
+- **A Teams message that comes cut**: `teams_list_channel_messages` returns a `bodyPreview` of at most 1000 characters, HTML tags included, and says `bodyTruncated: true` when the message is longer. This holds for channels and for question threads, and no thread is judged on a cut message you could have read:
+  - a cut **root**: read it whole with `read_resource` on the `uri` the listing gives, always, before you judge its thread;
+  - a cut **reply**: the connector cannot return it whole (a reply has no `uri`, and `read_resource` on an address built from its id answers not found, or returns the root): do not try. Work from the visible part, prefix with `?` every finding that may depend on the missing end, never report a `[decision]` or an `[answer]` that rests on it, and return a `CUT` line for it.
 - **Teams channel**: every message written after the last run, replies included, whenever its thread started. `teams_list_channel_messages` without `parentMessageId` returns only the **roots** (top-level messages), ordered by the last activity of their conversation, most recent first; replies come only from a call with `parentMessageId: <root id>`. A reply to an old root is therefore never in the listing: you find it by asking for the replies of that root. Three steps:
   1. **Walk the roots**, page by page, in the order given. For each root (skip system events, `messageType` other than `message`):
      - created after the cursor → a new thread: fetch its replies and read it whole;
@@ -58,6 +61,7 @@ Return only this, as plain text:
     ITEM <ref> knowledge                               (`knowledge (continued)` for a thread read before)
       <findings, one per line>
     ITEM <ref> signal: <one line>
+    CUT <ref> <webUrl of the message>: <what its visible part is about>   (Teams only: a message not read whole)
     ITEM <ref> ignore
     ITEM <ref> deferred: <reason>
     ITEM <ref> skipped: <reason>

@@ -294,6 +294,72 @@ class QuestionsTest(unittest.TestCase):
         self.assertEqual((data["off"], data["published"]), (False, ["Twice"]))
         self.assertEqual(len(self.hook.received), 1)
 
+    def test_summary_lists_the_open_questions_each_linked_to_its_card(self):
+        self.brain(page("open-question", "Older [v2]", "area: technical\ncreated: 2026-10-01"),
+                   page("open-question", "Twice", "area: functional\ncreated: 2026-11-01"),
+                   page("open-question", "Newest", "area: ux\ncreated: 2026-11-02"),
+                   extra=', tenant_id: "ten-1"')
+        code, data, _ = self.cli("summary")
+        self.assertEqual((code, data["posted"], data["listed"]), (0, False, []))
+        self.assertIn("no posted question", data["skipped"])
+        self.cli("publish")
+        self.cli("mark", "Older [v2]", "--message", "1700000000001")
+        self.cli("mark", "Twice", "--message", "1700000000002", "--url", "https://teams.microsoft.com/l/message/x/2")
+        self.assertEqual(self.cli("mark", "Twice", "--url", "ftp://nowhere")[0], 2)
+        code, data, _ = self.cli("summary", "--check")
+        self.assertEqual((code, data["posted"], len(self.hook.received)), (0, False, 3))
+        code, data, err = self.cli("summary")
+        self.assertEqual(code, 0, err)
+        self.assertEqual((data["posted"], data["listed"], data["unlinked"]),
+                         (True, ["Older [v2]", "Twice", "Newest"], ["Newest"]))
+        # One card, after the questions' own, with nothing but the list.
+        self.assertEqual(len(self.hook.received), 4)
+        built = ("https://teams.microsoft.com/l/message/19%3Aabc%40thread.tacv2/1700000000001?groupId=t-1"
+                 "&tenantId=ten-1&parentMessageId=1700000000001&createdTime=1700000000001")
+        self.assertEqual(texts(self.hook.received[-1]), ["STILL OPEN · 3", "\n".join([
+            f"- [Older \\[v2\\]]({built})", "- [Twice](https://teams.microsoft.com/l/message/x/2)", "- Newest"])])
+        self.assertEqual({q["title"]: q["url"] for q in self.cli()[1]["posted"]}["Older [v2]"], built)
+        # An answered question leaves the list; the list is not remembered as a question.
+        (self.repo / "brain/open-questions/Twice.md").unlink()
+        self.assertEqual(self.cli("summary")[1]["listed"], ["Older [v2]", "Newest"])
+        self.assertEqual(sorted(self.state()), ["Newest", "Older [v2]", "Twice"])
+
+    def test_summary_shows_the_translated_titles_and_label(self):
+        self.italian(page("open-question", "Twice", "area: functional"))
+        path = self.translations({"labels": {"still_open": "ANCORA APERTE"},
+                                  "questions": {"Twice": {"title": "Due volte"}}})
+        self.cli("publish", "--translations", path)
+        self.cli("mark", "Twice", "--url", "https://teams.microsoft.com/l/message/x/1")
+        self.assertEqual(self.cli("publish", "--check")[1]["translate"]["labels"]["still_open"], "STILL OPEN")
+        code, data, err = self.cli("summary", "--translations", self.translations({"labels": {"still_open": "ANCORA APERTE"}}))
+        self.assertEqual((code, data["posted"]), (0, True), err)
+        self.assertEqual(texts(self.hook.received[-1]),
+                         ["ANCORA APERTE · 1", "- [Due volte](https://teams.microsoft.com/l/message/x/1)"])
+
+    def test_summary_is_not_posted_switched_off_or_without_a_webhook_and_reports_a_refusal(self):
+        self.brain(page("open-question", "Twice", "area: functional"))
+        self.cli("publish")
+        with mock.patch.dict(os.environ, {"PB_QUESTIONS_WEBHOOK": ""}):
+            code, data, _ = self.cli("summary")
+            self.assertEqual((code, data["posted"]), (0, False))
+            self.assertIn("no webhook", data["skipped"])
+        refusing = Webhook(status=400)
+        self.addCleanup(refusing.close)
+        with mock.patch.dict(os.environ, {"PB_QUESTIONS_WEBHOOK": refusing.url}):
+            code, data, _ = self.cli("summary")
+        self.assertEqual((code, data["posted"]), (1, False))
+        self.assertNotIn("s3cr3tvalue", json.dumps(data))
+        run_cli("sources", "off", "questions", cwd=self.repo)
+        code, data, _ = self.cli("summary")
+        self.assertEqual((code, data["off"], data["posted"]), (0, True, False))
+        self.assertEqual(len(self.hook.received), 1)
+
+    def test_the_routine_posts_the_list_last(self):
+        sync = (ROOT / "skills/sync/SKILL.md").read_text()
+        self.assertIn("PB questions summary --translations <file>", sync)
+        self.assertLess(sync.index("`PB questions publish --translations <file>`"), sync.index("`PB questions summary`"))
+        self.assertIn("`$PB questions summary`", (ROOT / "templates/routine/prompt.md").read_text())
+
     def test_test_card(self):
         self.brain()
         code, data, _ = self.cli("test")

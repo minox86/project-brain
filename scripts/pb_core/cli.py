@@ -159,10 +159,12 @@ def _cmd_questions(args):
         return questions.publish(brain, check=args.check, translations=args.translations)
     if args.action == "test":
         return questions.test(brain)
+    if args.action == "summary":
+        return questions.summary(brain, check=args.check, translations=args.translations)
     if args.action == "mark":
-        if not args.title or not (args.message or args.seen):
-            raise UsageError('usage: pb questions mark "<title>" [--message ID] [--seen ISO]')
-        return {"marked": questions.mark(brain, args.title, args.message, args.seen)}, 0
+        if not args.title or not (args.message or args.seen or args.url):
+            raise UsageError('usage: pb questions mark "<title>" [--message ID] [--url URL] [--seen ISO]')
+        return {"marked": questions.mark(brain, args.title, args.message, args.seen, args.url)}, 0
     return questions.status(brain), 0
 
 
@@ -321,13 +323,15 @@ def build_parser():
     p.add_argument("--today")
     p.set_defaults(handler=_cmd_pending)
     p = sub.add_parser("questions", help="open questions on Teams: post the new ones through the workflow webhook, "
-                                         "list the posted ones waiting for an answer")
-    p.add_argument("action", nargs="?", default="status", choices=["status", "publish", "mark", "test"])
+                                         "list the posted ones waiting for an answer, post that list as one card")
+    p.add_argument("action", nargs="?", default="status", choices=["status", "publish", "summary", "mark", "test"])
     p.add_argument("title", nargs="?", help="mark: the title of the posted question")
     p.add_argument("--message", metavar="ID", help="mark: the id of its Teams message")
+    p.add_argument("--url", metavar="URL", help="mark: the address of its Teams message (its webUrl)")
     p.add_argument("--seen", metavar="ISO", help="mark: the time of the last reply read")
-    p.add_argument("--check", action="store_true", help="publish: post nothing, say what would be posted")
-    p.add_argument("--translations", metavar="FILE", help="publish: the cards' texts in the team's language (JSON)")
+    p.add_argument("--check", action="store_true", help="publish, summary: post nothing, say what would be posted")
+    p.add_argument("--translations", metavar="FILE",
+                   help="publish, summary: the cards' texts in the team's language (JSON)")
     p.set_defaults(handler=_cmd_questions)
     p = sub.add_parser("sources", help="the sources a sync reads, and the switch that turns one off or on")
     p.add_argument("action", nargs="?", default="status", choices=["status", "off", "on"])

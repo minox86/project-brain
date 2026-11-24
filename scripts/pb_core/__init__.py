@@ -1,3 +1,3 @@
 """Deterministic toolkit of the project-brain (pb) plugin."""
-__version__ = "0.10.1"
+__version__ = "0.11.0"
 FORMAT_VERSION = 2

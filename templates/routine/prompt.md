@@ -17,7 +17,7 @@ Steps:
 
 Constraints:
 - `gh pr …` commands do not work in this environment: use `gh api` REST calls only.
-- The webhook of the Teams workflow that posts the open questions, when the team set one up, is in this environment's variables: only `$PB questions publish` reads it. Never print it, never write it to a file, never look for it.
+- The webhook of the Teams workflow that posts the open questions, when the team set one up, is in this environment's variables: only `$PB questions publish` and `$PB questions summary` read it. Never print it, never write it to a file, never look for it.
 - The brain is written in English. Only the open questions posted on Teams are in the team's language (`team_language` in `brain/.pb/schema/brain.md`), as the sync instructions say.
 - If a connector (Microsoft 365, Atlassian) is unavailable, skip that source and report it in the digest; never invent content.
 - Finish with a three-line summary: ingested pages (with the PR link and the watched points), skipped/deferred counts, problems (with the `behind` notice when `behind` is above 0).

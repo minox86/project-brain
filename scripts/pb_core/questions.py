@@ -1,5 +1,6 @@
 """Open questions on Teams: each one posted once as a card through a Teams workflow webhook, answered by replying
-to it. The toolkit posts and remembers what it posted; the routine reads the replies through its connector.
+to it. The toolkit posts and remembers what it posted; the routine reads the replies through its connector. Each
+run ends with one more card: the list of the questions still waiting for an answer, each linked to its own card.
 
 The brain is written in English; the cards are posted in the team's language (`team_language` of brain.md). The
 toolkit does not translate: for another language the routine passes the translated texts of each card to `publish`.
@@ -25,7 +26,7 @@ WEBHOOK_ENV = "PB_QUESTIONS_WEBHOOK"
 GIT_KEY = "pb.questionsWebhook"
 MAX_PER_RUN = 5
 AREAS = ("functional", "ux", "technical")
-KEYS = {"team", "team_id", "channel", "channel_id", "max_per_run", "areas", "webhook_env", "people"}
+KEYS = {"team", "team_id", "channel", "channel_id", "tenant_id", "max_per_run", "areas", "webhook_env", "people"}
 # Who can answer a question, by its area; a question with no area asks everyone.
 ROLES = {"tech": "Tech", "product": "Product", "analyst": "Analyst", "ux": "UX"}
 ROLES_OF = {"technical": ("tech",), "functional": ("product", "analyst"), "ux": ("ux",)}
@@ -36,7 +37,8 @@ ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$")
 LANGUAGE = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$")
 # The fixed words of a card, in English; a translation may replace any of them.
 LABELS = {"open_question": "OPEN QUESTION", "affects": "Affects", "for": "For",
-          "functional": "FUNCTIONAL", "technical": "TECHNICAL", "ux": "UX"}
+          "functional": "FUNCTIONAL", "technical": "TECHNICAL", "ux": "UX", "still_open": "STILL OPEN"}
+MESSAGE_LINK = "https://teams.microsoft.com/l/message/"
 
 
 def language(brain):
@@ -67,7 +69,7 @@ def _translations(path):
             data = json.load(handle)
     except (OSError, ValueError) as exc:
         raise UsageError(f"--translations {path}: {exc}")
-    found = data.get("questions") if isinstance(data, dict) else None
+    found = data.get("questions", {}) if isinstance(data, dict) else None
     labels = data.get("labels") if isinstance(data, dict) else None
     if not isinstance(found, dict) or any(not _usable(entry) for entry in found.values()):
         raise UsageError(f'--translations {path}: expected {{"labels": {{…}}, "questions": {{"<title>": {{"title": "…", '
@@ -191,7 +193,8 @@ def status(brain):
         "channel": {key: settings.get(key) for key in ("team", "team_id", "channel", "channel_id")},
         "posted": [{"title": title, "path": pages[title].rel if title in pages else None,
                     "shown": entry.get("shown") or title,
-                    "at": entry.get("at"), "message_id": entry.get("message_id"), "seen": entry.get("seen")}
+                    "at": entry.get("at"), "message_id": entry.get("message_id"), "seen": entry.get("seen"),
+                    "url": link(settings, entry)}
                    for title, entry in sorted(posted.items(), key=lambda item: str(item[1].get("at")))],
         "unpublished": len([title for title in pages if title not in posted]),
     }
@@ -256,11 +259,81 @@ def publish(brain, now=None, check=False, translations=None):
     return out, 1 if out["failed"] else 0
 
 
-def mark(brain, title, message_id=None, seen=None):
-    """Record the Teams message of a posted question and how far its replies were read."""
+def link(settings, entry):
+    """The address that opens a posted card in Teams: the one the routine recorded for it (the message's `webUrl`),
+    or the one built from the channel and the message id. None until the card's message is found."""
+    if entry.get("url"):
+        return entry["url"]
+    message, channel = entry.get("message_id"), settings.get("channel_id")
+    if not message or not channel:
+        return None
+    query = {"groupId": settings.get("team_id"), "tenantId": settings.get("tenant_id"),
+             "parentMessageId": message, "createdTime": message}
+    return (f"{MESSAGE_LINK}{urllib.parse.quote(str(channel), safe='')}/{urllib.parse.quote(str(message), safe='')}?"
+            + urllib.parse.urlencode({key: value for key, value in query.items() if value}))
+
+
+def summary(brain, check=False, translations=None):
+    """Post one card listing the questions already posted and still open, oldest first, each title a link to its
+    card. Posted after the new cards of the run, so it is the last message of the channel."""
+    settings = config(brain)
+    if settings is None:
+        return {"configured": False, "posted": False, "listed": []}, 0
+    if switched_off(brain):
+        return {"configured": True, "off": True, "posted": False, "listed": [],
+                "skipped": "questions is switched off (`disabled` in sources.md): `pb sources on questions`"}, 0
+    found = problems(brain)
+    if found:
+        raise UsageError(f"{SCHEMA}/sources.md: " + "; ".join(found))
+    waiting, _ = _prune(brain, _posted(brain))
+    # Oldest card first; the cards of one run share their time, and go in the order they were posted: oldest question.
+    age = {p.title: str(p.get("created") or p.get("updated") or "9999") for p in brain.pages()
+           if p.type == "open-question"}
+    items = [(title, entry.get("shown") or title, link(settings, entry)) for title, entry in sorted(
+        waiting.items(), key=lambda item: (str(item[1].get("at")), age.get(item[0], "9999"), item[0].lower()))]
+    url, where = webhook(brain)
+    out = {"configured": True, "off": False, "webhook": where, "language": language(brain), "posted": False,
+           "listed": [title for title, _, _ in items],
+           "unlinked": [title for title, _, target in items if target is None]}
+    if not items:
+        out["skipped"] = "no posted question is waiting for an answer"
+    elif url is None:
+        out["skipped"] = (f"no webhook: set ${settings.get('webhook_env') or WEBHOOK_ENV} in the environment of the "
+                          f"run, or `git config --local {GIT_KEY} <url>` in this clone")
+    if check or "skipped" in out:
+        return out, 0
+    _, labels = _translations(translations)
+    error = post(url, summary_card([(shown, target) for _, shown, target in items], labels))
+    if error:
+        out["error"] = error
+        return out, 1
+    out["posted"] = True
+    return out, 0
+
+
+def summary_card(items, labels=None):
+    """The Teams message listing the open questions: `items` are (title shown, link to its card | None)."""
+    words = dict(LABELS, **(labels or {}))
+    lines = [f"- [{_label(shown)}]({target})" if target else f"- {shown}" for shown, target in items]
+    return _message([_text(f"{words['still_open']} · {len(items)}", size="Small", weight="Bolder", color="Accent",
+                           spacing="None"),
+                     _text("\n".join(lines), spacing="Small")])
+
+
+def _label(text):
+    """A title as the label of a Markdown link."""
+    return re.sub(r"([\[\]\\])", r"\\\1", text)
+
+
+def mark(brain, title, message_id=None, seen=None, url=None):
+    """Record the Teams message of a posted question, its address and how far its replies were read."""
     posted = _posted(brain)
     if title not in posted:
         raise UsageError(f"'{title}' was not posted: `pb questions` lists the posted questions")
+    if url:
+        if not re.match(r"https://\S+$", url):
+            raise UsageError("--url must be the https address of the card's message in Teams")
+        posted[title]["url"] = url
     if message_id:
         posted[title]["message_id"] = message_id
     if seen:
